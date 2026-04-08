@@ -1,0 +1,241 @@
+<template>
+  <div class="filter-section">
+    <a-tabs v-model:activeKey="activeTab" @change="handleTabChange">
+      <a-tab-pane key="users" :tab="userTabLabel" />
+      <a-tab-pane key="adAccounts" :tab="accountTabLabel" />
+    </a-tabs>
+
+    <!-- 用户筛选 - 使用通用筛选组件 -->
+    <div v-if="activeTab === 'users'" class="filter-content">
+      <generic-filter-section
+        :fields="userFilterFields"
+        :default-visible-keys="userDefaultVisibleKeys"
+        :storage-key="`ad-account-user-filters-${props.platform}`"
+        :show-modal="true"
+        i18n-prefix="pages.adAccount.filter"
+        @search="handleUserSearch"
+      />
+    </div>
+
+    <!-- 广告账户筛选 - 使用通用筛选组件 -->
+    <div v-else class="filter-content">
+      <generic-filter-section
+        :fields="adAccountFilterFields"
+        :default-visible-keys="adAccountDefaultVisibleKeys"
+        :storage-key="`ad-account-filters-${props.platform}`"
+        :show-modal="true"
+        i18n-prefix="pages.adAccount.filter"
+        @search="handleAdAccountSearch"
+      />
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
+import GenericFilterSection from '@/components/filter-section';
+import type { FilterFieldConfig, FilterValue } from '@/components/filter-section';
+import type { FilterTab, PlatformType } from '../types';
+
+const props = defineProps<{
+  platform?: PlatformType;
+  currentTab?: FilterTab;
+}>();
+
+const { t, locale } = useI18n();
+
+const activeTab = ref<FilterTab>(props.currentTab || 'adAccounts');
+
+// 平台配置
+const platformConfig: Record<PlatformType, { name: string; nameEn: string }> = {
+  meta: { name: 'Facebook', nameEn: 'Facebook' },
+  google: { name: 'Google', nameEn: 'Google' },
+  tiktok: { name: 'TikTok', nameEn: 'TikTok' },
+};
+
+// 判断是否为中文
+const isZh = computed(() => locale.value.startsWith('zh'));
+
+// 根据平台和语言获取标签文本
+const userTabLabel = computed(() => {
+  const platform = props.platform || 'meta';
+  const config = platformConfig[platform];
+  const platformName = isZh.value ? config.name : config.nameEn;
+  return isZh.value ? `${platformName}用户` : `${platformName} Users`;
+});
+
+const accountTabLabel = computed(() => {
+  const platform = props.platform || 'meta';
+  const config = platformConfig[platform];
+  const platformName = isZh.value ? config.name : config.nameEn;
+  return isZh.value ? `${platformName}广告账户` : `${platformName} Ad Accounts`;
+});
+
+// 根据平台获取个人号标签
+const getPersonalAccountLabel = () => {
+  const platform = props.platform || 'meta';
+  if (platform === 'meta') {
+    return isZh.value ? 'FB个人号' : 'FB Account';
+  } else if (platform === 'google') {
+    return isZh.value ? 'Google账号' : 'Google Account';
+  } else if (platform === 'tiktok') {
+    return isZh.value ? 'TikTok账号' : 'TikTok Account';
+  }
+};
+
+// 用户筛选字段配置
+const userFilterFields = computed<FilterFieldConfig[]>(() => [
+  {
+    key: 'autoBind',
+    label: t('pages.adAccount.filter.autoBind'),
+    type: 'select',
+    options: [
+      { label: isZh.value ? '是' : 'Yes', value: 'true' },
+      { label: isZh.value ? '否' : 'No', value: 'false' },
+    ],
+  },
+  {
+    key: 'personalAccount',
+    label: getPersonalAccountLabel(),
+    type: 'input',
+  },
+  {
+    key: 'authorizer',
+    label: t('pages.adAccount.table.authorizer'),
+    type: 'input',
+  },
+  {
+    key: 'authTimeRange',
+    label: t('pages.adAccount.filter.authTimeRange'),
+    type: 'date-range',
+  },
+  {
+    key: 'authStatus',
+    label: t('pages.adAccount.table.authStatus'),
+    type: 'select',
+    options: [
+      { label: t('pages.adAccount.authStatus.authorized'), value: 'authorized' },
+      { label: t('pages.adAccount.authStatus.unauthorized'), value: 'unauthorized' },
+      { label: t('pages.adAccount.authStatus.expired'), value: 'expired' },
+      { label: t('pages.adAccount.authStatus.failed'), value: 'failed' },
+    ],
+  },
+]);
+
+// 广告账户筛选字段配置
+const adAccountFilterFields = computed<FilterFieldConfig[]>(() => [
+  {
+    key: 'personalAccount',
+    label: getPersonalAccountLabel(),
+    type: 'input',
+  },
+  {
+    key: 'accountStatus',
+    label: isZh.value ? '账户状态' : 'Account Status',
+    type: 'select',
+    options: [
+      { label: isZh.value ? '活跃' : 'Active', value: 'active' },
+      { label: isZh.value ? '禁用' : 'Disabled', value: 'disabled' },
+      { label: isZh.value ? '未激活' : 'Unactivated', value: 'unactivated' },
+      { label: isZh.value ? '关闭' : 'Closed', value: 'closed' },
+    ],
+  },
+  {
+    key: 'authStatus',
+    label: t('pages.adAccount.table.authStatus'),
+    type: 'select',
+    options: [
+      { label: t('pages.adAccount.authStatus.authorized'), value: 'authorized' },
+      { label: t('pages.adAccount.authStatus.unauthorized'), value: 'unauthorized' },
+      { label: t('pages.adAccount.authStatus.expired'), value: 'expired' },
+      { label: t('pages.adAccount.authStatus.failed'), value: 'failed' },
+    ],
+  },
+  {
+    key: 'owner',
+    label: t('pages.adAccount.table.owner'),
+    type: 'input',
+  },
+  {
+    key: 'assistant',
+    label: t('pages.adAccount.table.assistants'),
+    type: 'input',
+  },
+  {
+    key: 'bm',
+    label: t('pages.adAccount.table.bm'),
+    type: 'input',
+  },
+  {
+    key: 'authTimeRange',
+    label: t('pages.adAccount.filter.authTimeRange'),
+    type: 'date-range',
+  },
+]);
+
+// 默认显示前2个字段
+const userDefaultVisibleKeys = computed(() => {
+  return userFilterFields.value.slice(0, 2).map(f => f.key);
+});
+
+const adAccountDefaultVisibleKeys = computed(() => {
+  return adAccountFilterFields.value.slice(0, 2).map(f => f.key);
+});
+
+const emit = defineEmits<{
+  (e: 'tabChange', tab: FilterTab): void;
+  (e: 'userFilterChange', filters: FilterValue): void;
+  (e: 'adAccountFilterChange', filters: FilterValue): void;
+}>();
+
+const handleTabChange = (key: string) => {
+  activeTab.value = key as FilterTab;
+  emit('tabChange', key as FilterTab);
+};
+
+const handleUserSearch = (filters: FilterValue) => {
+  // 转换 autoBind 的字符串值为布尔值
+  const processedFilters = { ...filters };
+  if (processedFilters.autoBind === 'true') {
+    processedFilters.autoBind = true;
+  } else if (processedFilters.autoBind === 'false') {
+    processedFilters.autoBind = false;
+  } else {
+    processedFilters.autoBind = undefined;
+  }
+  emit('userFilterChange', processedFilters);
+};
+
+const handleAdAccountSearch = (filters: FilterValue) => {
+  emit('adAccountFilterChange', filters);
+};
+
+// 监听外部 currentTab 变化
+watch(() => props.currentTab, (newTab) => {
+  if (newTab && newTab !== activeTab.value) {
+    activeTab.value = newTab;
+  }
+});
+
+defineExpose({
+  activeTab,
+});
+</script>
+
+<style scoped lang="less">
+.filter-section {
+  margin-bottom: 16px;
+
+  .filter-content {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+
+    .search-row {
+      display: flex;
+      align-items: center;
+    }
+  }
+}
+</style>

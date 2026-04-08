@@ -1,0 +1,236 @@
+<template>
+  <div class="template-table">
+    <a-table
+      :columns="columns"
+      :data-source="dataSource"
+      :loading="loading"
+      :pagination="pagination"
+      :row-selection="rowSelection"
+      row-key="id"
+      @change="handleTableChange"
+    >
+      <template #bodyCell="{ column, record }">
+        <!-- 渠道 -->
+        <template v-if="column.dataIndex === 'platform'">
+          <div class="platform-cell">
+            <component :is="getPlatformIcon(record.platform)" class="platform-icon" />
+            <span>{{ getPlatformLabel(record.platform) }}</span>
+          </div>
+        </template>
+
+        <!-- 模板名称 -->
+        <template v-else-if="column.dataIndex === 'name'">
+          <div class="name-cell">
+            <span class="name-text">{{ record.name }}</span>
+            <EditOutlined class="edit-icon" @click="handleEdit(record)" />
+          </div>
+        </template>
+
+        <!-- 模板ID -->
+        <template v-else-if="column.dataIndex === 'id'">
+          {{ record.id }}
+        </template>
+
+        <!-- 模板描述 -->
+        <template v-else-if="column.dataIndex === 'description'">
+          {{ record.description || '-' }}
+        </template>
+
+        <!-- 创建者 -->
+        <template v-else-if="column.dataIndex === 'createdBy'">
+          {{ record.createdBy }}
+        </template>
+
+        <!-- 模板更新时间 -->
+        <template v-else-if="column.dataIndex === 'updatedAt'">
+          {{ record.updatedAt }}
+        </template>
+
+        <!-- 操作 -->
+        <template v-else-if="column.key === 'action'">
+          <a-space>
+            <a v-if="record.isOwner" @click="handleShare(record)">{{ t('pages.adTemplate.actions.share') }}</a>
+            <a-popconfirm
+              v-if="record.isOwner"
+              :title="t('pages.adTemplate.messages.deleteConfirm')"
+              :ok-text="t('pages.adTemplate.actions.confirm')"
+              :cancel-text="t('pages.adTemplate.actions.cancel')"
+              @confirm="handleDelete(record)"
+            >
+              <a class="danger-text">{{ t('pages.adTemplate.actions.delete') }}</a>
+            </a-popconfirm>
+          </a-space>
+        </template>
+      </template>
+    </a-table>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
+import type { TableProps } from 'ant-design-vue';
+import {
+  FacebookOutlined,
+  GoogleOutlined,
+  // TikTokOutlined,
+  ThunderboltOutlined,
+  EditOutlined,
+} from '@ant-design/icons-vue';
+import type { AdTemplate } from '../types';
+import type { PlatformType } from '../types';
+
+const props = defineProps<{
+  dataSource: AdTemplate[];
+  loading: boolean;
+  pagination: {
+    current: number;
+    pageSize: number;
+    total: number;
+    showSizeChanger: boolean;
+    showQuickJumper: boolean;
+    showTotal: (total: number) => string;
+  };
+  selectedRowKeys?: string[];
+}>();
+
+const emit = defineEmits<{
+  (e: 'share', record: AdTemplate): void;
+  (e: 'delete', record: AdTemplate): void;
+  (e: 'edit', record: AdTemplate): void;
+  (e: 'update:selectedRowKeys', keys: string[]): void;
+  (e: 'pageChange', page: number, pageSize: number): void;
+}>();
+
+const { t, locale } = useI18n();
+
+const isZh = computed(() => locale.value.startsWith('zh'));
+
+const columns = computed(() => [
+  {
+    title: t('pages.adTemplate.table.channel'),
+    dataIndex: 'platform',
+    width: 100,
+  },
+  {
+    title: t('pages.adTemplate.table.name'),
+    dataIndex: 'name',
+    width: 200,
+    ellipsis: true,
+  },
+  {
+    title: t('pages.adTemplate.table.id'),
+    dataIndex: 'id',
+    width: 120,
+  },
+  {
+    title: t('pages.adTemplate.table.description'),
+    dataIndex: 'description',
+    width: 250,
+    ellipsis: true,
+  },
+  {
+    title: t('pages.adTemplate.table.createdBy'),
+    dataIndex: 'createdBy',
+    width: 100,
+  },
+  {
+    title: t('pages.adTemplate.table.updatedAt'),
+    dataIndex: 'updatedAt',
+    width: 160,
+  },
+  {
+    title: t('pages.adTemplate.table.actions'),
+    key: 'action',
+    width: 120,
+  },
+]);
+
+const rowSelection = computed(() => ({
+  selectedRowKeys: props.selectedRowKeys,
+  onChange: (keys: string[]) => emit('update:selectedRowKeys', keys),
+}));
+
+const getPlatformLabel = (platform: PlatformType) => {
+  const labels: Record<PlatformType, { zh: string; en: string }> = {
+    meta: { zh: 'Meta', en: 'Meta' },
+    google: { zh: 'Google', en: 'Google' },
+    tiktok: { zh: 'TikTok', en: 'TikTok' },
+    kwai: { zh: '快手', en: 'Kwai' },
+  };
+  return isZh.value ? labels[platform].zh : labels[platform].en;
+};
+
+const getPlatformIcon = (platform: PlatformType) => {
+  const icons: Record<PlatformType, any> = {
+    meta: FacebookOutlined,
+    google: GoogleOutlined,
+    // tiktok: TikTokOutlined,
+    kwai: ThunderboltOutlined,
+  };
+  return icons[platform] || FacebookOutlined;
+};
+
+const handleShare = (record: AdTemplate) => {
+  emit('share', record);
+};
+
+const handleDelete = (record: AdTemplate) => {
+  emit('delete', record);
+};
+
+const handleEdit = (record: AdTemplate) => {
+  emit('edit', record);
+};
+
+const handleTableChange: TableProps['onChange'] = (pagination) => {
+  emit('pageChange', pagination.current, pagination.pageSize);
+};
+</script>
+
+<style scoped lang="less">
+.template-table {
+  .platform-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    .platform-icon {
+      font-size: 16px;
+    }
+  }
+
+  .name-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    .name-text {
+      flex: 1;
+    }
+
+    .edit-icon {
+      color: #1890ff;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.2s;
+
+      &:hover {
+        color: #40a9ff;
+      }
+    }
+  }
+
+  .name-cell:hover .edit-icon {
+    opacity: 1;
+  }
+
+  .danger-text {
+    color: #ff4d4f;
+
+    &:hover {
+      color: #ff7875;
+    }
+  }
+}
+</style>

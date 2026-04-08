@@ -1,0 +1,185 @@
+[2026-03-23 11:15:10] production.ERROR: 404 occurred  
+[2026-03-23 11:15:10] production.ERROR: 404 occurred  
+[2026-03-23 11:15:39] production.ERROR: 404 occurred  
+[2026-03-23 11:17:22] production.ERROR: 404 occurred  
+[2026-03-23 11:17:22] production.ERROR: 404 occurred  
+[2026-03-23 11:17:22] production.ERROR: 404 occurred  
+[2026-03-23 11:17:22] production.ERROR: 404 occurred  
+[2026-03-23 11:17:22] production.ERROR: 404 occurred  
+[2026-03-23 11:17:22] production.ERROR: 404 occurred  
+[2026-03-23 11:17:22] production.ERROR: 404 occurred  
+[2026-03-23 11:17:22] production.ERROR: 404 occurred  
+[2026-03-23 11:17:22] production.ERROR: 404 occurred  
+[2026-03-23 11:17:23] production.ERROR: 404 occurred  
+[2026-03-23 11:17:23] production.ERROR: 404 occurred  
+[2026-03-23 11:17:23] production.ERROR: 404 occurred  
+[2026-03-23 11:17:23] production.ERROR: 404 occurred  
+[2026-03-23 11:19:17] production.ERROR: 404 occurred  
+[2026-03-23 11:19:17] production.ERROR: 404 occurred  
+[2026-03-23 11:19:17] production.ERROR: 404 occurred  
+[2026-03-23 11:19:18] production.ERROR: 404 occurred  
+[2026-03-23 11:19:18] production.ERROR: 404 occurred  
+[2026-03-23 11:19:18] production.ERROR: 404 occurred  
+[2026-03-23 11:19:18] production.ERROR: 404 occurred  
+[2026-03-23 11:19:18] production.ERROR: 404 occurred  
+[2026-03-23 11:19:18] production.ERROR: 404 occurred  
+[2026-03-23 11:19:18] production.ERROR: 404 occurred  
+[2026-03-23 11:19:18] production.ERROR: 404 occurred  
+[2026-03-23 11:19:18] production.ERROR: 404 occurred  
+[2026-03-23 11:19:18] production.ERROR: 404 occurred  
+[2026-03-23 11:20:21] production.ERROR: 404 occurred  
+[2026-03-23 11:20:22] production.ERROR: 404 occurred  
+[2026-03-23 11:20:22] production.ERROR: 404 occurred  
+[2026-03-23 11:20:22] production.ERROR: 404 occurred  
+[2026-03-23 11:20:22] production.ERROR: 404 occurred  
+[2026-03-23 11:20:22] production.ERROR: 404 occurred  
+[2026-03-23 11:20:22] production.ERROR: 404 occurred  
+[2026-03-23 11:20:22] production.ERROR: 404 occurred  
+[2026-03-23 11:20:22] production.ERROR: 404 occurred  
+[2026-03-23 11:20:22] production.ERROR: 404 occurred  
+[2026-03-23 11:20:22] production.ERROR: 404 occurred  
+[2026-03-23 11:20:22] production.ERROR: 404 occurred  
+[2026-03-23 11:20:22] production.ERROR: 404 occurred  
+[2026-03-23 11:22:58] production.ERROR: 404 occurred  
+[2026-03-23 11:22:58] production.ERROR: 404 occurred  
+[2026-03-23 11:22:58] production.ERROR: 404 occurred  
+[2026-03-23 11:22:58] production.ERROR: 404 occurred  
+[2026-03-23 11:22:58] production.ERROR: 404 occurred  
+[2026-03-23 11:22:58] production.ERROR: 404 occurred  
+[2026-03-23 11:22:58] production.ERROR: 404 occurred  
+[2026-03-23 11:22:58] production.ERROR: 404 occurred  
+[2026-03-23 11:22:59] production.ERROR: 404 occurred  
+[2026-03-23 11:22:59] production.ERROR: 404 occurred  
+[2026-03-23 11:22:59] production.ERROR: 404 occurred  
+[2026-03-23 11:22:59] production.ERROR: 404 occurred  
+[2026-03-23 11:23:02] production.ERROR: 404 occurred  
+[2026-03-23 11:23:02] production.ERROR: 404 occurred  
+[2026-03-23 11:23:02] production.ERROR: 404 occurred  
+[2026-03-23 11:23:02] production.ERROR: 404 occurred  
+[2026-03-23 11:23:03] production.ERROR: 404 occurred  
+[2026-03-23 11:23:03] production.ERROR: 404 occurred  
+[2026-03-23 11:23:03] production.ERROR: 404 occurred  
+[2026-03-23 11:23:03] production.ERROR: 404 occurred  
+[2026-03-23 11:23:03] production.ERROR: 404 occurred  
+[2026-03-23 11:23:03] production.ERROR: 404 occurred  
+[2026-03-23 11:23:03] production.ERROR: 404 occurred  
+[2026-03-23 11:24:19] production.ERROR: 404 occurred  
+[2026-03-23 11:24:28] production.ERROR: 404 occurred  
+[2026-03-23 11:24:32] production.ERROR: 404 occurred  
+[2026-03-23 11:28:31] production.ERROR: SQLSTATE[23000]: Integrity constraint violation: 1048 Column 'owner_id' cannot be null (Connection: mysql, SQL: insert into `meta_folders` (`folder_name`, `parent_id`, `folder_path`, `library_type`, `owner_id`, `level`, `sort_order`, `create_time`, `deleted_at`) values (123, 0, 123, 0, ?, 1, 1, 2026-03-23 11:28:30, ?)) {"exception":"[object] (Illuminate\\Database\\QueryException(code: 23000): SQLSTATE[23000]: Integrity constraint violation: 1048 Column 'owner_id' cannot be null (Connection: mysql, SQL: insert into `meta_folders` (`folder_name`, `parent_id`, `folder_path`, `library_type`, `owner_id`, `level`, `sort_order`, `create_time`, `deleted_at`) values (123, 0, 123, 0, ?, 1, 1, 2026-03-23 11:28:30, ?)) at D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php:822)
+[stacktrace]
+#0 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php(776): Illuminate\\Database\\Connection->runQueryCallback('insert into `me...', Array, Object(Closure))
+#1 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php(569): Illuminate\\Database\\Connection->run('insert into `me...', Array, Object(Closure))
+#2 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php(533): Illuminate\\Database\\Connection->statement('insert into `me...', Array)
+#3 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Query\\Processors\\Processor.php(32): Illuminate\\Database\\Connection->insert('insert into `me...', Array)
+#4 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Query\\Builder.php(3387): Illuminate\\Database\\Query\\Processors\\Processor->processInsertGetId(Object(Illuminate\\Database\\Query\\Builder), 'insert into `me...', Array, NULL)
+#5 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\app\\Http\\Controllers\\XmpFoldersController.php(157): Illuminate\\Database\\Query\\Builder->insertGetId(Array)
+#6 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Controller.php(54): App\\Http\\Controllers\\XmpFoldersController->store(Object(Illuminate\\Http\\Request))
+#7 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\ControllerDispatcher.php(43): Illuminate\\Routing\\Controller->callAction('store', Array)
+#8 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Route.php(259): Illuminate\\Routing\\ControllerDispatcher->dispatch(Object(Illuminate\\Routing\\Route), Object(App\\Http\\Controllers\\XmpFoldersController), 'store')
+#9 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Route.php(205): Illuminate\\Routing\\Route->runController()
+#10 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(806): Illuminate\\Routing\\Route->run()
+#11 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(144): Illuminate\\Routing\\Router->Illuminate\\Routing\\{closure}(Object(Illuminate\\Http\\Request))
+#12 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\app\\Http\\Middleware\\RequestLogger.php(36): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#13 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): App\\Http\\Middleware\\RequestLogger->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#14 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Middleware\\SubstituteBindings.php(50): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#15 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): Illuminate\\Routing\\Middleware\\SubstituteBindings->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#16 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Middleware\\ThrottleRequests.php(159): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#17 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Middleware\\ThrottleRequests.php(125): Illuminate\\Routing\\Middleware\\ThrottleRequests->handleRequest(Object(Illuminate\\Http\\Request), Object(Closure), Array)
+#18 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Middleware\\ThrottleRequests.php(87): Illuminate\\Routing\\Middleware\\ThrottleRequests->handleRequestUsingNamedLimiter(Object(Illuminate\\Http\\Request), Object(Closure), 'api', Object(Closure))
+#19 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): Illuminate\\Routing\\Middleware\\ThrottleRequests->handle(Object(Illuminate\\Http\\Request), Object(Closure), 'api')
+#20 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\sanctum\\src\\Http\\Middleware\\EnsureFrontendRequestsAreStateful.php(25): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#21 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(144): Laravel\\Sanctum\\Http\\Middleware\\EnsureFrontendRequestsAreStateful->Laravel\\Sanctum\\Http\\Middleware\\{closure}(Object(Illuminate\\Http\\Request))
+#22 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(119): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#23 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\sanctum\\src\\Http\\Middleware\\EnsureFrontendRequestsAreStateful.php(24): Illuminate\\Pipeline\\Pipeline->then(Object(Closure))
+#24 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): Laravel\\Sanctum\\Http\\Middleware\\EnsureFrontendRequestsAreStateful->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#25 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(119): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#26 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(805): Illuminate\\Pipeline\\Pipeline->then(Object(Closure))
+#27 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(784): Illuminate\\Routing\\Router->runRouteWithinStack(Object(Illuminate\\Routing\\Route), Object(Illuminate\\Http\\Request))
+#28 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(748): Illuminate\\Routing\\Router->runRoute(Object(Illuminate\\Http\\Request), Object(Illuminate\\Routing\\Route))
+#29 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(737): Illuminate\\Routing\\Router->dispatchToRoute(Object(Illuminate\\Http\\Request))
+#30 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Kernel.php(200): Illuminate\\Routing\\Router->dispatch(Object(Illuminate\\Http\\Request))
+#31 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(144): Illuminate\\Foundation\\Http\\Kernel->Illuminate\\Foundation\\Http\\{closure}(Object(Illuminate\\Http\\Request))
+#32 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\app\\Http\\Middleware\\ForceJsonResponse.php(21): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#33 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): App\\Http\\Middleware\\ForceJsonResponse->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#34 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#35 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Middleware\\ConvertEmptyStringsToNull.php(31): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#36 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): Illuminate\\Foundation\\Http\\Middleware\\ConvertEmptyStringsToNull->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#37 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#38 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Middleware\\TrimStrings.php(40): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#39 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): Illuminate\\Foundation\\Http\\Middleware\\TrimStrings->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#40 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Middleware\\ValidatePostSize.php(27): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#41 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): Illuminate\\Foundation\\Http\\Middleware\\ValidatePostSize->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#42 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Middleware\\PreventRequestsDuringMaintenance.php(99): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#43 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): Illuminate\\Foundation\\Http\\Middleware\\PreventRequestsDuringMaintenance->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#44 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Http\\Middleware\\HandleCors.php(62): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#45 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): Illuminate\\Http\\Middleware\\HandleCors->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#46 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Http\\Middleware\\TrustProxies.php(39): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#47 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): Illuminate\\Http\\Middleware\\TrustProxies->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#48 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(119): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#49 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Kernel.php(175): Illuminate\\Pipeline\\Pipeline->then(Object(Closure))
+#50 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Kernel.php(144): Illuminate\\Foundation\\Http\\Kernel->sendRequestThroughRouter(Object(Illuminate\\Http\\Request))
+#51 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\public\\index.php(51): Illuminate\\Foundation\\Http\\Kernel->handle(Object(Illuminate\\Http\\Request))
+#52 {main}
+
+[previous exception] [object] (PDOException(code: 23000): SQLSTATE[23000]: Integrity constraint violation: 1048 Column 'owner_id' cannot be null at D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php:580)
+[stacktrace]
+#0 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php(580): PDOStatement->execute()
+#1 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php(809): Illuminate\\Database\\Connection->Illuminate\\Database\\{closure}('insert into `me...', Array)
+#2 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php(776): Illuminate\\Database\\Connection->runQueryCallback('insert into `me...', Array, Object(Closure))
+#3 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php(569): Illuminate\\Database\\Connection->run('insert into `me...', Array, Object(Closure))
+#4 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php(533): Illuminate\\Database\\Connection->statement('insert into `me...', Array)
+#5 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Query\\Processors\\Processor.php(32): Illuminate\\Database\\Connection->insert('insert into `me...', Array)
+#6 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Query\\Builder.php(3387): Illuminate\\Database\\Query\\Processors\\Processor->processInsertGetId(Object(Illuminate\\Database\\Query\\Builder), 'insert into `me...', Array, NULL)
+#7 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\app\\Http\\Controllers\\XmpFoldersController.php(157): Illuminate\\Database\\Query\\Builder->insertGetId(Array)
+#8 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Controller.php(54): App\\Http\\Controllers\\XmpFoldersController->store(Object(Illuminate\\Http\\Request))
+#9 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\ControllerDispatcher.php(43): Illuminate\\Routing\\Controller->callAction('store', Array)
+#10 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Route.php(259): Illuminate\\Routing\\ControllerDispatcher->dispatch(Object(Illuminate\\Routing\\Route), Object(App\\Http\\Controllers\\XmpFoldersController), 'store')
+#11 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Route.php(205): Illuminate\\Routing\\Route->runController()
+#12 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(806): Illuminate\\Routing\\Route->run()
+#13 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(144): Illuminate\\Routing\\Router->Illuminate\\Routing\\{closure}(Object(Illuminate\\Http\\Request))
+#14 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\app\\Http\\Middleware\\RequestLogger.php(36): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#15 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): App\\Http\\Middleware\\RequestLogger->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#16 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Middleware\\SubstituteBindings.php(50): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#17 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): Illuminate\\Routing\\Middleware\\SubstituteBindings->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#18 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Middleware\\ThrottleRequests.php(159): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#19 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Middleware\\ThrottleRequests.php(125): Illuminate\\Routing\\Middleware\\ThrottleRequests->handleRequest(Object(Illuminate\\Http\\Request), Object(Closure), Array)
+#20 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Middleware\\ThrottleRequests.php(87): Illuminate\\Routing\\Middleware\\ThrottleRequests->handleRequestUsingNamedLimiter(Object(Illuminate\\Http\\Request), Object(Closure), 'api', Object(Closure))
+#21 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): Illuminate\\Routing\\Middleware\\ThrottleRequests->handle(Object(Illuminate\\Http\\Request), Object(Closure), 'api')
+#22 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\sanctum\\src\\Http\\Middleware\\EnsureFrontendRequestsAreStateful.php(25): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#23 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(144): Laravel\\Sanctum\\Http\\Middleware\\EnsureFrontendRequestsAreStateful->Laravel\\Sanctum\\Http\\Middleware\\{closure}(Object(Illuminate\\Http\\Request))
+#24 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(119): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#25 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\sanctum\\src\\Http\\Middleware\\EnsureFrontendRequestsAreStateful.php(24): Illuminate\\Pipeline\\Pipeline->then(Object(Closure))
+#26 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): Laravel\\Sanctum\\Http\\Middleware\\EnsureFrontendRequestsAreStateful->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#27 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(119): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#28 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(805): Illuminate\\Pipeline\\Pipeline->then(Object(Closure))
+#29 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(784): Illuminate\\Routing\\Router->runRouteWithinStack(Object(Illuminate\\Routing\\Route), Object(Illuminate\\Http\\Request))
+#30 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(748): Illuminate\\Routing\\Router->runRoute(Object(Illuminate\\Http\\Request), Object(Illuminate\\Routing\\Route))
+#31 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(737): Illuminate\\Routing\\Router->dispatchToRoute(Object(Illuminate\\Http\\Request))
+#32 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Kernel.php(200): Illuminate\\Routing\\Router->dispatch(Object(Illuminate\\Http\\Request))
+#33 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(144): Illuminate\\Foundation\\Http\\Kernel->Illuminate\\Foundation\\Http\\{closure}(Object(Illuminate\\Http\\Request))
+#34 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\app\\Http\\Middleware\\ForceJsonResponse.php(21): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#35 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): App\\Http\\Middleware\\ForceJsonResponse->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#36 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#37 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Middleware\\ConvertEmptyStringsToNull.php(31): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#38 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): Illuminate\\Foundation\\Http\\Middleware\\ConvertEmptyStringsToNull->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#39 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#40 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Middleware\\TrimStrings.php(40): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#41 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): Illuminate\\Foundation\\Http\\Middleware\\TrimStrings->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#42 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Middleware\\ValidatePostSize.php(27): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#43 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): Illuminate\\Foundation\\Http\\Middleware\\ValidatePostSize->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#44 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Middleware\\PreventRequestsDuringMaintenance.php(99): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#45 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): Illuminate\\Foundation\\Http\\Middleware\\PreventRequestsDuringMaintenance->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#46 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Http\\Middleware\\HandleCors.php(62): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#47 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): Illuminate\\Http\\Middleware\\HandleCors->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#48 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Http\\Middleware\\TrustProxies.php(39): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#49 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): Illuminate\\Http\\Middleware\\TrustProxies->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#50 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(119): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#51 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Kernel.php(175): Illuminate\\Pipeline\\Pipeline->then(Object(Closure))
+#52 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Kernel.php(144): Illuminate\\Foundation\\Http\\Kernel->sendRequestThroughRouter(Object(Illuminate\\Http\\Request))
+#53 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\public\\index.php(51): Illuminate\\Foundation\\Http\\Kernel->handle(Object(Illuminate\\Http\\Request))
+#54 {main}
+"} 
+[2026-03-23 11:39:22] production.ERROR: 404 occurred  
+[2026-03-23 11:46:43] production.ERROR: 404 occurred  
+[2026-03-23 12:17:17] production.ERROR: 404 occurred  

@@ -1,0 +1,100 @@
+version: '3'
+services:
+    app:
+        build:
+            context: ../../
+            dockerfile: ./docker/prod/Dockerfile
+            args:
+                WWWGROUP: '${WWWGROUP}'
+        image: sail-8.3-prod/app
+        deploy:
+            resources:
+                limits:
+                    memory: '${APP_MEMORY_LIMIT}'
+                    cpus: '${APP_CPU_LIMIT}'
+        restart: always
+        extra_hosts:
+            - 'host.docker.internal:host-gateway'
+        ports:
+            - '${APP_PORT:-28088}:80'
+            - '${VITE_PORT:-5173}:${VITE_PORT:-5173}'
+        environment:
+            WWWUSER: '${WWWUSER}'
+            WWWGROUP: '${WWWGROUP}'
+            LARAVEL_SAIL: 1
+            XDEBUG_MODE: '${SAIL_XDEBUG_MODE:-off}'
+            XDEBUG_CONFIG: '${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}'
+            IGNITION_LOCAL_SITES_PATH: '${PWD}'
+            COMPOSER_ALLOW_SUPERUSER: 1
+        volumes:
+            - '../../app:/var/www/html/app'
+            - '../../rules:/var/www/html/rules'
+            - '../../storage:/var/www/html/storage'
+            - '../../public:/var/www/html/public'
+            - './php-ini-mod.ini:/etc/php/8.3/cli/php.ini'
+        networks:
+            - sail
+        depends_on:
+            - mysql
+    mysql:
+        restart: always
+        image: 'mysql/mysql-server:8.0'
+        ports:
+            - '${FORWARD_DB_PORT:-13306}:3306'
+        environment:
+            MYSQL_ROOT_PASSWORD: '${DB_PASSWORD}'
+            MYSQL_ROOT_HOST: '%'
+            MYSQL_DATABASE: '${DB_DATABASE}'
+            MYSQL_USER: '${DB_USERNAME}'
+            MYSQL_PASSWORD: '${DB_PASSWORD}'
+            MYSQL_ALLOW_EMPTY_PASSWORD: 1
+        volumes:
+            - 'sail-mysql-v2:/var/lib/mysql'
+            - '../mysql/create-testing-database.sh:/docker-entrypoint-initdb.d/10-create-testing-database.sh'
+        networks:
+            - sail
+        healthcheck:
+            test:
+                - CMD
+                - mysqladmin
+                - ping
+                - '-p${DB_PASSWORD}'
+            retries: 3
+            timeout: 5s
+#    grafana:
+#        restart: always
+#        image: 'grafana/grafana-oss:latest'
+#        ports:
+#            - '13000:3000'
+#        environment:
+#            GF_SECURITY_ADMIN_PASSWORD: admin2023..ext
+#            GF_SERVER_DOMAIN: gf.discountdealshubs.com
+#            GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s:%(http_port)s/grafana/"
+#            GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+#        networks:
+#            - sail
+#        volumes:
+#            - 'grafana_storage:/var/lib/grafana'
+    redis:
+        image: 'redis:alpine'
+        restart: always
+        ports:
+            - '${FORWARD_REDIS_PORT:-6379}:6379'
+        volumes:
+            - 'prod-redis:/data'
+        networks:
+            - sail
+        healthcheck:
+            test: ["CMD", "redis-cli", "ping"]
+            retries: 3
+            timeout: 5s
+networks:
+    sail:
+        driver: bridge
+volumes:
+    sail-mysql-v2:
+        driver: local
+    grafana_storage:
+        driver: local
+    prod-redis:
+        driver: local

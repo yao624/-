@@ -1,0 +1,88 @@
+<template>
+  <div class="filter-section">
+    <a-row :gutter="[16, 16]">
+      <!-- 搜索框 -->
+      <a-col :span="16">
+        <a-input
+          v-model:value="keyword"
+          :placeholder="t('pages.adTemplate.filter.searchPlaceholder')"
+          allow-clear
+          @pressEnter="handleSearch"
+        >
+          <template #prefix>
+            <SearchOutlined />
+          </template>
+        </a-input>
+      </a-col>
+
+      <!-- 渠道筛选 -->
+      <a-col :span="4">
+        <a-select
+          v-model:value="platform"
+          :placeholder="t('pages.adTemplate.filter.channel')"
+          allow-clear
+          style="width: 100%"
+          @change="handleFilterChange"
+        >
+          <a-select-option value="meta">Meta</a-select-option>
+          <a-select-option value="google">Google</a-select-option>
+          <a-select-option value="tiktok">TikTok</a-select-option>
+          <a-select-option value="kwai">{{ isZh ? '快手' : 'Kwai' }}</a-select-option>
+        </a-select>
+      </a-col>
+
+      <!-- 操作按钮 -->
+      <a-col :span="4">
+        <a-space>
+          <a-button type="primary" @click="handleSearch">
+            <SearchOutlined />
+            {{ t('pages.adTemplate.actions.search') }}
+          </a-button>
+          <a-button @click="handleReset">
+            <ReloadOutlined />
+            {{ t('pages.adTemplate.actions.reset') }}
+          </a-button>
+        </a-space>
+      </a-col>
+    </a-row>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue';
+import type { PlatformType } from '../types';
+
+const emit = defineEmits<{
+  (e: 'search', keyword: string, platform?: PlatformType): void;
+  (e: 'reset'): void;
+}>();
+
+const { t, locale } = useI18n();
+
+const isZh = computed(() => locale.value.startsWith('zh'));
+
+const keyword = ref('');
+const platform = ref<PlatformType | undefined>();
+
+const handleSearch = () => {
+  emit('search', keyword.value, platform.value);
+};
+
+const handleFilterChange = () => {
+  emit('search', keyword.value, platform.value);
+};
+
+const handleReset = () => {
+  keyword.value = '';
+  platform.value = undefined;
+  emit('reset');
+};
+</script>
+
+<style scoped lang="less">
+.filter-section {
+  margin-bottom: 16px;
+}
+</style>

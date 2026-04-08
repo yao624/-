@@ -1,0 +1,289 @@
+[
+    {
+        "english_name": "Afrikaans",
+        "native_name": "Afrikaans",
+        "label_name": "af_ZA",
+        "locales": [
+            36
+        ]
+    },
+    {
+        "english_name": "Albanian",
+        "native_name": "Shqip",
+        "label_name": "sq_AL",
+        "locales": [
+            87
+        ]
+    },
+    {
+        "english_name": "Arabic",
+        "native_name": "العربية",
+        "label_name": "ar_AR",
+        "locales": [
+            28
+        ]
+    },
+    {
+        "english_name": "Armenian",
+        "native_name": "Հայերեն",
+        "label_name": "hy_AM",
+        "locales": [
+            68
+        ]
+    },
+    {
+        "english_name": "Azerbaijani",
+        "native_name": "Azərbaycan dili",
+        "label_name": "az_AZ",
+        "locales": [
+            53
+        ]
+    },
+    {
+        "english_name": "Basque",
+        "native_name": "Euskara",
+        "label_name": "eu_ES",
+        "locales": [
+            59
+        ]
+    },
+    {
+        "english_name": "Belarusian",
+        "native_name": "Беларуская",
+        "label_name": "be_BY",
+        "locales": [
+            54
+        ]
+    },
+    {
+        "english_name": "Bosnian",
+        "native_name": "Bosanski",
+        "label_name": "bs_BA",
+        "locales": [
+            55
+        ]
+    },
+    {
+        "english_name": "Bulgarian",
+        "native_name": "Български",
+        "label_name": "bg_BG",
+        "locales": [
+            37
+        ]
+    },
+    {
+        "english_name": "Catalan",
+        "native_name": "Català",
+        "label_name": "ca_ES",
+        "locales": [
+            1
+        ]
+    },
+    {
+        "english_name": "Croatian",
+        "native_name": "Hrvatski",
+        "label_name": "hr_HR",
+        "locales": [
+            38
+        ]
+    },
+    {
+        "english_name": "Filipino",
+        "native_name": "Filipino",
+        "label_name": "tl_XX",
+        "locales": [
+            26
+        ]
+    },
+    {
+        "english_name": "Georgian",
+        "native_name": "ქართული",
+        "label_name": "ka_GE",
+        "locales": [
+            72
+        ]
+    },
+    {
+        "english_name": "Hebrew",
+        "native_name": "עברית",
+        "label_name": "he_IL",
+        "locales": [
+            29
+        ]
+    },
+    {
+        "english_name": "Hindi",
+        "native_name": "हिन्दी",
+        "label_name": "hi_IN",
+        "locales": [
+            46
+        ]
+    },
+    {
+        "english_name": "Hungarian",
+        "native_name": "Magyar",
+        "label_name": "hu_HU",
+        "locales": [
+            30
+        ]
+    },
+    {
+        "english_name": "Indonesian",
+        "native_name": "Bahasa Indonesia",
+        "label_name": "id_ID",
+        "locales": [
+            25
+        ]
+    },
+    {
+        "english_name": "Kazakh",
+        "native_name": "Қазақша",
+        "label_name": "kk_KZ",
+        "locales": [
+            73
+        ]
+    },
+    {
+        "english_name": "Latin",
+        "native_name": "lingua latina",
+        "label_name": "la_VA",
+        "locales": []
+    },
+    {
+        "english_name": "Latvian",
+        "native_name": "Latviešu",
+        "label_name": "lv_LV",
+        "locales": [
+            78
+        ]
+    },
+    {
+        "english_name": "Lithuanian",
+        "native_name": "Lietuvių",
+        "label_name": "lt_LT",
+        "locales": [
+            40
+        ]
+    },
+    {
+        "english_name": "Macedonian",
+        "native_name": "Македонски",
+        "label_name": "mk_MK",
+        "locales": [
+            79
+        ]
+    },
+    {
+        "english_name": "Malay",
+        "native_name": "Bahasa Melayu",
+        "label_name": "ms_MY",
+        "locales": [
+            41,
+            50
+        ]
+    },
+    {
+        "english_name": "Malayalam",
+        "native_name": "മലയാളം",
+        "label_name": "ml_IN",
+        "locales": [
+            50
+        ]
+    },
+    {
+        "english_name": "Marathi",
+        "native_name": "मराठी",
+        "label_name": "mr_IN",
+        "locales": [
+            81
+        ]
+    },
+    {
+        "english_name": "Nepali",
+        "native_name": "नेपाली",
+        "label_name": "ne_NP",
+        "locales": [
+            82
+        ]
+    },
+    {
+        "english_name": "Northern Kurdish (Kurmanji)",
+        "native_name": "Kurdî (Kurmancî)",
+        "label_name": "ku_TR",
+        "locales": [
+            76
+        ]
+    },
+    {
+        "english_name": "Slovenian",
+        "native_name": "Slovenščina",
+        "label_name": "sl_SI",
+        "locales": [
+            34
+        ]
+    },
+    {
+        "english_name": "Swahili",
+        "native_name": "Kiswahili",
+        "label_name": "sw_KE",
+        "locales": [
+            88
+        ]
+    },
+    {
+        "english_name": "Tamil",
+        "native_name": "தமிழ்",
+        "label_name": "ta_IN",
+        "locales": [
+            48
+        ]
+    },
+    {
+        "english_name": "Thai",
+        "native_name": "ภาษาไทย",
+        "label_name": "th_TH",
+        "locales": [
+            35
+        ]
+    },
+    {
+        "english_name": "Turkish",
+        "native_name": "Türkçe",
+        "label_name": "tr_TR",
+        "locales": [
+            19
+        ]
+    },
+    {
+        "english_name": "Ukrainian",
+        "native_name": "Українська",
+        "label_name": "uk_UA",
+        "locales": [
+            52
+        ]
+    },
+    {
+        "english_name": "Urdu",
+        "native_name": "اردو",
+        "label_name": "ur_PK",
+        "locales": [
+            90
+        ]
+    },
+    {
+        "english_name": "Vietnamese",
+        "native_name": "Tiếng Việt",
+        "label_name": "vi_VN",
+        "locales": [
+            27
+        ]
+    },
+    {
+        "english_name": "Welsh",
+        "native_name": "Cymraeg",
+        "label_name": "cy_GB",
+        "locales": [
+            3
+        ]
+    }
+]

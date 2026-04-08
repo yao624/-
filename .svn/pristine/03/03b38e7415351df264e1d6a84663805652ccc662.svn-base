@@ -1,0 +1,1209 @@
+
+<template>
+  <page-container :title="'Facebook主页'" :showPageHeader="true">
+    <div class="facebook-pages-container">
+      <div class="tabs-section">
+        <a-tabs v-model:activeKey="activeTabKey" size="small">
+          <a-tab-pane key="home" tab="主页管理" />
+          <a-tab-pane key="comment" tab="评论管理" />
+          <a-tab-pane key="keyword" tab="关键词包" />
+        </a-tabs>
+      </div>
+
+      <div v-if="activeTabKey !== 'keyword'" class="filter-card">
+        <!-- 主页管理 Toolbar -->
+        <div v-if="activeTabKey === 'home'" class="instrument-toolbar">
+          <div class="filter-section">
+            <div class="filter-item">
+              <span class="filter-label">公共主页</span>
+              <a-input v-model:value="publicPageSearchText" placeholder="搜索..." allow-clear size="small" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">授权状态</span>
+              <a-select v-model:value="authorizationStatus" placeholder="请选择" size="small" allow-clear :options="authorizationStatusOptions" />
+            </div>
+          </div>
+
+          <div class="action-section">
+            <a-button type="primary" size="small" @click="handleAddPage">+ 添加页面</a-button>
+            <a-dropdown :trigger="['click']">
+              <a-button size="small">
+                <check-square-outlined /> 批量操作 <down-outlined />
+              </a-button>
+              <template #overlay>
+                <a-menu>
+                  <a-menu-item key="refresh" @click="handleMoreAction('refresh')">刷新</a-menu-item>
+                  <a-menu-item key="sync-latest" @click="handleMoreAction('sync-latest')">同步最新</a-menu-item>
+                </a-menu>
+              </template>
+            </a-dropdown>
+          </div>
+        </div>
+
+        <!-- 评论管理 Toolbar -->
+        <div v-if="activeTabKey === 'comment'" class="instrument-toolbar">
+          <div class="filter-section">
+            <div class="filter-item">
+              <span class="filter-label">评论</span>
+              <a-input v-model:value="commentSearchText" placeholder="搜索..." allow-clear size="small" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">状态</span>
+              <a-select v-model:value="commentStatus" placeholder="请选择" size="small" allow-clear :options="commentStatusOptions" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">公共主页</span>
+              <a-select v-model:value="commentPageId" placeholder="搜索..." size="small" allow-clear :options="commentPageOptions" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">创建时间</span>
+              <a-range-picker v-model:value="commentTimeRange" size="small" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">帖子</span>
+              <a-input v-model:value="commentPostId" placeholder="搜索..." allow-clear size="small" />
+            </div>
+          </div>
+
+          <div class="action-section">
+            <a-dropdown :trigger="['click']">
+              <a-button size="small">
+                <check-square-outlined /> 批量操作 <down-outlined />
+              </a-button>
+              <template #overlay>
+                <a-menu @click="handleBatchCommentAction">
+                  <a-menu-item key="reply">回复</a-menu-item>
+                  <a-menu-item key="hide">隐藏</a-menu-item>
+                  <a-menu-item key="unhide">取消隐藏</a-menu-item>
+                  <a-menu-item key="like">点赞</a-menu-item>
+                  <a-menu-item key="unlike">取消点赞</a-menu-item>
+                  <a-menu-item key="delete">删除</a-menu-item>
+                </a-menu>
+              </template>
+            </a-dropdown>
+            <a-button size="small" @click="handleGetPages">
+              <reload-outlined /> 刷新
+            </a-button>
+            <div class="info-text">
+              <info-circle-outlined /> 数据每5分钟同步一次
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="activeTabKey === 'keyword'" class="filter-card">
+        <div class="instrument-toolbar">
+          <div class="filter-section">
+            <div class="filter-item">
+              <span class="filter-label">关键词包:</span>
+              <a-input v-model:value="keywordPackSearchText" placeholder="搜索..." allow-clear size="small" />
+            </div>
+          </div>
+          <div class="action-section">
+            <a-button type="primary" size="small" @click="handleAddKeywordPack">+ 添加关键词包</a-button>
+            <a-dropdown :trigger="['click']">
+              <a-button size="small"> 批量操作 <down-outlined /> </a-button>
+              <template #overlay>
+                <a-menu @click="handleBatchKeywordAction">
+                  <a-menu-item key="delete">删除</a-menu-item>
+                </a-menu>
+              </template>
+            </a-dropdown>
+            <a-button size="small" @click="handleRefreshKeywords">
+              <reload-outlined /> 刷新
+            </a-button>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-section">
+        <a-table
+          :columns="activeTabKey === 'home' ? columns : activeTabKey === 'comment' ? commentColumns : keywordColumns"
+          :data-source="activeTabKey === 'home' ? dataSource : activeTabKey === 'comment' ? commentDataSource : keywordDataSource"
+          :row-key="record => record.id"
+          :loading="loading"
+          :scroll="{ x: 1200, y: safeTableHeight }"
+          :pagination="pagination"
+          @change="handleTableChange"
+          :row-selection="{ selectedRowKeys: selectedRowKeys, onChange: onSelectChange }"
+          size="small"
+        >
+          <template #bodyCell="{ column, text, record }">
+            <!-- Home Tab Cells -->
+            <template v-if="activeTabKey === 'home'">
+              <template v-if="column.dataIndex === 'public_page_name'">
+                <a @click="goToPageComments(record)">{{ text }}</a>
+              </template>
+              <template v-if="column.dataIndex === 'auto_rule_status'">
+                <a-tag :color="text === 'ENABLED' || text === true ? 'green' : 'default'">
+                  {{ (text === 'ENABLED' || text === true) ? '启用' : '停用' }}
+                </a-tag>
+              </template>
+              <template v-if="column.dataIndex === 'authorization_status'">
+                <span :style="{ color: text === 'AUTHORIZED' ? '#52c41a' : '#ff4d4f' }">
+                  {{ text === 'AUTHORIZED' ? '已授权' : '未授权' }}
+                </span>
+              </template>
+              <template v-if="column.dataIndex === 'authorization_time'">
+                <span>{{ text ? dayjs(text).format('YYYY-MM-DD HH:mm:ss') : '-' }}</span>
+              </template>
+              <template v-if="column.dataIndex === 'operation'">
+                <a @click="handleAutoRule(record)">自动规则</a>
+              </template>
+            </template>
+
+            <!-- Comment Tab Cells -->
+            <template v-else-if="activeTabKey === 'comment'">
+              <template v-if="column.dataIndex === 'status'">
+                <a-tag :color="text === 'VISIBLE' ? 'green' : 'orange'">
+                  {{ text === 'VISIBLE' ? '显示' : '隐藏' }}
+                </a-tag>
+              </template>
+              <template v-if="column.dataIndex === 'created_time'">
+                <span>{{ text ? dayjs(text).format('YYYY-MM-DD HH:mm:ss') : '-' }}</span>
+              </template>
+            </template>
+
+            <!-- Keyword Tab Cells -->
+            <template v-else-if="activeTabKey === 'keyword'">
+              <template v-if="column.dataIndex === 'operation'">
+                <a @click="handleEditKeywordPack(record)">编辑</a>
+                <a-divider type="vertical" />
+                <a style="color: #ff4d4f" @click="handleDeleteKeywordPack(record)">删除</a>
+              </template>
+              <template v-if="column.dataIndex === 'created_time'">
+                <span>{{ text ? dayjs(text).format('YYYY-MM-DD HH:mm:ss') : '-' }}</span>
+              </template>
+            </template>
+          </template>
+        </a-table>
+      </div>
+    </div>
+
+    <!-- 设置自动规则弹窗 -->
+    <a-modal
+      v-model:visible="autoRuleModalVisible"
+      title="设置自动规则"
+      width="800px"
+      class="auto-rule-modal"
+      @ok="handleAutoRuleOk"
+      ok-text="确定"
+      cancel-text="取消"
+      :body-style="{ padding: '18px 24px 20px' }"
+    >
+      <div class="auto-rule-modal-content">
+        <a-alert
+          message="启用自动规则会对主页的帖子评论执行自动操作，您也可以前往评论管理手动操作"
+          type="info"
+          show-icon
+          class="auto-rule-alert"
+        />
+        
+        <div class="modal-form-row">
+          <div class="row-label">规则状态:</div>
+          <div class="row-control">
+            <a-radio-group v-model:value="autoRuleForm.status" button-style="outline" class="status-radio-group">
+              <a-radio-button value="DISABLED">停用</a-radio-button>
+              <a-radio-button value="ENABLED">启用</a-radio-button>
+            </a-radio-group>
+          </div>
+        </div>
+
+        <div class="modal-form-row">
+          <div class="row-label">操作:</div>
+          <div class="row-control">
+            <a-radio-group v-model:value="autoRuleForm.action" class="horizontal-radio-group">
+              <a-radio value="HIDE_ALL">自动隐藏所有新增评论</a-radio>
+              <a-radio value="HIDE_KEYWORDS">自动隐藏包含特定关键词的新增评论</a-radio>
+            </a-radio-group>
+          </div>
+        </div>
+      </div>
+    </a-modal>
+    <!-- 添加关键词包弹窗 -->
+    <a-modal
+      v-model:visible="keywordModalVisible"
+      :title="keywordModalTitle"
+      width="600px"
+      @ok="handleKeywordModalOk"
+      ok-text="确定"
+      cancel-text="取消"
+      :body-style="{ padding: '32px 40px' }"
+    >
+      <div class="keyword-modal-content">
+        <a-alert
+          message="输入关键词，用来隐藏包含关键词的评论。之后前往主页管理，为每个主页设置自动隐藏评论的关键词包。"
+          type="info"
+          show-icon
+          class="mb-24"
+        />
+        
+        <div class="keyword-pack-name-row">
+          <div class="name-label"><span class="required-mark">*</span> 关键词包名称:</div>
+          <div class="name-input-wrap">
+            <a-input
+              v-model:value="keywordForm.name"
+              placeholder="请输入"
+              :maxlength="20"
+              show-count
+            />
+          </div>
+        </div>
+
+        <div class="keyword-block">
+          <div class="name-label"><span class="required-mark">*</span> 关键词:</div>
+          <div class="keyword-textarea-wrapper">
+            <div class="line-numbers">
+              <div v-for="n in keywordLineCount" :key="n">{{ n }}</div>
+            </div>
+            <a-textarea
+              v-model:value="keywordForm.keywords"
+              placeholder="每行输入一个关键词"
+              :auto-size="{ minRows: 6, maxRows: 10 }"
+              class="keyword-textarea"
+            />
+          </div>
+          <div class="keyword-actions">
+            <a class="copy-link" @click="handleCopyAllKeywords">全部复制</a>
+          </div>
+        </div>
+      </div>
+    </a-modal>
+  </page-container>
+</template>
+
+
+<script lang="ts">
+import dayjs from 'dayjs';
+import { defineComponent, ref, computed, onMounted, watch, reactive } from 'vue';
+import {
+  batchActionMetaFbCommentsApi,
+  batchDeleteMetaFbKeywordPacksApi,
+  batchSyncMetaFbPagesApi,
+  createMetaFbKeywordPackApi,
+  deleteMetaFbKeywordPackApi,
+  getMetaFbAutoRuleApi,
+  getMetaFbKeywordPackKeywordsApi,
+  queryMetaFbCommentsApi,
+  queryMetaFbKeywordPacksApi,
+  queryMetaFbPageOptionsApi,
+  queryPagesApi,
+  saveMetaFbAutoRuleApi,
+  updateMetaFbKeywordPackApi,
+} from '@/api/pages';
+import { useTableHeight } from '@/utils/hooks/useTableHeight';
+import { DownOutlined, EyeOutlined, CheckSquareOutlined, InfoCircleOutlined, ReloadOutlined } from '@ant-design/icons-vue';
+import { message } from 'ant-design-vue';
+
+export default defineComponent({
+  name: 'FacebookPages',
+  components: {
+    DownOutlined,
+    EyeOutlined,
+    CheckSquareOutlined,
+    InfoCircleOutlined,
+    ReloadOutlined,
+  },
+  setup() {
+    const { tableHeight } = useTableHeight();
+    const safeTableHeight = computed(() => {
+      const v = tableHeight.value;
+      return Number.isFinite(v) && v > 200 ? v : 200;
+    });
+
+    const useMock = false;
+
+    const mockPages = ref([
+      {
+        id: '1',
+        public_page_name: '公共主页A',
+        public_page_id: '100000000001',
+        auto_rule_status: 'ENABLED',
+        auto_hide_comments: true,
+        rating: 4.7,
+        fb_personal_account: 'FB个人号1',
+        fb_personal_account_count: 3,
+        authorization_status: 'AUTHORIZED',
+        authorization_time: '20250110T12:30:27Z',
+      },
+      {
+        id: '2',
+        public_page_name: '公共主页B',
+        public_page_id: '100000000002',
+        auto_rule_status: 'DISABLED',
+        auto_hide_comments: false,
+        rating: 3.9,
+        fb_personal_account: 'FB个人号2',
+        fb_personal_account_count: 1,
+        authorization_status: 'UNAUTHORIZED',
+        authorization_time: '20250221T09:12:05Z',
+      },
+      {
+        id: '3',
+        public_page_name: '公共主页C',
+        public_page_id: '100000000003',
+        auto_rule_status: 'ENABLED',
+        auto_hide_comments: false,
+        rating: 4.2,
+        fb_personal_account: 'FB个人号3',
+        fb_personal_account_count: 2,
+        authorization_status: 'AUTHORIZED',
+        authorization_time: '20250302T18:22:11Z',
+      },
+      {
+        id: '4',
+        public_page_name: '公共主页D',
+        public_page_id: '100000000004',
+        auto_rule_status: 'DISABLED',
+        auto_hide_comments: true,
+        rating: 2.8,
+        fb_personal_account: 'FB个人号4',
+        fb_personal_account_count: 5,
+        authorization_status: 'AUTHORIZED',
+        authorization_time: '20250418T06:44:59Z',
+      },
+      {
+        id: '5',
+        public_page_name: '公共主页E',
+        public_page_id: '100000000005',
+        auto_rule_status: 'ENABLED',
+        auto_hide_comments: true,
+        rating: 4.9,
+        fb_personal_account: 'FB个人号5',
+        fb_personal_account_count: 2,
+        authorization_status: 'UNAUTHORIZED',
+        authorization_time: '20250525T21:10:33Z',
+      },
+    ]);
+
+    const mockComments = ref([
+      {
+        id: 'c1',
+        comment_content: '这是一个非常棒的帖子！',
+        post_info: '帖子A',
+        operation_type: '回复',
+        status: 'VISIBLE',
+        likes: 12,
+        replies: 2,
+        public_page: '公共主页A',
+        page_authorization_status: 'AUTHORIZED',
+        created_time: '20250330T10:00:00Z',
+      },
+      {
+        id: 'c2',
+        comment_content: '我不喜欢这个内容。',
+        post_info: '帖子B',
+        operation_type: '隐藏',
+        status: 'HIDDEN',
+        likes: 0,
+        replies: 0,
+        public_page: '公共主页B',
+        page_authorization_status: 'AUTHORIZED',
+        created_time: '20250330T11:30:00Z',
+      },
+    ]);
+
+    const mockKeywordPacks = ref([
+      {
+        id: 'k1',
+        pack_name: '常见垃圾评论包',
+        keyword_count: 50,
+        created_time: '20250325T09:00:00Z',
+      },
+      {
+        id: 'k2',
+        pack_name: '违规词过滤包',
+        keyword_count: 120,
+        created_time: '20250328T14:30:00Z',
+      },
+    ]);
+
+    const selectedRowKeys = ref<string[]>([]);
+    const onSelectChange = (keys: string[]) => {
+      selectedRowKeys.value = keys;
+    };
+
+    // 自动规则弹窗相关
+    const autoRuleModalVisible = ref(false);
+    const currentAutoRulePageId = ref<string>('');
+    const autoRuleForm = reactive({
+      status: 'DISABLED',
+      action: 'HIDE_ALL',
+    });
+
+    const handleAutoRule = async (record: any) => {
+      currentAutoRulePageId.value = record.id;
+      autoRuleForm.status = 'DISABLED';
+      autoRuleForm.action = 'HIDE_ALL';
+      if (!useMock) {
+        const res: any = await getMetaFbAutoRuleApi(record.id);
+        autoRuleForm.status = res?.data?.status || 'DISABLED';
+        autoRuleForm.action = res?.data?.action || 'HIDE_ALL';
+      }
+      autoRuleModalVisible.value = true;
+    };
+
+    const handleAutoRuleOk = async () => {
+      if (!useMock && currentAutoRulePageId.value) {
+        await saveMetaFbAutoRuleApi(currentAutoRulePageId.value, {
+          status: autoRuleForm.status,
+          action: autoRuleForm.action,
+        });
+        message.success('自动规则保存成功');
+        await fetchPages();
+      }
+      autoRuleModalVisible.value = false;
+    };
+
+    const handleAddPage = () => {
+      console.log('Handle add page');
+    };
+
+    const publicPageSearchText = ref('');
+    const authorizationStatus = ref<string | undefined>(undefined);
+    const authorizationStatusOptions = computed(() => [
+      { label: '已授权', value: 'AUTHORIZED' },
+      { label: '未授权', value: 'UNAUTHORIZED' },
+    ]);
+
+    // 评论管理筛选
+    const commentSearchText = ref('');
+    const commentStatus = ref<string | undefined>(undefined);
+    const commentPageId = ref<string | undefined>(undefined);
+    const commentTimeRange = ref<any>([]);
+    const commentPostId = ref('');
+    const commentStatusOptions = [
+      { label: '显示', value: 'VISIBLE' },
+      { label: '隐藏', value: 'HIDDEN' },
+    ];
+    const commentPageOptions = ref<any[]>([]);
+
+    // 关键词包筛选
+    const keywordPackSearchText = ref('');
+
+    const activeTabKey = ref<'home' | 'comment' | 'keyword'>('home');
+    const keepCommentFilterOnNextTabSwitch = ref(false);
+    const batchOperationChecked = computed(() => selectedRowKeys.value.length > 0);
+
+    const loading = ref(true);
+    const dataSource = ref<any[]>([]);
+    const commentDataSource = ref<any[]>([]);
+    const keywordDataSource = ref<any[]>([]);
+
+    const pagination = ref({
+      current: 1,
+      pageSize: 10,
+      total: 0,
+      showQuickJumper: true,
+      showSizeChanger: true,
+      pageSizeOptions: ['10', '20', '50', '100', '200'],
+      showTotal: (total: number) => `共 ${total} 条`,
+    });
+
+    // mock 模式：初始化就填充数据，确保首屏一定有行可渲染
+    if (useMock) {
+      pagination.value.total = mockPages.value.length;
+      loading.value = false;
+    }
+
+    const filteredMockPages = computed(() => {
+      const kw = publicPageSearchText.value.trim().toLowerCase();
+      return mockPages.value.filter((p) => {
+        const matchKw =
+          !kw ||
+          String(p.public_page_name || '').toLowerCase().includes(kw) ||
+          String(p.public_page_id || '').toLowerCase().includes(kw) ||
+          String(p.id || '').toLowerCase().includes(kw);
+        const matchAuth = !authorizationStatus.value || p.authorization_status === authorizationStatus.value;
+        return matchKw && matchAuth;
+      });
+    });
+
+    const columns = computed<any[]>(() => [
+      {
+        title: '公共主页名称',
+        key: 'public_page_name',
+        dataIndex: 'public_page_name',
+        width: 180,
+        align: 'center',
+        ellipsis: true,
+      },
+      { title: '公共主页ID', key: 'public_page_id', dataIndex: 'public_page_id', width: 160, align: 'center' },
+      { title: '操作', key: 'operation', dataIndex: 'operation', width: 150, align: 'center' },
+      {
+        title: '自动规则状态',
+        key: 'auto_rule_status',
+        dataIndex: 'auto_rule_status',
+        width: 150,
+        align: 'center',
+      },
+      { title: '自动隐藏评论', key: 'auto_hide_comments', dataIndex: 'auto_hide_comments', width: 170, align: 'center' },
+      { title: '评分', key: 'rating', dataIndex: 'rating', width: 100, align: 'center' },
+      { title: 'FB个人号', key: 'fb_personal_account', dataIndex: 'fb_personal_account', width: 160, align: 'center', ellipsis: true },
+      {
+        title: 'FB个人号数量',
+        key: 'fb_personal_account_count',
+        dataIndex: 'fb_personal_account_count',
+        width: 170,
+        align: 'center',
+      },
+      {
+        title: '授权状态',
+        key: 'authorization_status',
+        dataIndex: 'authorization_status',
+        width: 120,
+        align: 'center',
+      },
+      {
+        title: '授权时间',
+        key: 'authorization_time',
+        dataIndex: 'authorization_time',
+        width: 200,
+        align: 'center',
+      },
+    ]);
+
+    const commentColumns = computed<any[]>(() => [
+      { title: '评论', key: 'comment_content', dataIndex: 'comment_content', width: 250, align: 'center', ellipsis: true },
+      { title: '帖子', key: 'post_info', dataIndex: 'post_info', width: 150, align: 'center' },
+      { title: '操作', key: 'operation_type', dataIndex: 'operation_type', width: 120, align: 'center' },
+      { title: '状态', key: 'status', dataIndex: 'status', width: 100, align: 'center' },
+      { title: '点赞数', key: 'likes', dataIndex: 'likes', width: 100, align: 'center' },
+      { title: '回复', key: 'replies', dataIndex: 'replies', width: 100, align: 'center' },
+      { title: '公共主页', key: 'public_page', dataIndex: 'public_page', width: 180, align: 'center' },
+      { title: '主页授权状态', key: 'page_authorization_status', dataIndex: 'page_authorization_status', width: 150, align: 'center' },
+      { title: '创建时间', key: 'created_time', dataIndex: 'created_time', width: 180, align: 'center' },
+    ]);
+
+    const keywordColumns = computed<any[]>(() => [
+      { title: '关键词包名称', key: 'pack_name', dataIndex: 'pack_name', width: 300, align: 'center' },
+      { title: '操作', key: 'operation', dataIndex: 'operation', width: 150, align: 'center' },
+      { title: '关键词数量', key: 'keyword_count', dataIndex: 'keyword_count', width: 150, align: 'center' },
+      { title: '创建时间', key: 'created_time', dataIndex: 'created_time', width: 200, align: 'center' },
+    ]);
+
+    const fetchPages = async () => {
+      loading.value = true;
+      try {
+        if (useMock) {
+          if (activeTabKey.value === 'home') {
+            pagination.value.total = filteredMockPages.value.length;
+            const start = (pagination.value.current - 1) * pagination.value.pageSize;
+            const end = start + pagination.value.pageSize;
+            dataSource.value = filteredMockPages.value.slice(start, end);
+          } else if (activeTabKey.value === 'comment') {
+            pagination.value.total = mockComments.value.length;
+            commentDataSource.value = mockComments.value;
+          } else if (activeTabKey.value === 'keyword') {
+            pagination.value.total = mockKeywordPacks.value.length;
+            keywordDataSource.value = mockKeywordPacks.value;
+          }
+          return;
+        }
+
+        const param: Record<string, any> = {
+          pageNo: pagination.value.current,
+          pageSize: pagination.value.pageSize,
+        };
+
+        if (activeTabKey.value === 'home') {
+          if (publicPageSearchText.value) param.keyword = publicPageSearchText.value;
+          if (authorizationStatus.value) param.authorization_status = authorizationStatus.value;
+          const res: any = await queryPagesApi(param);
+          dataSource.value = res?.data || [];
+          pagination.value.total = res?.totalCount ?? 0;
+          return;
+        }
+
+        if (activeTabKey.value === 'comment') {
+          if (commentSearchText.value) param.keyword = commentSearchText.value;
+          if (commentStatus.value) param.status = commentStatus.value;
+          if (commentPageId.value) param.public_page_id = commentPageId.value;
+          if (commentPostId.value) param.post_id = commentPostId.value;
+          if (commentTimeRange.value && commentTimeRange.value.length === 2) {
+            param.start_time = dayjs(commentTimeRange.value[0]).format('YYYY-MM-DD HH:mm:ss');
+            param.end_time = dayjs(commentTimeRange.value[1]).format('YYYY-MM-DD HH:mm:ss');
+          }
+          const res: any = await queryMetaFbCommentsApi(param);
+          commentDataSource.value = res?.data || [];
+          pagination.value.total = res?.totalCount ?? 0;
+          return;
+        }
+
+        if (keywordPackSearchText.value) param.keyword = keywordPackSearchText.value;
+        const res: any = await queryMetaFbKeywordPacksApi(param);
+        keywordDataSource.value = res?.data || [];
+        pagination.value.total = res?.totalCount ?? 0;
+      } finally {
+        loading.value = false;
+      }
+    };
+
+    const handleTableChange = (paginationArg: any) => {
+      const nextCurrent = paginationArg?.current;
+      const nextPageSize = paginationArg?.pageSize;
+
+      if (typeof nextCurrent === 'number') pagination.value.current = nextCurrent;
+      if (typeof nextPageSize === 'number') pagination.value.pageSize = nextPageSize;
+
+      fetchPages();
+    };
+
+    const handleGetPages = () => {
+      pagination.value.current = 1;
+      fetchPages();
+    };
+
+    const handleSyncLatest = () => {
+      const ids = selectedRowKeys.value.map(v => Number(v)).filter(v => Number.isFinite(v));
+      if (!useMock) {
+        batchSyncMetaFbPagesApi({ page_ids: ids.length ? ids : undefined }).then(() => {
+          message.success('同步最新已触发');
+          handleGetPages();
+        });
+        return;
+      }
+      handleGetPages();
+    };
+
+    const handleMoreAction = (action: string) => {
+      if (action === 'refresh') {
+        handleGetPages();
+        return;
+      }
+      if (action === 'sync-latest') {
+        handleSyncLatest();
+      }
+    };
+
+    // 关键词包弹窗相关
+    const keywordModalVisible = ref(false);
+    const keywordModalTitle = ref('添加关键词包');
+    const keywordForm = reactive({
+      id: '',
+      name: '',
+      keywords: '',
+    });
+
+    const keywordLineCount = computed(() => {
+      const lines = keywordForm.keywords.split('\n');
+      return Math.max(lines.length, 1);
+    });
+
+    const handleAddKeywordPack = () => {
+      keywordModalTitle.value = '添加关键词包';
+      keywordForm.id = '';
+      keywordForm.name = '';
+      keywordForm.keywords = '';
+      keywordModalVisible.value = true;
+    };
+
+    const handleEditKeywordPack = async (record: any) => {
+      keywordModalTitle.value = '编辑关键词包';
+      keywordForm.id = record.id;
+      keywordForm.name = record.pack_name;
+      keywordModalVisible.value = true;
+
+      if (!useMock) {
+        const res: any = await getMetaFbKeywordPackKeywordsApi(record.id);
+        const kws: string[] = res?.data?.keywords ?? [];
+        keywordForm.keywords = kws.join('\n');
+      } else {
+        // mock 编辑用占位
+        keywordForm.keywords = '示例关键词1\n示例关键词2';
+      }
+    };
+
+    const handleKeywordModalOk = async () => {
+      if (!keywordForm.name.trim()) {
+        message.error('请输入关键词包名称');
+        return;
+      }
+      if (!keywordForm.keywords.trim()) {
+        message.error('请输入关键词');
+        return;
+      }
+
+      const keywords = keywordForm.keywords
+        .split('\n')
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      if (!keywords.length) {
+        message.error('请输入有效关键词');
+        return;
+      }
+
+      if (!useMock) {
+        if (!keywordForm.id) {
+          await createMetaFbKeywordPackApi({
+            pack_name: keywordForm.name,
+            keywords,
+          });
+        } else {
+          await updateMetaFbKeywordPackApi(keywordForm.id, {
+            pack_name: keywordForm.name,
+            keywords,
+          });
+        }
+      }
+
+      message.success('保存成功');
+      keywordModalVisible.value = false;
+      handleGetPages();
+    };
+
+    const handleCopyAllKeywords = () => {
+      if (!keywordForm.keywords) return;
+      navigator.clipboard.writeText(keywordForm.keywords).then(() => {
+        message.success('已复制到剪贴板');
+      });
+    };
+
+    const handleDeleteKeywordPack = async (record: any) => {
+      if (!record?.id) return;
+      if (!window.confirm(`确定删除关键词包「${record.pack_name ?? ''}」吗？`)) return;
+
+      if (!useMock) {
+        await deleteMetaFbKeywordPackApi(record.id);
+      }
+
+      message.success('删除成功');
+      keywordModalVisible.value = false;
+      handleGetPages();
+    };
+
+    const goToPageComments = (record: any) => {
+      keepCommentFilterOnNextTabSwitch.value = true;
+      activeTabKey.value = 'comment';
+      commentPageId.value = record.public_page_id;
+      pagination.value.current = 1;
+      fetchPages();
+    };
+
+    const handleRefreshKeywords = () => {
+      handleGetPages();
+    };
+
+    watch([
+      publicPageSearchText,
+      authorizationStatus,
+      activeTabKey,
+      commentSearchText,
+      commentStatus,
+      commentPageId,
+      commentPostId,
+      commentTimeRange,
+      keywordPackSearchText,
+    ], () => {
+      // 筛选条件或 Tab 变化时，从第一页重新加载
+      pagination.value.current = 1;
+      fetchPages();
+    });
+
+    watch(activeTabKey, (tab) => {
+      if (tab !== 'comment') {
+        return;
+      }
+      // 手动切到“评论管理”时默认看全量；仅从主页名称跳转时保留主页筛选
+      if (keepCommentFilterOnNextTabSwitch.value) {
+        keepCommentFilterOnNextTabSwitch.value = false;
+        return;
+      }
+      commentPageId.value = undefined;
+    });
+
+    onMounted(async () => {
+      if (!useMock) {
+        const optionRes: any = await queryMetaFbPageOptionsApi();
+        commentPageOptions.value = optionRes?.data || [];
+      }
+      await fetchPages();
+    });
+
+    const handleBatchCommentAction = (info: any) => {
+      const key = info.key;
+      if (selectedRowKeys.value.length === 0) {
+        message.warning('请先选择评论');
+        return;
+      }
+      // 这里不要强制转 number，Facebook 评论 ID / 后端主键可能是字符串
+      // 直接把表格的 rowKey 原样传给后端，避免被转成 NaN 后数组为空导致后端无实际操作
+      const ids = selectedRowKeys.value.slice();
+      const actionMap: Record<string, 'REPLY' | 'HIDE' | 'UNHIDE' | 'LIKE' | 'UNLIKE' | 'DELETE'> = {
+        reply: 'REPLY',
+        hide: 'HIDE',
+        unhide: 'UNHIDE',
+        like: 'LIKE',
+        unlike: 'UNLIKE',
+        delete: 'DELETE',
+      };
+      const action = actionMap[key];
+      if (!action) return;
+
+      if (useMock) {
+        message.success('批量操作成功');
+        return;
+      }
+
+      batchActionMetaFbCommentsApi({ comment_ids: ids, action }).then(() => {
+        message.success('批量操作成功');
+        selectedRowKeys.value = [];
+        fetchPages();
+      });
+    };
+
+    const handleBatchKeywordAction = (info: any) => {
+      if (info.key !== 'delete') return;
+      if (selectedRowKeys.value.length === 0) {
+        message.warning('请先选择关键词包');
+        return;
+      }
+
+      const ids = selectedRowKeys.value.map(v => Number(v)).filter(v => Number.isFinite(v));
+      if (useMock) {
+        message.success('批量删除成功');
+        return;
+      }
+
+      batchDeleteMetaFbKeywordPacksApi({ pack_ids: ids }).then(() => {
+        message.success('批量删除成功');
+        selectedRowKeys.value = [];
+        fetchPages();
+      });
+    };
+
+    return {
+      dayjs,
+      columns,
+      commentColumns,
+      keywordColumns,
+      dataSource,
+      commentDataSource,
+      keywordDataSource,
+      loading,
+      pagination,
+      tableHeight,
+      safeTableHeight,
+      handleGetPages,
+      handleTableChange,
+      handleAutoRule,
+      autoRuleModalVisible,
+      autoRuleForm,
+      handleAutoRuleOk,
+      handleAddPage,
+      handleSyncLatest,
+      handleMoreAction,
+      selectedRowKeys,
+      onSelectChange,
+      publicPageSearchText,
+      authorizationStatus,
+      authorizationStatusOptions,
+      activeTabKey,
+      batchOperationChecked,
+      commentSearchText,
+      commentStatus,
+      commentPageId,
+      commentTimeRange,
+      commentPostId,
+      commentStatusOptions,
+      commentPageOptions,
+      keywordPackSearchText,
+      handleAddKeywordPack,
+      handleEditKeywordPack,
+      handleDeleteKeywordPack,
+      keywordModalVisible,
+      keywordModalTitle,
+      keywordForm,
+      keywordLineCount,
+      handleKeywordModalOk,
+      handleCopyAllKeywords,
+      goToPageComments,
+      handleRefreshKeywords,
+      handleBatchCommentAction,
+      handleBatchKeywordAction,
+    };
+  },
+});
+</script>
+
+<style scoped lang="less">
+.facebook-pages-container {
+  background-color: #f0f2f5;
+  padding: 12px 0;
+  min-height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  .tabs-section {
+    background: #fff;
+    padding: 0 24px;
+    border-bottom: 1px solid #f0f0f0;
+    
+    :deep(.ant-tabs-nav) {
+      margin-bottom: 0;
+      &::before {
+        border-bottom: none;
+      }
+    }
+  }
+
+  .filter-card {
+    background: #fff;
+    border-bottom: 1px solid #f0f0f0;
+
+    .instrument-toolbar {
+      padding: 16px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+
+      .filter-section {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px 24px;
+        align-items: center;
+
+        .filter-item {
+          display: flex;
+          align-items: center;
+          min-width: 220px;
+
+          .filter-label {
+            min-width: 60px;
+            padding-right: 8px;
+            font-size: 14px;
+            color: #333;
+            white-space: nowrap;
+          }
+
+          :deep(.ant-input), :deep(.ant-select), :deep(.ant-picker) {
+            flex: 1;
+            border-radius: 2px;
+          }
+        }
+      }
+
+      .action-section {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding-top: 12px;
+        border-top: 1px solid #f5f5f5;
+
+        .info-text {
+          margin-left: auto;
+          font-size: 14px;
+          color: #1890ff;
+        }
+
+        :deep(.ant-btn) {
+          border-radius: 2px;
+          font-size: 14px;
+          height: 32px;
+        }
+      }
+    }
+  }
+
+  .table-section {
+    padding: 0 24px;
+    background: #fff;
+    overflow: hidden;
+
+    :deep(.ant-table) {
+      font-size: 14px;
+
+      .ant-table-thead > tr > th {
+        background: #fafafa;
+        color: #333;
+        font-weight: 500;
+        padding: 12px 16px;
+        border-bottom: 1px solid #f0f0f0;
+
+        &::before {
+          display: none;
+        }
+      }
+
+      .ant-table-tbody > tr > td {
+        padding: 12px 16px;
+        border-bottom: 1px solid #f0f0f0;
+      }
+    }
+  }
+
+  .empty-wrapper {
+    margin-top: 12px;
+    background: #fff;
+    padding: 48px;
+    border-radius: 4px;
+    text-align: center;
+  }
+
+  :deep(.auto-rule-modal .ant-modal-header) {
+    padding: 14px 24px;
+  }
+
+  :deep(.auto-rule-modal .ant-modal-title) {
+    font-size: 24px;
+    line-height: 32px;
+    font-weight: 600;
+  }
+
+  :deep(.auto-rule-modal .ant-modal-footer) {
+    padding: 12px 24px;
+  }
+
+  .auto-rule-modal-content, .keyword-modal-content {
+    .mb-24 {
+      margin-bottom: 24px;
+    }
+
+    :deep(.ant-alert) {
+      border-radius: 4px;
+      background-color: #e6f7ff;
+      border: 1px solid #91d5ff;
+      .ant-alert-message {
+        color: #000000d9;
+        font-size: 14px;
+      }
+    }
+
+    .modal-form-row {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 22px;
+
+      .row-label {
+        width: 120px;
+        line-height: 30px;
+        color: #000000d9;
+        font-weight: 400;
+        font-size: 24px;
+      }
+
+      .row-control {
+        flex: 1;
+        min-width: 0;
+      }
+    }
+
+    .horizontal-radio-group {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
+      
+      :deep(.ant-radio-wrapper) {
+        margin-right: 0;
+        font-size: 14px;
+        color: #000000d9;
+        display: flex;
+        align-items: center;
+      }
+    }
+  }
+
+  .auto-rule-modal-content {
+    .auto-rule-alert {
+      margin-bottom: 22px;
+    }
+
+    .status-radio-group {
+      :deep(.ant-radio-button-wrapper) {
+        min-width: 92px;
+        text-align: center;
+      }
+    }
+  }
+
+  // 关键词包弹窗样式
+  .keyword-modal-content {
+    .keyword-pack-name-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 16px;
+
+      .name-label {
+        width: 120px;
+        color: #000000d9;
+        font-weight: 500;
+      }
+
+      .name-input-wrap {
+        flex: 1;
+      }
+    }
+
+    .keyword-block {
+      .name-label {
+        margin-bottom: 8px;
+        color: #000000d9;
+        font-weight: 500;
+      }
+    }
+
+    .required-mark {
+      color: #ff4d4f;
+      margin-right: 2px;
+    }
+
+    .mb-24 {
+      margin-bottom: 24px;
+    }
+
+    :deep(.ant-alert) {
+      border-radius: 4px;
+      background-color: #e6f7ff;
+      border: 1px solid #91d5ff;
+      .ant-alert-message {
+        color: #000000d9;
+        font-size: 14px;
+      }
+    }
+
+    .keyword-textarea-wrapper {
+      display: flex;
+      border: 1px solid #d9d9d9;
+      border-radius: 2px;
+      overflow: hidden;
+
+      .line-numbers {
+        width: 32px;
+        background-color: #f5f5f5;
+        border-right: 1px solid #d9d9d9;
+        padding: 5px 0;
+        text-align: center;
+        color: #bfbfbf;
+        font-family: monospace;
+        line-height: 1.5;
+        font-size: 14px;
+        user-select: none;
+      }
+
+      .keyword-textarea {
+        flex: 1;
+        border: none;
+        padding: 4px 11px;
+
+        :deep(textarea) {
+          border: none !important;
+          box-shadow: none !important;
+        }
+
+        &:focus {
+          box-shadow: none;
+        }
+      }
+    }
+
+    .keyword-actions {
+      margin-top: 8px;
+      .copy-link {
+        font-size: 14px;
+        color: #1890ff;
+      }
+    }
+  }
+}
+</style>

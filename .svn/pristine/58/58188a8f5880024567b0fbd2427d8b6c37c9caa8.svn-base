@@ -1,0 +1,76 @@
+export type TaskStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
+export type MaterialEditStatus = 'success' | 'failed' | 'pending';
+
+export type MaterialType = 'image' | 'video';
+
+export type FolderOption = 'original' | 'new';
+
+export type FieldMode = 'original' | 'unified' | 'smart';
+
+export interface MaterialEditorTask {
+  id: string;              // 任务Id
+  status: TaskStatus;      // 状态
+  createdAt: string;       // 创建时间
+  createdBy: string;       // 创建人
+  folderId?: string;       // 文件夹ID
+  folderName?: string;     // 文件夹名称
+}
+
+export interface MaterialEditItem {
+  id: string;                      // 素材ID
+  name: string;                    // 素材名称
+  previewUrl: string;              // 素材预览
+  originalPreviewUrl: string;      // 原素材预览
+  status: MaterialEditStatus;      // 状态
+  editContent: string;             // 编辑内容
+  reason: string;                  // 生效原因
+}
+
+export interface TaskFilter {
+  taskId?: string;
+  status?: TaskStatus;
+  startTime?: string;
+  endTime?: string;
+  createdBy?: string;
+}
+
+// Create Task Modal Types
+export interface MaterialItem {
+  id: string;
+  name: string;
+  type: MaterialType;
+  previewUrl: string;
+}
+
+export interface CreateTaskForm {
+  materialType: MaterialType | undefined;
+  materials: MaterialItem[];
+  folderOption: FolderOption;
+  targetFolderId: string | undefined;
+  tags: string[];
+  designerId: string | undefined;
+  creativeId: string | undefined;
+  materialName: string;
+}
+
+export interface FolderInfo {
+  id: string;
+  name: string;
+}
+
+export interface DesignerInfo {
+  id: string;
+  name: string;
+}
+
+export interface CreativeInfo {
+  id: string;
+  name: string;
+}
+
+export interface TagInfo {
+  id: string;
+  name: string;
+  color?: string;
+}

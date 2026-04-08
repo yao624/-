@@ -1,0 +1,228 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Resources\CopywritingResource;
+use App\Models\Copywriting;
+use App\Models\Tag;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
+
+class CopywritingController extends Controller
+{
+    /**
+     * Display a listing of the resource.
+     */
+    public function index(Request $request)
+    {
+        $sortField = $request->get('sortField', 'created_at');
+        $sortDirection = $request->get('sortOrder', 'desc');
+        $pageSize = $request->get('pageSize', 10);
+        $pageNo = $request->get('pageNo', 1);
+
+        $tagNames = $request->has('tags') ? explode(',', $request->get('tags')) : [];
+        Log::debug($tagNames);
+
+        $searchableFields = [
+            'primary_text' => $request->get('primary_text'),
+            'headline' => $request->get('headline'),
+            'description' => $request->get('description'),
+            'notes' => $request->get('notes'),
+            'date_start' => $request->get('date_start'),
+            'date_end' => $request->get('date_end')
+        ];
+
+        if ($request->get('name')) {
+            $searchableFields['notes'] = $request->get('name');
+        }
+
+        $copywritings = Copywriting::searchByTagNames($tagNames)->search($searchableFields)
+            ->with('sharedWith')
+            ->where(function ($query) {
+                $query->where('user_id', auth()->id()) // 当前用户创建的 Material
+                ->orWhereHas('sharedWith', function ($subQuery) {
+                    $subQuery->where('user_id', auth()->id()); // 被分享给当前用户的 Material
+                });
+            })
+            ->orderBy($sortField, $sortDirection)
+            ->orderBy('id', $sortDirection)
+            ->paginate($pageSize, ['*'], 'page', $pageNo);
+
+        return [
+            'data' => CopywritingResource::collection($copywritings->items()),
+            'pageSize' => $copywritings->perPage(),
+            'pageNo' => $copywritings->currentPage(),
+            'totalPage' => $copywritings->lastPage(),
+            'totalCount' => $copywritings->total(),
+        ];
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     */
+    public function store(Request $request)
+    {
+        Log::debug('store copywriting');
+        $request->validate([
+            'primary_text' => 'nullable',
+            'headline' => 'nullable',
+            'description' => 'nullable',
+            'notes' => 'nullable',
+            'new_tags' => [
+                'sometimes', // 只有当 new_tags 存在时才应用后续的规则
+                'array',     // new_tags 必须是一个数组
+            ],
+            'new_tags.*' => [
+                'string',    // new_tags 数组中的每个元素必须是字符串
+                'distinct',  // new_tags 数组中的每个元素必须是唯一的
+                Rule::notIn(Tag::pluck('name')->toArray()), // new_tags 数组中的每个元素不能在 Tag 模型的 name 字段值中
+            ],
+        ]);
+
+        $copywriting = Copywriting::create([
+            'primary_text' => $request->input('primary_text'),
+            'headline' => $request->input('headline'),
+            'description' => $request->input('description'),
+            'notes' => $request->input('notes', ''),
+            'user_id' => auth()->id(),
+        ]);
+
+        // 创建新的 Tag
+        $newTags = collect($request->get('new_tags'))->map(function ($name) {
+            return Tag::query()->firstOrCreate(['name' => $name])->id;
+        });
+
+        // 使用已经有的 tags
+        $tagIds = array_merge($request->get('tag_ids', []), $newTags->toArray());
+        $copywriting->tags()->sync($tagIds);
+
+        // 预加载 tags
+        $copywriting->load('tags');
+
+        return new CopywritingResource($copywriting);
+    }
+
+    /**
+     * Display the specified resource.
+     */
+    public function show(Copywriting $copywriting)
+    {
+        // 获取当前用户的 ID
+        $currentUserId = auth()->id();
+
+        // 检查当前用户是否是材料的创建者或被分享的用户
+        if ($copywriting->user_id !== $currentUserId && !$copywriting->isSharedWith($currentUserId)) {
+            // 如果用户没有权限，返回403 Forbidden
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+        return new CopywritingResource($copywriting);
+    }
+
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update(Request $request, Copywriting $copywriting)
+    {
+        // 检查当前用户是否为材料的创建者
+        if ($copywriting->user_id !== auth()->id()) {
+            // 如果用户没有权限，返回403 Forbidden
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        // 验证请求数据
+        $validatedData = $request->validate([
+            'primary_text' => 'nullable',
+            'headline' => 'nullable',
+            'description' => 'nullable',
+            'notes' => 'nullable',
+            'new_tags' => [
+                'sometimes', // 只有当 new_tags 存在时才应用后续的规则
+                'array',     // new_tags 必须是一个数组
+            ],
+            'new_tags.*' => [
+                'string',    // new_tags 数组中的每个元素必须是字符串
+                'distinct',  // new_tags 数组中的每个元素必须是唯一的
+                Rule::notIn(Tag::pluck('name')->toArray()), // new_tags 数组中的每个元素不能在 Tag 模型的 name 字段值中
+            ],
+        ]);
+
+        // 更新模型实例
+        $copywriting->update($validatedData);
+        // 创建新的 Tag
+        $newTags = collect($request->get('new_tags'))->map(function ($name) {
+            return Tag::query()->firstOrCreate(['name' => $name])->id;
+        });
+
+        // 使用已经有的 tags
+        $tagIds = array_merge($request->get('tag_ids', []), $newTags->toArray());
+        $copywriting->tags()->sync($tagIds);
+
+        // 返回资源
+        return new CopywritingResource($copywriting);
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy(Copywriting $copywriting)
+    {
+        if ($copywriting->user_id !== auth()->id()) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+        $copywriting->delete();
+        return response()->json(null, 204);
+    }
+
+    public function share(Request $request)
+    {
+        $request->validate([
+            'user_emails' => 'required|array',
+            'user_emails.*' => 'exists:users,email', // 确保每个用户ID存在
+            'resource_ids' => 'required|array',
+            'resource_ids.*' => 'exists:copywritings,id', // 确保每个材料ID存在
+        ]);
+
+        $userIds = User::whereIn('email', $request->user_emails)->pluck('id');
+
+        foreach ($request->resource_ids as $resourceId) {
+            $resource = Copywriting::findOrFail($resourceId);
+
+            // 检查当前用户是否为该材料的拥有者
+            if ($resource->user_id !== $request->user()->id) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            $resource->sharedWith()->syncWithoutDetaching($userIds);
+        }
+
+        return response()->json(['message' => 'Resource shared successfully.']);
+    }
+
+    public function unshare(Request $request)
+    {
+        $request->validate([
+            'user_emails' => 'required|array',
+            'user_emails.*' => 'exists:users,email', // 确保每个用户ID存在
+            'resource_ids' => 'required|array',
+            'resource_ids.*' => 'exists:copywritings,id', // 确保每个材料ID存在
+        ]);
+
+        $userIds = User::whereIn('email', $request->user_emails)->pluck('id');
+
+        foreach ($request->resource_ids as $resourceId) {
+            $resource = Copywriting::findOrFail($resourceId);
+
+            // 检查当前用户是否为该材料的拥有者
+            if ($resource->user_id !== $request->user()->id) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            $resource->sharedWith()->detach($userIds);
+        }
+
+        return response()->json(['message' => 'Resource unshared successfully.']);
+    }
+
+}

@@ -1,0 +1,37 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class MetaTags extends Model
+{
+    use HasFactory;
+
+    protected $table = 'meta_tags';
+
+    protected $fillable = [
+        'name',
+        'remark',
+        'folder_id',
+        'tag_object',
+        'tag_object_level1',
+        'sort',
+    ];
+
+    protected $casts = [
+        'folder_id' => 'integer',
+        'sort' => 'integer',
+    ];
+
+    public function folder()
+    {
+        return $this->belongsTo(MetaTagFolders::class, 'folder_id');
+    }
+
+    public function options()
+    {
+        return $this->hasMany(MetaTagOptions::class, 'tag_id');
+    }
+}

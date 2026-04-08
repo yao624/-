@@ -1,0 +1,363 @@
+<template>
+  <page-container :showPageHeader="false">
+    <div class="channel-manage-page">
+      <div class="content-card">
+
+        <!-- 筛选区域 -->
+        <div class="filter-area">
+          <filter-section
+            ref="filterSectionRef"
+            @search="handleSearch"
+            @reset="handleReset"
+          />
+        </div>
+
+        <!-- 操作栏 -->
+        <div class="action-bar">
+          <div class="action-left">
+            <a-dropdown :disabled="!hasSelected">
+              <a-button>
+                {{ t('pages.channelManage.actions.batchOperation') }}
+                <DownOutlined />
+              </a-button>
+              <template #overlay>
+                <a-menu @click="handleBatchOperation">
+                  <a-menu-item key="delete">
+                    {{ t('pages.channelManage.actions.batchDelete') }}
+                  </a-menu-item>
+                </a-menu>
+              </template>
+            </a-dropdown>
+          </div>
+          <div class="action-right">
+            <a-button @click="handleCustomColumns">
+              {{ t('pages.channelManage.actions.customColumns') }}
+            </a-button>
+          </div>
+        </div>
+
+        <!-- 表格区域 -->
+        <div class="table-area">
+          <material-table
+            :data-source="materialData"
+            :loading="loading"
+            :pagination="pagination"
+            :selected-row-keys="selectedRowKeys"
+            @update:selected-row-keys="handleSelectionChange"
+            @page-change="handlePageChange"
+            @edit="handleEdit"
+            @delete="handleDelete"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- 上传弹窗 -->
+    <a-modal
+      v-model:open="uploadModalVisible"
+      :title="t('pages.channelManage.actions.upload')"
+      width="600px"
+      @ok="handleUploadModalOk"
+      @cancel="uploadModalVisible = false"
+    >
+      <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
+        <a-form-item :label="t('pages.channelManage.form.channel')">
+          <a-select
+            v-model:value="uploadForm.platform"
+            :placeholder="t('pages.channelManage.form.selectChannel')"
+          >
+            <a-select-option value="meta">Meta</a-select-option>
+            <a-select-option value="google">Google</a-select-option>
+            <a-select-option value="tiktok">TikTok</a-select-option>
+            <a-select-option value="kwai">快手</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item :label="t('pages.channelManage.form.files')">
+          <a-upload
+            v-model:file-list="uploadForm.fileList"
+            :multiple="true"
+            :before-upload="() => false"
+            list-type="picture-card"
+          >
+            <div>
+              <PlusOutlined />
+              <div style="margin-top: 8px">{{ t('pages.channelManage.form.uploadText') }}</div>
+            </div>
+          </a-upload>
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
+    <!-- 编辑弹窗 -->
+    <a-modal
+      v-model:open="editModalVisible"
+      :title="t('pages.channelManage.actions.edit')"
+      width="500px"
+      @ok="handleEditModalOk"
+      @cancel="editModalVisible = false"
+    >
+      <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
+        <a-form-item :label="t('pages.channelManage.table.name')">
+          <a-input
+            v-model:value="editForm.name"
+            :placeholder="t('pages.channelManage.form.namePlaceholder')"
+          />
+        </a-form-item>
+        <a-form-item :label="t('pages.channelManage.table.remark')">
+          <a-textarea
+            v-model:value="editForm.remark"
+            :placeholder="t('pages.channelManage.form.remarkPlaceholder')"
+            :rows="4"
+          />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+  </page-container>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { message, Modal } from 'ant-design-vue';
+import { PlusOutlined, DownOutlined } from '@ant-design/icons-vue';
+import MaterialActions from './components/MaterialActions.vue';
+import FilterSection from './components/FilterSection.vue';
+import MaterialTable from './components/MaterialTable.vue';
+import { getMaterialList, deleteMaterial, batchDeleteMaterials } from './mock-data';
+import type { Material, PlatformType } from './types';
+
+const { t } = useI18n();
+
+// Data
+const materialData = ref<Material[]>([]);
+const loading = ref(false);
+const selectedRowKeys = ref<string[]>([]);
+const currentPage = ref(1);
+const pageSize = ref(20);
+const total = ref(0);
+
+const filterSectionRef = ref<any>(null);
+
+// Upload Modal
+const uploadModalVisible = ref(false);
+const uploadForm = ref({
+  platform: undefined as PlatformType | undefined,
+  fileList: [] as any[],
+});
+
+// Edit Modal
+const editModalVisible = ref(false);
+const editForm = ref({
+  id: '',
+  name: '',
+  remark: '',
+});
+
+// 筛选条件
+const currentPlatform = ref<PlatformType | undefined>();
+const currentMaterialType = ref<string | undefined>();
+const currentStartDate = ref<string | undefined>();
+const currentEndDate = ref<string | undefined>();
+
+// Computed
+const pagination = computed(() => ({
+  current: currentPage.value,
+  pageSize: pageSize.value,
+  total: total.value,
+  showSizeChanger: true,
+  showQuickJumper: true,
+  showTotal: (total: number) => t('pages.channelManage.messages.total', { count: total }),
+}));
+
+const hasSelected = computed(() => selectedRowKeys.value.length > 0);
+
+// Methods
+const loadData = async () => {
+  loading.value = true;
+  try {
+    const response = await getMaterialList({
+      page: currentPage.value,
+      pageSize: pageSize.value,
+      platform: currentPlatform.value,
+      materialType: currentMaterialType.value,
+      startTime: currentStartDate.value,
+      endTime: currentEndDate.value,
+    });
+    materialData.value = response.data;
+    total.value = response.total;
+  } finally {
+    loading.value = false;
+  }
+};
+
+const handleSearch = (platform?: PlatformType, materialType?: string, dateRange?: [string, string]) => {
+  currentPlatform.value = platform;
+  currentMaterialType.value = materialType;
+  if (dateRange) {
+    currentStartDate.value = dateRange[0];
+    currentEndDate.value = dateRange[1];
+  } else {
+    currentStartDate.value = undefined;
+    currentEndDate.value = undefined;
+  }
+  currentPage.value = 1;
+  loadData();
+};
+
+const handleReset = () => {
+  currentPlatform.value = undefined;
+  currentMaterialType.value = undefined;
+  currentStartDate.value = undefined;
+  currentEndDate.value = undefined;
+  currentPage.value = 1;
+  selectedRowKeys.value = [];
+  loadData();
+};
+
+const handleSelectionChange = (keys: string[]) => {
+  selectedRowKeys.value = keys;
+};
+
+const clearSelection = () => {
+  selectedRowKeys.value = [];
+};
+
+const handlePageChange = (page: number, size: number) => {
+  currentPage.value = page;
+  pageSize.value = size;
+  loadData();
+};
+
+const handleUpload = () => {
+  uploadForm.value.platform = undefined;
+  uploadForm.value.fileList = [];
+  uploadModalVisible.value = true;
+};
+
+const handleUploadModalOk = async () => {
+  if (!uploadForm.value.platform) {
+    message.warning(t('pages.channelManage.messages.channelRequired'));
+    return;
+  }
+  if (uploadForm.value.fileList.length === 0) {
+    message.warning(t('pages.channelManage.messages.filesRequired'));
+    return;
+  }
+  // TODO: 实现上传逻辑
+  message.success(t('pages.channelManage.messages.uploadSuccess'));
+  uploadModalVisible.value = false;
+  loadData();
+};
+
+const handleEdit = (record: Material) => {
+  editForm.value.id = record.id;
+  editForm.value.name = record.name;
+  editForm.value.remark = record.remark || '';
+  editModalVisible.value = true;
+};
+
+const handleEditModalOk = () => {
+  if (!editForm.value.name.trim()) {
+    message.warning(t('pages.channelManage.messages.nameRequired'));
+    return;
+  }
+  const index = materialData.value.findIndex(item => item.id === editForm.value.id);
+  if (index !== -1) {
+    materialData.value[index] = {
+      ...materialData.value[index],
+      name: editForm.value.name,
+      remark: editForm.value.remark,
+    };
+    message.success(t('pages.channelManage.messages.editSuccess'));
+  }
+  editModalVisible.value = false;
+};
+
+const handleDelete = async (record: Material) => {
+  try {
+    await deleteMaterial(record.id);
+    message.success(t('pages.channelManage.messages.deleteSuccess'));
+    loadData();
+  } catch {
+    message.error(t('pages.channelManage.messages.deleteError'));
+  }
+};
+
+const handleBatchDelete = () => {
+  Modal.confirm({
+    title: t('pages.channelManage.messages.batchDeleteConfirm'),
+    content: t('pages.channelManage.messages.batchDeleteConfirmContent', { count: selectedRowKeys.value.length }),
+    onOk: async () => {
+      try {
+        await batchDeleteMaterials(selectedRowKeys.value);
+        message.success(t('pages.channelManage.messages.batchDeleteSuccess'));
+        selectedRowKeys.value = [];
+        loadData();
+      } catch {
+        message.error(t('pages.channelManage.messages.batchDeleteError'));
+      }
+    },
+  });
+};
+
+const handleBatchOperation = ({ key }: { key: string }) => {
+  if (key === 'delete') {
+    handleBatchDelete();
+  }
+};
+
+const handleSyncData = () => {
+  loadData();
+};
+
+const handleCustomColumns = () => {
+  message.info(t('pages.channelManage.messages.customColumnsInfo'));
+};
+
+// Lifecycle
+onMounted(() => {
+  loadData();
+});
+</script>
+
+<style scoped lang="less">
+.channel-manage-page {
+  min-height: 500px;
+
+  .content-card {
+    background: #fff;
+    border-radius: 8px;
+    padding: 16px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+
+    .action-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      .action-left {
+        display: flex;
+        gap: 8px;
+      }
+
+      .action-right {
+        display: flex;
+        gap: 8px;
+      }
+    }
+
+    .filter-area {
+      flex-shrink: 0;
+    }
+
+    .table-area {
+      flex: 1;
+      overflow: hidden;
+      min-height: 0;
+    }
+  }
+}
+</style>

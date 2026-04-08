@@ -1,0 +1,211 @@
+<template>
+  <page-container :title="t('pages.materialGroups.title')">
+    <a-card :bordered="false">
+      <div class="toolbar">
+        <a-space>
+          <a-input
+            v-model:value="searchText"
+            :placeholder="t('请输入素材组名称')"
+            style="width: 260px"
+            allow-clear
+            @pressEnter="reload"
+          />
+          <a-button type="primary" @click="reload">{{ t('查询') }}</a-button>
+          <a-button @click="resetSearch">{{ t('重置') }}</a-button>
+        </a-space>
+        <a-button type="primary" @click="openCreate">
+          {{ t('新增素材组') }}
+        </a-button>
+      </div>
+
+      <a-table
+        row-key="id"
+        :loading="loading"
+        :columns="columns"
+        :data-source="tableData"
+        :pagination="pagination"
+        @change="handleTableChange"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.dataIndex === 'operation'">
+            <a-space>
+              <a-button type="link" size="small" @click="openEdit(record)">{{ t('编辑') }}</a-button>
+              <a-popconfirm
+                :title="t('确认删除该素材组？')"
+                :ok-text="t('确定')"
+                :cancel-text="t('取消')"
+                @confirm="removeGroup(record)"
+              >
+                <a-button type="link" danger size="small">{{ t('删除') }}</a-button>
+              </a-popconfirm>
+            </a-space>
+          </template>
+        </template>
+      </a-table>
+    </a-card>
+
+    <a-modal
+      v-model:visible="modalVisible"
+      :title="isEdit ? t('编辑素材组') : t('新增素材组')"
+      :confirm-loading="saving"
+      @ok="submit"
+      @cancel="closeModal"
+    >
+      <a-form layout="vertical">
+        <a-form-item :label="t('素材组名称')" required>
+          <a-input v-model:value="formData.name" :maxlength="100" />
+        </a-form-item>
+        <a-form-item :label="t('描述')">
+          <a-textarea v-model:value="formData.description" :maxlength="500" :rows="3" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+  </page-container>
+</template>
+
+<script lang="ts" setup>
+import { onActivated, onMounted, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { message } from 'ant-design-vue';
+import {
+  getMaterialLibraryMaterialGroups,
+  createMaterialLibraryMaterialGroup,
+  updateMaterialLibraryMaterialGroup,
+  deleteMaterialLibraryMaterialGroup,
+} from '@/api/material-library/options';
+
+const { t } = useI18n();
+
+const searchText = ref('');
+const loading = ref(false);
+const saving = ref(false);
+const tableData = ref<any[]>([]);
+const pagination = ref({
+  current: 1,
+  pageSize: 20,
+  total: 0,
+  showSizeChanger: true,
+  pageSizeOptions: ['10', '20', '50', '100'],
+});
+
+const columns = [
+  { title: 'ID', dataIndex: 'id', key: 'id', width: 120 },
+  { title: t('素材组名称'), dataIndex: 'name', key: 'name' },
+  { title: t('描述'), dataIndex: 'description', key: 'description' },
+  { title: t('创建时间'), dataIndex: 'createTime', key: 'createTime', width: 180 },
+  { title: t('操作'), dataIndex: 'operation', key: 'operation', width: 150 },
+];
+
+const modalVisible = ref(false);
+const isEdit = ref(false);
+const editingId = ref<string | null>(null);
+const formData = ref({
+  name: '',
+  description: '',
+});
+
+const reload = async () => {
+  loading.value = true;
+  try {
+    const res = await getMaterialLibraryMaterialGroups({
+      search: searchText.value,
+      pageNo: pagination.value.current,
+      pageSize: pagination.value.pageSize,
+    } as any);
+    tableData.value = res.data || [];
+    pagination.value.total = res.totalCount || 0;
+  } finally {
+    loading.value = false;
+  }
+};
+
+const handleTableChange = (pag: any) => {
+  pagination.value.current = pag.current;
+  pagination.value.pageSize = pag.pageSize;
+  reload();
+};
+
+const resetSearch = () => {
+  searchText.value = '';
+  pagination.value.current = 1;
+  reload();
+};
+
+const openCreate = () => {
+  isEdit.value = false;
+  editingId.value = null;
+  formData.value = { name: '', description: '' };
+  modalVisible.value = true;
+};
+
+const openEdit = (record: any) => {
+  isEdit.value = true;
+  editingId.value = String(record.id);
+  formData.value = {
+    name: record.name || '',
+    description: record.description || '',
+  };
+  modalVisible.value = true;
+};
+
+const closeModal = () => {
+  modalVisible.value = false;
+  saving.value = false;
+};
+
+const submit = async () => {
+  const name = String(formData.value.name || '').trim();
+  if (!name) {
+    message.warning(t('请输入素材组名称'));
+    return;
+  }
+
+  saving.value = true;
+  try {
+    if (isEdit.value && editingId.value) {
+      await updateMaterialLibraryMaterialGroup(editingId.value, {
+        name,
+        description: formData.value.description || '',
+      });
+      message.success(t('修改成功'));
+    } else {
+      await createMaterialLibraryMaterialGroup({
+        name,
+        description: formData.value.description || '',
+      });
+      message.success(t('新增成功'));
+    }
+    closeModal();
+    reload();
+  } finally {
+    saving.value = false;
+  }
+};
+
+const removeGroup = async (record: any) => {
+  await deleteMaterialLibraryMaterialGroup(record.id);
+  message.success(t('删除成功'));
+  if (tableData.value.length === 1 && pagination.value.current > 1) {
+    pagination.value.current -= 1;
+  }
+  reload();
+};
+
+onMounted(() => {
+  reload();
+});
+
+onActivated(() => {
+  reload();
+});
+</script>
+
+<style scoped>
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+</style>
+

@@ -1,0 +1,230 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Permission;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
+
+class PermissionController extends BaseController
+{
+    public function index(Request $request)
+    {
+        try {
+            $query = Permission::query();
+
+            if ($request->filled('name')) {
+                $query->where('name', 'like', '%' . $request->get('name') . '%');
+            }
+
+            if ($request->filled('slug')) {
+                $query->where('slug', 'like', '%' . $request->get('slug') . '%');
+            }
+
+            if ($request->filled('type')) {
+                $query->where('type', $request->get('type'));
+            }
+
+            if ($request->filled('status')) {
+                $query->where('status', $request->get('status'));
+            }
+
+            $query->orderBy('sort', 'asc');
+
+            $permissions = $query->get();
+
+            return response()->json([
+                'status' => true,
+                'data' => $this->buildTree($permissions->all()),
+            ]);
+        } catch (\Throwable $th) {
+            Log::debug($th->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    private function buildTree($items, int $parentId = 0): array
+    {
+        $tree = [];
+        foreach ($items as $item) {
+            if ($item->pid == $parentId) {
+                $children = static::buildTree($items, $item->id);
+                if ($children) {
+                    $item->children = $children;
+                }
+                $tree[] = $item;
+            }
+        }
+        return $tree;
+    }
+
+    public function store(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'pid' => 'nullable|integer',
+                'name' => 'required|max:50',
+                'slug' => 'nullable|max:80',
+                'alias' => 'nullable|max:50',
+                'icon' => 'nullable|max:128',
+                'path' => 'nullable|max:200',
+                'component' => 'nullable|max:200',
+                'redirect' => 'nullable|max:200',
+                'type' => 'nullable|max:20',
+                'hide_in_menu' => 'nullable|integer|in:0,1',
+                'hide_children_in_menu' => 'nullable|integer|in:0,1',
+                'hide_in_breadcrumb' => 'nullable|integer|in:0,1',
+                'sort' => 'nullable|integer',
+                'status' => 'nullable|integer|in:0,1',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'validation error',
+                    'errors' => $validator->errors(),
+                ], 401);
+            }
+
+            $permission = Permission::create($request->only([
+                'pid', 'name', 'slug', 'alias', 'icon', 'path', 'component',
+                'redirect', 'type', 'hide_in_menu', 'hide_children_in_menu',
+                'hide_in_breadcrumb', 'sort', 'status',
+            ]));
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Permission created successfully',
+                'data' => $permission,
+            ], 200);
+        } catch (\Throwable $th) {
+            Log::debug($th->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function show($id)
+    {
+        try {
+            $permission = Permission::with('roles')->find($id);
+
+            if (!$permission) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Permission not found',
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => true,
+                'data' => $permission,
+            ]);
+        } catch (\Throwable $th) {
+            Log::debug($th->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function update(Request $request, $id)
+    {
+        try {
+            $permission = Permission::find($id);
+
+            if (!$permission) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Permission not found',
+                ], 404);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'pid' => 'nullable|integer',
+                'name' => 'nullable|max:50',
+                'slug' => 'nullable|max:80',
+                'alias' => 'nullable|max:50',
+                'icon' => 'nullable|max:128',
+                'path' => 'nullable|max:200',
+                'component' => 'nullable|max:200',
+                'redirect' => 'nullable|max:200',
+                'type' => 'nullable|max:20',
+                'hide_in_menu' => 'nullable|integer|in:0,1',
+                'hide_children_in_menu' => 'nullable|integer|in:0,1',
+                'hide_in_breadcrumb' => 'nullable|integer|in:0,1',
+                'sort' => 'nullable|integer',
+                'status' => 'nullable|integer|in:0,1',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'validation error',
+                    'errors' => $validator->errors(),
+                ], 401);
+            }
+
+            $pid = $request->get('pid');
+            if ($pid !== null && $pid == $id) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Cannot set parent to itself',
+                ], 401);
+            }
+
+            $permission->update($request->only([
+                'pid', 'name', 'slug', 'alias', 'icon', 'path', 'component',
+                'redirect', 'type', 'hide_in_menu', 'hide_children_in_menu',
+                'hide_in_breadcrumb', 'sort', 'status',
+            ]));
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Permission updated successfully',
+                'data' => $permission,
+            ]);
+        } catch (\Throwable $th) {
+            Log::debug($th->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function destroy($id)
+    {
+        try {
+            $permission = Permission::find($id);
+
+            if (!$permission) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Permission not found',
+                ], 404);
+            }
+
+            $permission->roles()->detach();
+            $permission->delete();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Permission deleted successfully',
+            ]);
+        } catch (\Throwable $th) {
+            Log::debug($th->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => $th->getMessage(),
+            ], 500);
+        }
+    }
+}

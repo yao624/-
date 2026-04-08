@@ -1,0 +1,39 @@
+{
+  "compilerOptions": {
+    "target": "es2018",
+    "module": "esnext",
+    "jsx": "preserve",
+    "rootDir": ".",
+    "importHelpers": true,
+    "moduleResolution": "node",
+    "allowJs": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "sourceMap": true,
+    "baseUrl": ".",
+    "types": ["node", "vite/client", "webpack-env"],
+    "paths": {
+      "@/*": ["src/*"]
+    },
+    "strict": true,
+    "strictFunctionTypes": false,
+    "lib": ["esnext", "dom", "DOM.Iterable"],
+    "strictNullChecks": false,
+    "experimentalDecorators": true,
+    "noUnusedParameters": true,
+    "noUnusedLocals": true,
+    "noImplicitAny": false,
+    "skipLibCheck": true
+  },
+  "include": [
+    "pages/**/*",
+    "components/**/*",
+    "views/**/*",
+    "utils/**/*",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.vue",
+    "node_modules/ant-design-vue/typings/global.d.ts"
+  ],
+  "exclude": ["node_modules/ant-design-vue/lib/**"]
+}

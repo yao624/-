@@ -1,0 +1,67 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class MetaMaterialEditItem extends Model
+{
+    use HasFactory;
+
+    protected $table = 'meta_material_edit_items';
+
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
+    protected $fillable = [
+        'task_id',
+        'material_id',
+        'material_name',
+        'preview_url',
+        'original_preview_url',
+        'status',
+        'edit_content',
+        'reason',
+    ];
+
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'task_id' => 'integer',
+        'material_id' => 'integer',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+    ];
+
+    public $timestamps = true;
+
+    /**
+     * 获取所属任务
+     */
+    public function task()
+    {
+        return $this->belongsTo(MetaMaterialEditorTask::class, 'task_id');
+    }
+
+    /**
+     * 获取素材
+     */
+    public function material()
+    {
+        return $this->belongsTo(MetaMediaMaterial::class, 'material_id');
+    }
+
+    /**
+     * 获取原始素材（通过 material 关联）
+     */
+    public function originalMaterial()
+    {
+        return $this->material();
+    }
+}

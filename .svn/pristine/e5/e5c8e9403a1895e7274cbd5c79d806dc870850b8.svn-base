@@ -1,0 +1,128 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreMetaTagRequest;
+use App\Models\MetaTags;
+use App\Services\MetaTagsService;
+use App\Traits\ApiResponse;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+class MetaTagsController extends Controller
+{
+    use ApiResponse;
+
+    protected MetaTagsService $service;
+
+    public function __construct(MetaTagsService $service)
+    {
+        $this->service = $service;
+    }
+
+    /**
+     * 获取标签列表
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function list(Request $request): JsonResponse
+    {
+        $filters = [
+            'keyword' => $request->input('keyword'),
+            'folder_id' => $request->input('folder_id'),
+            'tag_object' => $request->input('tag_object'),
+            'tag_object_level1' => $request->input('tag_object_level1'),
+        ];
+
+        $tags = $this->service->getList($filters);
+
+        return $this->success($tags);
+    }
+
+    /**
+     * 创建标签
+     *
+     * @param StoreMetaTagRequest $request
+     * @return JsonResponse
+     */
+    public function create(StoreMetaTagRequest $request): JsonResponse
+    {
+        try {
+            $data = $request->validated();
+            $tag = $this->service->create($data);
+
+            return $this->success($tag);
+        } catch (\Exception $e) {
+            return $this->fail($e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * 更新标签
+     *
+     * @param StoreMetaTagRequest $request
+     * @param int $id
+     * @return JsonResponse
+     */
+    public function update(StoreMetaTagRequest $request, int $id): JsonResponse
+    {
+        $tag = MetaTags::find($id);
+
+        if (!$tag) {
+            return $this->fail('Tag not found', 404);
+        }
+
+        try {
+            $data = $request->validated();
+            $updated = $this->service->update($tag, $data);
+
+            return $this->success($updated, 'Tag updated successfully');
+        } catch (\Exception $e) {
+            return $this->fail($e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * 删除标签
+     *
+     * @param Request $request
+     * @param int $id
+     * @return JsonResponse
+     */
+    public function delete(Request $request, int $id): JsonResponse
+    {
+        $tag = MetaTags::find($id);
+
+        if (!$tag) {
+            return $this->fail('Tag not found', 404);
+        }
+
+        try {
+            $this->service->delete($tag);
+
+            return $this->success(null, 'Tag deleted successfully');
+        } catch (\Exception $e) {
+            return $this->fail($e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * 获取标签详情
+     *
+     * @param Request $request
+     * @param int $id
+     * @return JsonResponse
+     */
+    public function show(Request $request, int $id): JsonResponse
+    {
+        $tag = MetaTags::find($id);
+
+        if (!$tag) {
+            return $this->fail('Tag not found', 404);
+        }
+
+        return $this->success($tag);
+    }
+}

@@ -1,0 +1,263 @@
+<template>
+  <div>
+    <div
+      class="folder-item"
+      :style="{ paddingLeft: `${8 + level * 18}px` }"
+      @click="emit('toggle', folder)"
+    >
+      <span class="folder-toggle" @click.stop="emit('toggle', folder)">
+        <RightOutlined v-if="!folder.isExpanded" />
+        <DownOutlined v-else />
+      </span>
+      <span class="folder-icon">
+        <FolderFilled />
+      </span>
+      <span class="folder-title">{{ folder.name }}</span>
+      <span v-if="folderTags.length > 0" class="folder-tag-count">
+        <TagOutlined style="font-size: 10px" />
+        {{ folderTags.length }}
+      </span>
+      <!-- 悬停操作按钮 -->
+      <div class="folder-actions" @click.stop>
+        <a-button
+          type="text"
+          size="small"
+          class="action-btn"
+          :icon="h(PlusOutlined)"
+          @click="emit('add-tag', folder)"
+        />
+        <a-dropdown>
+          <a-button
+            type="text"
+            size="small"
+            class="action-btn"
+            :icon="h(MoreOutlined)"
+          />
+          <template #overlay>
+            <a-menu @click="({ key }) => handleMenuClick(key)">
+              <a-menu-item key="edit">{{ t('编辑') }}</a-menu-item>
+              <a-menu-item key="delete">{{ t('删除') }}</a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
+      </div>
+    </div>
+
+    <!-- 展开后显示标签列表 -->
+    <div v-if="folder.isExpanded && folderTags.length > 0" class="folder-children">
+      <div
+        v-for="tag in folderTags"
+        :key="tag.id"
+        class="tag-item"
+        :class="{ active: selectedTag?.id === tag.id }"
+        :style="{ paddingLeft: `${8 + (level + 1) * 18}px` }"
+        @click="emit('select-tag', tag)"
+      >
+        <span class="tag-icon">
+          <TagOutlined />
+        </span>
+        <span class="tag-name">{{ tag.name }}</span>
+        <span class="tag-add" @click.stop="emit('add-option', tag)">
+          <PlusOutlined />
+        </span>
+      </div>
+    </div>
+
+    <div v-if="folder.isExpanded" class="folder-children">
+      <FolderTreeNode
+        v-for="child in folder.children || []"
+        :key="child.id"
+        :folder="child"
+        :selected-tag="selectedTag"
+        :search-text="searchText"
+        :level="level + 1"
+        :tags="tags"
+        @toggle="emit('toggle', $event)"
+        @add-tag="emit('add-tag', $event)"
+        @edit="emit('edit', $event)"
+        @delete="emit('delete', $event)"
+        @select-tag="emit('select-tag', $event)"
+      />
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, h } from 'vue';
+import { DownOutlined, FolderFilled, RightOutlined, TagOutlined, PlusOutlined, MoreOutlined } from '@ant-design/icons-vue';
+import { useI18n } from 'vue-i18n';
+
+defineOptions({ name: 'FolderTreeNode' });
+const { t } = useI18n();
+
+const props = defineProps<{
+  folder: any;
+  selectedTag: any;
+  searchText?: string;
+  level?: number;
+  tags: any[];
+}>();
+
+const level = computed(() => props.level ?? 0);
+
+// 获取该文件夹下的标签（根据搜索过滤）
+const folderTags = computed(() => {
+  const tags = (props.tags || []).filter(tag => tag.parent_id === props.folder.id);
+  if (!props.searchText) return tags;
+  const search = props.searchText.toLowerCase();
+  return tags.filter(tag => tag.name.toLowerCase().includes(search));
+});
+
+const emit = defineEmits<{
+  (e: 'toggle', folder: any): void;
+  (e: 'add-tag', folder: any): void;
+  (e: 'add-option', tag: any): void;
+  (e: 'edit', folder: any): void;
+  (e: 'delete', folderId: string): void;
+  (e: 'select-tag', tag: any): void;
+}>();
+
+const handleMenuClick = (key: string) => {
+  if (key === 'edit') {
+    emit('edit', props.folder);
+  } else if (key === 'delete') {
+    emit('delete', String(props.folder.id));
+  }
+};
+</script>
+
+<style lang="less" scoped>
+.folder-item {
+  min-height: 34px;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 3px;
+  margin: 2px 0;
+  color: #2b2f36;
+  cursor: pointer;
+
+  &:hover {
+    background: #f5f7fb;
+
+    .folder-actions {
+      display: flex;
+    }
+  }
+}
+
+.tag-item {
+  min-height: 30px;
+  padding: 4px 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 3px;
+  margin: 1px 0;
+  color: #2b2f36;
+
+  &:hover {
+    background: #f5f7fb;
+  }
+
+  &.active {
+    background: #dbe8ff;
+    color: #1d4ea3;
+  }
+}
+
+.folder-tag-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 11px;
+  color: #1890ff;
+  background: #e6f7ff;
+  padding: 1px 6px;
+  border-radius: 10px;
+  margin-right: 4px;
+}
+
+.folder-toggle {
+  width: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #5d6472;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.folder-icon {
+  display: inline-flex;
+  align-items: center;
+  color: #d8a227;
+  font-size: 14px;
+}
+
+.tag-icon {
+  display: inline-flex;
+  align-items: center;
+  color: #1890ff;
+  font-size: 12px;
+}
+
+.tag-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.tag-name {
+  font-size: 13px;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tag-add {
+  display: none;
+  color: #1890ff;
+  cursor: pointer;
+  margin-left: 4px;
+
+  &:hover {
+    color: #40a9ff;
+  }
+}
+
+.tag-item {
+  &:hover .tag-add {
+    display: inline-flex;
+  }
+}
+
+.folder-title {
+  flex: 1;
+  font-size: 14px;
+}
+
+.folder-actions {
+  display: none;
+  align-items: center;
+  gap: 0;
+
+  .action-btn {
+    padding: 0 4px;
+    height: 24px;
+    color: #666;
+
+    &:hover {
+      color: #1890ff;
+    }
+  }
+}
+
+.folder-children {
+  margin-left: 10px;
+}
+</style>

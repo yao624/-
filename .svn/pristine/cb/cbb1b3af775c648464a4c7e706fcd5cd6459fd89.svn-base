@@ -1,0 +1,107 @@
+<template>
+  <filter-section
+    :fields="filterFields"
+    :default-visible-keys="defaultVisibleKeys"
+    storage-key="channel-filter-visible"
+    :show-modal="true"
+    i18n-prefix="pages.channelManage.filter"
+    @search="handleSearch"
+    @reset="handleReset"
+  />
+</template>
+
+<script setup lang="ts">
+import { ref, computed } from 'vue';
+import FilterSection from '@/components/filter-section';
+import type { FilterFieldConfig } from '@/components/filter-section';
+
+const emit = defineEmits<{
+  (e: 'search', filters: Record<string, string | undefined>): void;
+  (e: 'reset'): void;
+}>();
+
+// Filter field configurations
+const filterFields = ref<FilterFieldConfig[]>([
+  {
+    key: 'adAccount',
+    label: '广告账户',
+    type: 'select',
+    options: [
+      { label: 'Account 1', value: 'Account 1' },
+      { label: 'Account 2', value: 'Account 2' },
+    ],
+  },
+  {
+    key: 'fbPersonal',
+    label: 'FB个人号',
+    type: 'select',
+    options: [
+      { label: 'FB 1', value: 'FB 1' },
+      { label: 'FB 2', value: 'FB 2' },
+    ],
+  },
+  {
+    key: 'bm',
+    label: 'BM',
+    type: 'input',
+  },
+  {
+    key: 'accountStatus',
+    label: '账号状态',
+    type: 'select',
+    options: [
+      { label: 'Active', value: 'Active' },
+      { label: 'Inactive', value: 'Inactive' },
+    ],
+  },
+  {
+    key: 'entity',
+    label: '主体',
+    type: 'input',
+  },
+  {
+    key: 'assignedPersonnel',
+    label: '所属人员',
+    type: 'select',
+    options: [
+      { label: 'User 1', value: 'User 1' },
+      { label: 'User 2', value: 'User 2' },
+    ],
+  },
+  {
+    key: 'assistantPersonnel',
+    label: '协助人员',
+    type: 'select',
+    options: [
+      { label: 'Assistant 1', value: 'Assistant 1' },
+      { label: 'Assistant 2', value: 'Assistant 2' },
+    ],
+  },
+  {
+    key: 'authStatus',
+    label: '授权状态',
+    type: 'select',
+    options: [
+      { label: 'Authorized', value: 'Authorized' },
+      { label: 'Unauthorized', value: 'Unauthorized' },
+    ],
+  },
+]);
+
+// 默认显示前2个字段
+const defaultVisibleKeys = computed(() => {
+  return filterFields.value.slice(0, 2).map(f => f.key);
+});
+
+const handleSearch = (filters: Record<string, string | undefined>) => {
+  emit('search', filters);
+};
+
+const handleReset = () => {
+  emit('reset');
+};
+</script>
+
+<style scoped lang="less">
+// Styles are handled by the generic component
+</style>

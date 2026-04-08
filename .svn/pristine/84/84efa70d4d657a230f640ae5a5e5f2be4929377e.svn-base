@@ -1,0 +1,101 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\MetaTags;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
+class MetaTagsService
+{
+    /**
+     * 获取标签列表
+     *
+     * @param array $filters
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getList(array $filters = [])
+    {
+        $query = MetaTags::query();
+
+        if (isset($filters['keyword']) && $filters['keyword'] !== '') {
+            $query->where('name', 'like', "%{$filters['keyword']}%");
+        }
+
+        if (isset($filters['folder_id'])) {
+            $query->where('folder_id', $filters['folder_id']);
+        }
+
+        if (isset($filters['tag_object']) && $filters['tag_object'] !== '') {
+            $query->where('tag_object', $filters['tag_object']);
+        }
+
+        if (isset($filters['tag_object_level1']) && $filters['tag_object_level1'] !== '') {
+            $query->where('tag_object_level1', $filters['tag_object_level1']);
+        }
+
+        return $query->orderBy('sort', 'asc')
+            ->orderBy('id', 'desc')
+            ->get();
+    }
+
+    /**
+     * 创建标签
+     *
+     * @param array $data
+     * @return MetaTags
+     * @throws \Exception
+     */
+    public function create(array $data): MetaTags
+    {
+        try {
+            return MetaTags::create($data);
+        } catch (\Exception $e) {
+            Log::error('Failed to create tag', ['error' => $e->getMessage()]);
+            throw $e;
+        }
+    }
+
+    /**
+     * 更新标签
+     *
+     * @param MetaTags $tag
+     * @param array $data
+     * @return MetaTags
+     * @throws \Exception
+     */
+    public function update(MetaTags $tag, array $data): MetaTags
+    {
+        try {
+            $tag->update($data);
+            return $tag->fresh();
+        } catch (\Exception $e) {
+            Log::error('Failed to update tag', ['tag_id' => $tag->id, 'error' => $e->getMessage()]);
+            throw $e;
+        }
+    }
+
+    /**
+     * 删除标签
+     *
+     * @param MetaTags $tag
+     * @return bool
+     * @throws \Exception
+     */
+    public function delete(MetaTags $tag): bool
+    {
+        DB::beginTransaction();
+        try {
+            $tag->delete();
+
+            DB::commit();
+            Log::info('Tag deleted', ['tag_id' => $tag->id]);
+
+            return true;
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Failed to delete tag', ['tag_id' => $tag->id, 'error' => $e->getMessage()]);
+            throw $e;
+        }
+    }
+}

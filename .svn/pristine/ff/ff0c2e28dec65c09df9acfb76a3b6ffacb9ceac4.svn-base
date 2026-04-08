@@ -1,0 +1,222 @@
+<template>
+  <a-modal
+      :open="visible"
+      width="90%"
+      :destroy-on-close="true"
+      :mask-closable="false"
+      :style="{ top: (level - 1) * 30 + 50 + 'px' }"
+      @cancel="handleCancel"
+  >
+    <template #title>
+      <PositionBreadcrumb :path="path" :default-text="t('pages.tags.subTagManagement')" />
+    </template>
+    <div class="sub-tag-content">
+      <a-tabs v-model:activeKey="activeTab">
+        <a-tab-pane key="manage" :tab="t('pages.tags.tagManagement')">
+          <div class="table-header">
+            <div style="display: flex; gap: 10px;">
+              <a-button type="primary" :icon="h(PlusOutlined)" @click="handleAddOption">
+                {{ t('pages.tags.addTagOption') }}
+              </a-button>
+              <a-dropdown>
+                <a-button>
+                  {{ t('pages.batchOperation') }}
+                  <DownOutlined />
+                </a-button>
+                <template #overlay>
+                  <a-menu @click="({ key }) => handleBatchClick(key)">
+                    <a-menu-item key="edit">{{ t('pages.batchEdit') }}</a-menu-item>
+                    <a-menu-item key="delete">{{ t('pages.batchDelete') }}</a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
+            </div>
+            <a-input
+                v-model:value="searchText"
+                :placeholder="t('pages.tags.searchTagOptionPlaceholder')"
+                prefix="Q"
+                allow-clear
+                style="width: 240px; margin-left: 8px"
+            />
+          </div>
+          <a-table
+              :columns="columns"
+              :data-source="filteredOptions"
+              :pagination="pagination"
+              :row-key="record => record.id"
+              :row-selection="rowSelection"
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.dataIndex === 'image'">
+                <img v-if="record.image" :src="record.image" style="width: 50px; height: 50px; object-fit: cover;" />
+                <span v-else>-</span>
+              </template>
+              <template v-if="column.dataIndex === 'operation'">
+                <a-button v-if="level < 3" type="link" size="small" @click="manageSubTags(record)">
+                  {{ t('pages.tags.subTagManagement') }}
+                </a-button>
+                <a-button type="link" size="small" @click="editOption(record)">
+                  {{ t('编辑') }}
+                </a-button>
+                <a-popconfirm
+                    :title="t('pages.doubleConfirmDel')"
+                    :ok-text="t('pages.confirm')"
+                    :cancel-text="t('pages.cancel')"
+                    @confirm="deleteOption(record)"
+                >
+                  <a-button type="link" size="small" danger>
+                    {{ t('删除') }}
+                  </a-button>
+                </a-popconfirm>
+              </template>
+            </template>
+          </a-table>
+        </a-tab-pane>
+        <a-tab-pane key="analytics" :tab="t('pages.tags.dataAnalysis')">
+          <TagDataAnalysis :loading="false" />
+        </a-tab-pane>
+      </a-tabs>
+    </div>
+
+    <!-- 嵌套的子标签弹窗 -->
+    <SubTagModal
+        v-if="visible && level < 3"
+        :visible="childModalVisible"
+        :level="level + 1"
+        :path="childPath"
+        :parent-id="childParentId"
+        @close="childModalVisible = false"
+    />
+  </a-modal>
+</template>
+
+<script lang="ts" setup>
+import { ref, computed, watch, h } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { PlusOutlined, DownOutlined } from '@ant-design/icons-vue';
+import SubTagModal from './sub-tag-modal.vue';
+import TagDataAnalysis from './tag-data-analysis.vue';
+import PositionBreadcrumb from '@/components/position-breadcrumb/index.vue';
+import { getSubTagOptions } from '../mock-data';
+
+defineOptions({ name: 'SubTagModal' });
+
+const { t } = useI18n();
+
+const props = defineProps<{
+  visible: boolean;
+  level?: number;
+  path?: string;
+  parentId?: number | string;
+}>();
+
+const emit = defineEmits<{
+  (e: 'close'): void;
+}>();
+
+const level = computed(() => props.level || 1);
+
+watch(() => props.visible, async (val) => {
+  if (!val) {
+    childModalVisible.value = false;
+    searchText.value = '';
+  } else {
+    // 加载子标签选项数据，根据 parentId 过滤
+    const data = await getSubTagOptions(props.parentId);
+    options.value = data;
+    pagination.value.total = data.length;
+  }
+});
+
+const handleClose = () => {
+  emit('close');
+};
+
+const handleCancel = () => {
+  emit('close');
+};
+
+const searchText = ref('');
+const activeTab = ref('manage');
+
+// 选项数据
+const options = ref<any[]>([]);
+
+const filteredOptions = computed(() => {
+  if (!searchText.value) return options.value;
+  const search = searchText.value.toLowerCase();
+  return options.value.filter(
+      (opt: any) =>
+          opt.name?.toLowerCase().includes(search) ||
+          opt.description?.toLowerCase().includes(search),
+  );
+});
+
+const pagination = ref({
+  current: 1,
+  pageSize: 20,
+  total: 3,
+});
+
+const selectedRowKeys = ref<any[]>([]);
+
+const rowSelection = computed(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  onChange: (keys: any[]) => {
+    selectedRowKeys.value = keys;
+  },
+}));
+
+const columns = computed(() => [
+  { title: t('pages.tags.optionName'), dataIndex: 'name', width: 150 },
+  { title: t('pages.tags.optionDesc'), dataIndex: 'description', width: 200 },
+  { title: t('pages.tags.optionImage'), dataIndex: 'image', width: 120 },
+  { title: t('pages.tags.optionRemark1'), dataIndex: 'remark1', width: 150 },
+  { title: t('pages.tags.optionRemark2'), dataIndex: 'remark2', width: 150 },
+  { title: t('pages.operation'), dataIndex: 'operation', width: 200, fixed: 'right' },
+]);
+
+const handleAddOption = () => {
+  console.log('add option');
+};
+
+const handleBatchClick = (key: string) => {
+  console.log('batch', key);
+};
+
+const editOption = (record: any) => {
+  console.log('edit', record);
+};
+
+const deleteOption = (record: any) => {
+  const idx = options.value.findIndex((o: any) => o.id === record.id);
+  if (idx > -1) options.value.splice(idx, 1);
+};
+
+// 子弹窗
+const childModalVisible = ref(false);
+const childPath = ref('');
+const childParentId = ref<number | string>();
+
+const manageSubTags = (record: any) => {
+  childPath.value = props.path ? `${props.path}/${record.name}` : record.name;
+  childParentId.value = record.id;
+  childModalVisible.value = true;
+};
+</script>
+
+<style lang="less" scoped>
+.sub-tag-content {
+  .table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+}
+
+:deep(.ant-tabs-tab) {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+}
+</style>

@@ -1,0 +1,661 @@
+@import '../basic-layout.less';
+
+@pro-layout-sider-menu-prefix-cls: ~'@{ant-prefix}-pro-sider';
+
+@nav-header-height: @pro-layout-header-height;
+
+.@{pro-layout-sider-menu-prefix-cls} {
+  position: relative;
+  //transition: background-color 0.3s;
+  z-index: 9;
+  background-color: @layout-sider-background;
+  border-right: 0;
+
+  &.@{ant-prefix}-menu-vertical .@{ant-prefix}-menu-item:not(:last-child),
+  &.@{ant-prefix}-menu-vertical-left .@{ant-prefix}-menu-item:not(:last-child),
+  &.@{ant-prefix}-menu-vertical-right .@{ant-prefix}-menu-item:not(:last-child),
+  &.@{ant-prefix}-menu-inline .@{ant-prefix}-menu-item:not(:last-child) {
+    margin-bottom: 2px;
+  }
+  
+  // 菜单项基础样式
+  .@{ant-prefix}-menu-item,
+  .@{ant-prefix}-menu-submenu-title {
+    margin: 2px 4px !important; // 减少左右 margin
+    border-radius: 4px;
+    height: 40px;
+    line-height: 40px;
+    padding-left: 14px !important; // 稍微减少左侧 padding
+    padding-right: 4px !important; // 进一步减少右侧 padding，给文字更多空间
+    transition: all 0.2s;
+    min-width: 0; // 允许收缩
+    overflow: visible !important; // 确保内容可见
+    display: flex !important; // 使用 flex 布局
+    align-items: center !important;
+    
+    // 确保文本区域可以完整显示
+    > * {
+      flex-shrink: 0; // 防止内容被压缩
+    }
+    
+    // 文本内容区域自适应
+    > span:last-child:not(.anticon),
+    .@{ant-prefix}-menu-title-content {
+      flex: 1 1 auto !important; // 文本区域自适应
+      min-width: 0 !important;
+      overflow: visible !important;
+      text-overflow: clip !important;
+      white-space: nowrap !important;
+      max-width: none !important;
+    }
+  }
+
+  &.@{ant-prefix}-layout-sider-light {
+    background-color: #ffffff;
+    
+    .@{ant-prefix}-menu-item a {
+      color: @heading-color;
+    }
+    .@{ant-prefix}-menu-item-selected a,
+    .@{ant-prefix}-menu-item a:hover {
+      color: @primary-color;
+    }
+    
+    // 选中菜单项样式：浅蓝色背景 + 左侧蓝色竖条
+    .@{ant-prefix}-menu-item-selected {
+      background-color: #e6f4ff !important;
+      position: relative;
+      
+      &::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        background-color: @primary-color;
+      }
+      
+      a {
+        color: @primary-color !important;
+        font-weight: 500;
+      }
+    }
+    
+    // 菜单项悬停效果
+    .@{ant-prefix}-menu-item:hover {
+      background-color: #f5f5f5;
+    }
+    
+    // 子菜单标题样式
+    .@{ant-prefix}-menu-submenu-title:hover {
+      background-color: #f5f5f5;
+    }
+  }
+
+  .@{ant-prefix}-menu-inline-collapsed > .@{ant-prefix}-menu-item .anticon + span,
+  .@{ant-prefix}-menu-inline-collapsed
+    > .@{ant-prefix}-menu-item-group
+    > .@{ant-prefix}-menu-item-group-list
+    > .@{ant-prefix}-menu-item
+    .anticon
+    + span,
+  .@{ant-prefix}-menu-inline-collapsed
+    > .@{ant-prefix}-menu-item-group
+    > .@{ant-prefix}-menu-item-group-list
+    > .@{ant-prefix}-menu-submenu
+    > .@{ant-prefix}-menu-submenu-title
+    .anticon
+    + span,
+  .@{ant-prefix}-menu-inline-collapsed
+    > .@{ant-prefix}-menu-submenu
+    > .@{ant-prefix}-menu-submenu-title
+    .anticon
+    + span {
+    display: none;
+  }
+
+  ul.@{ant-prefix}-menu-sub {
+    background-color: transparent;
+    overflow: visible !important; // 确保子菜单内容可见
+    min-width: fit-content !important; // 自适应宽度
+    max-width: none !important; // 不限制最大宽度
+    width: 100% !important;
+    
+    li.@{ant-prefix}-menu-item,
+    li.@{ant-prefix}-menu-submenu {
+      width: 100% !important;
+      min-width: fit-content !important;
+      max-width: none !important;
+      overflow: visible !important;
+      
+      .@{ant-prefix}-pro-menu-item {
+        padding-left: 8px;
+        width: 100% !important;
+        overflow: visible !important;
+      }
+      
+      // 子菜单项样式
+      .@{ant-prefix}-menu-item,
+      .@{ant-prefix}-menu-submenu-title {
+        margin: 2px 4px !important; // 进一步减少 margin
+        padding-left: 40px !important;
+        padding-right: 4px !important; // 进一步减少右侧 padding
+        height: 36px;
+        line-height: 36px;
+        font-size: 13px;
+        white-space: nowrap !important; // 不换行
+        overflow: visible !important; // 确保内容可见
+        text-overflow: clip !important; // 不截断文本
+        min-width: fit-content !important; // 适应内容
+        max-width: none !important; // 不限制最大宽度
+        width: auto !important; // 自动宽度
+        
+        // 强制文本完整显示
+        &, & * {
+          white-space: nowrap !important;
+          overflow: visible !important;
+          text-overflow: clip !important;
+        }
+        
+        span {
+          white-space: nowrap !important;
+          overflow: visible !important;
+          display: inline-block;
+          max-width: none !important;
+          width: auto !important;
+        }
+      }
+      
+      // 子菜单选中状态
+      .@{ant-prefix}-menu-item-selected {
+        background-color: #e6f4ff !important;
+        
+        &::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 3px;
+          background-color: @primary-color;
+        }
+      }
+    }
+  }
+
+  &-logo {
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: 16px;
+    line-height: 32px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    min-width: 0; // 允许 flex 子元素收缩
+    flex-shrink: 0; // 防止 logo 区域被压缩
+
+    > a {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 32px;
+      width: 100%;
+      min-width: 0; // 允许 flex 子元素收缩
+      overflow: visible; // 确保内容可见
+    }
+
+    img {
+      display: inline-block;
+      height: 32px;
+      width: auto;
+      vertical-align: middle;
+      transition: height 0.2s;
+      flex-shrink: 0; // 防止图片被压缩
+    }
+    h1 {
+      display: inline-block;
+      height: 32px;
+      margin: 0 0 0 12px;
+      overflow: visible; // 改为 visible，确保文字完整显示
+      white-space: nowrap; // 不换行
+      color: @primary-color;
+      font-weight: 600;
+      font-size: 18px;
+      line-height: 32px;
+      vertical-align: middle;
+      animation: fade-in;
+      animation-duration: 0.2s;
+      flex-shrink: 0; // 防止文字被压缩
+      min-width: 0; // 允许收缩，但配合 white-space: nowrap 确保完整显示
+    }
+  }
+  
+  // light 主题下的 logo 样式
+  &.@{ant-prefix}-layout-sider-light {
+    &-logo {
+      border-bottom: 1px solid #f0f0f0;
+      h1 {
+        color: @primary-color;
+      }
+    }
+  }
+
+  &-extra {
+    margin-bottom: 16px;
+    padding: 0 16px;
+    &-no-logo {
+      margin-top: 16px;
+    }
+  }
+
+  &-menu {
+    position: relative;
+    z-index: 10;
+    min-height: 100%;
+    box-shadow: 2px 0 6px rgba(0, 21, 41, 0.35);
+    overflow-x: visible !important; // 确保菜单内容不被水平方向遮挡
+    overflow-y: auto; // 垂直方向允许滚动
+  }
+
+  .@{ant-prefix}-layout-sider-children {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow-x: visible !important; // 确保内容不被水平方向遮挡
+    overflow-y: auto; // 垂直方向允许滚动
+
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 3px;
+      -webkit-box-shadow: inset 0 0 5px rgba(37, 37, 37, 0.05);
+    }
+
+    /* 滚动条滑块 */
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+      -webkit-box-shadow: inset 0 0 5px rgba(255, 255, 255, 0.05);
+    }
+  }
+
+  &.@{ant-prefix}-layout-sider-collapsed {
+    .@{ant-prefix}-menu-inline-collapsed {
+      width: 48px;
+    }
+    .@{pro-layout-sider-menu-prefix-cls} {
+      &-logo {
+        padding: 16px 8px;
+      }
+    }
+  }
+
+  .@{ant-prefix}-menu-inline-collapsed {
+    & > .@{ant-prefix}-menu-item .sider-menu-item-img + span,
+    &
+      > .@{ant-prefix}-menu-item-group
+      > .@{ant-prefix}-menu-item-group-list
+      > .@{ant-prefix}-menu-item
+      .sider-menu-item-img
+      + span,
+    &
+      > .@{ant-prefix}-menu-submenu
+      > .@{ant-prefix}-menu-submenu-title
+      .sider-menu-item-img
+      + span {
+      display: inline-block;
+      max-width: 0;
+      opacity: 0;
+    }
+
+    // hide menu item text in collapsed
+    .@{ant-prefix}-pro-menu-item-title {
+      display: none;
+    }
+  }
+
+  .@{ant-prefix}-menu-item,
+  .@{ant-prefix}-menu-submenu-title {
+    .anticon {
+      transition: none;
+      margin-right: 12px;
+      font-size: 16px;
+      flex-shrink: 0 !important; // 图标不被压缩
+    }
+    // 确保菜单文本完整显示，不换行
+    white-space: nowrap !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    min-width: fit-content !important; // 适应内容宽度
+    max-width: none !important; // 不限制最大宽度
+    width: auto !important; // 自动宽度
+    
+    // 所有子元素都不限制宽度
+    > * {
+      max-width: none !important;
+      overflow: visible !important;
+    }
+    
+    span {
+      white-space: nowrap !important;
+      overflow: visible !important;
+      display: inline-block !important;
+      max-width: none !important;
+      width: auto !important;
+      font-size: 14px;
+      flex-shrink: 0 !important; // 文本不被压缩
+    }
+    
+    // 菜单标题内容
+    .@{ant-prefix}-menu-title-content {
+      max-width: none !important;
+      width: auto !important;
+      overflow: visible !important;
+      text-overflow: clip !important;
+      white-space: nowrap !important;
+      flex: 0 1 auto !important;
+    }
+  }
+  
+  // 子菜单容器自适应
+  .@{ant-prefix}-menu-submenu {
+    overflow: visible !important;
+    min-width: fit-content !important;
+    max-width: none !important;
+    
+    > .@{ant-prefix}-menu-submenu-title {
+      overflow: visible !important;
+      min-width: 0;
+      max-width: none !important;
+    }
+  }
+  
+  // 确保菜单项文本完整显示
+  .@{ant-prefix}-menu {
+    width: 100% !important;
+    min-width: fit-content !important; // 确保菜单宽度适应内容
+    max-width: none !important; // 移除最大宽度限制
+    overflow: visible !important; // 允许内容溢出显示
+    
+    // 强制所有菜单项和子菜单项完整显示
+    .@{ant-prefix}-menu-item,
+    .@{ant-prefix}-menu-submenu-title {
+      max-width: none !important;
+      width: auto !important;
+      min-width: fit-content !important;
+      
+      // 强制所有内部元素完整显示
+      &, & * {
+        max-width: none !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        white-space: nowrap !important;
+      }
+    }
+  }
+  
+  // 菜单项容器样式
+  .@{ant-prefix}-menu-root {
+    overflow: visible !important;
+    width: 100% !important;
+    min-width: fit-content !important;
+    max-width: none !important;
+  }
+  
+  // 侧边栏容器自适应
+  &.@{ant-prefix}-layout-sider {
+    min-width: 280px !important; // 最小宽度
+    max-width: none !important; // 不限制最大宽度，允许自适应
+    width: auto !important; // 自动宽度
+  }
+  
+  // 强制覆盖 Ant Design 的默认宽度限制
+  .@{ant-prefix}-menu-inline,
+  .@{ant-prefix}-menu-vertical {
+    width: 100% !important;
+    min-width: fit-content !important;
+    max-width: none !important;
+    overflow: visible !important;
+    
+    .@{ant-prefix}-menu-item,
+    .@{ant-prefix}-menu-submenu-title {
+      max-width: none !important;
+      width: auto !important;
+      min-width: fit-content !important;
+      padding-right: 4px !important; // 减少右侧 padding
+      
+      // 强制所有子元素完整显示
+      &, & * {
+        max-width: none !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        white-space: nowrap !important;
+      }
+    }
+    
+    // 子菜单项也要完整显示
+    .@{ant-prefix}-menu-sub {
+      width: 100% !important;
+      min-width: fit-content !important;
+      max-width: none !important;
+      overflow: visible !important;
+      
+      .@{ant-prefix}-menu-item,
+      .@{ant-prefix}-menu-submenu-title {
+        max-width: none !important;
+        width: auto !important;
+        min-width: fit-content !important;
+        padding-right: 4px !important;
+        
+        &, & * {
+          max-width: none !important;
+          overflow: visible !important;
+          text-overflow: clip !important;
+          white-space: nowrap !important;
+        }
+      }
+    }
+  }
+  
+  // 强制所有文本元素完整显示
+  .@{ant-prefix}-menu-item,
+  .@{ant-prefix}-menu-submenu-title,
+  .@{ant-prefix}-menu-sub .@{ant-prefix}-menu-item,
+  .@{ant-prefix}-menu-sub .@{ant-prefix}-menu-submenu-title {
+    &, & * {
+      max-width: none !important;
+      overflow: visible !important;
+      text-overflow: clip !important;
+      white-space: nowrap !important;
+    }
+    
+    // 菜单项内部文本容器
+    > span,
+    .@{ant-prefix}-menu-title-content {
+      max-width: none !important;
+      width: auto !important;
+      overflow: visible !important;
+      text-overflow: clip !important;
+      white-space: nowrap !important;
+      display: inline-block !important;
+    }
+  }
+  
+  // 强制覆盖 Ant Design 菜单项的默认样式
+  .@{ant-prefix}-menu-item,
+  .@{ant-prefix}-menu-submenu-title {
+    // 移除所有可能的宽度限制
+    &::before,
+    &::after {
+      display: none; // 移除可能遮挡内容的伪元素
+    }
+    
+    // 确保菜单项内容区域完整显示
+    .@{ant-prefix}-menu-item-icon,
+    .@{ant-prefix}-menu-submenu-title-icon {
+      flex-shrink: 0; // 图标不被压缩
+    }
+    
+    // 文本区域自适应
+    .@{ant-prefix}-menu-title-content,
+    span:not(.anticon) {
+      flex: 0 1 auto !important; // 允许文本区域自适应
+      min-width: 0 !important;
+      max-width: none !important;
+      overflow: visible !important;
+      text-overflow: clip !important;
+      white-space: nowrap !important;
+    }
+  }
+
+  &-fixed {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 10;
+    height: 100%;
+    overflow-y: auto; // 垂直方向允许滚动
+    overflow-x: visible !important; // 水平方向允许内容显示，不被遮挡
+    box-shadow: 2px 0 8px 0 rgba(29, 35, 41, 0.05);
+    > .@{ant-prefix}-menu-root {
+      :not(.@{pro-layout-sider-menu-prefix-cls}-link-menu) {
+        height: ~'calc(100vh - @{nav-header-height})';
+        overflow-y: auto;
+        overflow-x: visible !important; // 确保水平方向内容不被遮挡
+      }
+    }
+  }
+
+  &-light {
+    .@{ant-prefix}-layout-sider-children {
+      ::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.06);
+        border-radius: 3px;
+        -webkit-box-shadow: inset 0 0 5px rgba(0, 21, 41, 0.05);
+      }
+
+      /* 滚动条滑块 */
+      ::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.12);
+        border-radius: 3px;
+        -webkit-box-shadow: inset 0 0 5px rgba(0, 21, 41, 0.05);
+      }
+    }
+
+    background-color: #ffffff;
+    box-shadow: 1px 0 4px 0 rgba(0, 0, 0, 0.08);
+    border-right: 1px solid #f0f0f0;
+    
+    .@{pro-layout-sider-menu-prefix-cls}-logo {
+      h1 {
+        color: @primary-color;
+      }
+    }
+    .@{ant-prefix}-menu-light {
+      border-right-color: transparent;
+      background-color: transparent;
+    }
+
+    .@{pro-layout-sider-menu-prefix-cls}-collapsed-button {
+      border-top: @border-width-base @border-style-base @border-color-split;
+    }
+  }
+
+  &-icon {
+    width: 14px;
+    vertical-align: baseline;
+  }
+
+  &-links {
+    width: 100%;
+    ul.@{ant-prefix}-menu-root {
+      height: auto;
+    }
+  }
+
+  &-collapsed-button {
+    border-top: @border-width-base @border-style-base rgba(0, 0, 0, 0.25);
+    .anticon {
+      font-size: 16px;
+    }
+  }
+
+  .top-nav-menu li.@{ant-prefix}-menu-item {
+    height: 100%;
+    line-height: 1;
+  }
+  .drawer .drawer-content {
+    background: @layout-sider-background;
+  }
+
+  .@{ant-prefix}-menu-item .sider-menu-item-img + span,
+  .@{ant-prefix}-menu-submenu-title .sider-menu-item-img + span {
+    opacity: 1;
+    transition: opacity 0.3s @ease-in-out, width 0.3s @ease-in-out;
+  }
+}
+
+@keyframes fade-in {
+  0% {
+    display: none;
+    opacity: 0;
+  }
+  99% {
+    display: none;
+    opacity: 0;
+  }
+  100% {
+    display: block;
+    opacity: 1;
+  }
+}
+
+// 全局强制覆盖：确保所有菜单相关元素文字完整显示（最高优先级）
+.@{pro-layout-sider-menu-prefix-cls} {
+  // 强制所有菜单项文字完整显示
+  .@{ant-prefix}-menu-item,
+  .@{ant-prefix}-menu-submenu-title,
+  .@{ant-prefix}-menu-sub .@{ant-prefix}-menu-item,
+  .@{ant-prefix}-menu-sub .@{ant-prefix}-menu-submenu-title {
+    // 移除所有可能的宽度和溢出限制
+    max-width: none !important;
+    width: auto !important;
+    min-width: fit-content !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: nowrap !important;
+    
+    // 所有子元素也要完整显示
+    &, & *, & *::before, & *::after {
+      max-width: none !important;
+      overflow: visible !important;
+      text-overflow: clip !important;
+    }
+    
+    // 文本节点和内容区域
+    span:not(.anticon),
+    .@{ant-prefix}-menu-title-content,
+    text {
+      max-width: none !important;
+      width: auto !important;
+      overflow: visible !important;
+      text-overflow: clip !important;
+      white-space: nowrap !important;
+      display: inline-block !important;
+    }
+  }
+  
+  // 确保菜单容器不限制宽度
+  .@{ant-prefix}-menu,
+  .@{ant-prefix}-menu-root,
+  .@{ant-prefix}-menu-sub {
+    max-width: none !important;
+    overflow-x: visible !important;
+    overflow-y: auto !important;
+  }
+}

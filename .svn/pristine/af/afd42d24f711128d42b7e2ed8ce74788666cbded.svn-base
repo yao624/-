@@ -1,0 +1,11 @@
+:root {
+  --input-placeholder-color: rgb(191, 184, 173);
+}
+
+[data-pro-theme='antdv-pro-theme-dark'] {
+  &,
+  * {
+    color-scheme: dark !important;
+  }
+  --input-placeholder-color: rgba(229, 224, 216, 0.3);
+}

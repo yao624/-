@@ -1,0 +1,582 @@
+<template>
+  <a-modal
+    v-model:open="visible"
+    :title="modalTitle"
+    :confirm-loading="loading"
+    :width="500"
+    @ok="handleOk"
+    @cancel="handleCancel"
+  >
+    <a-form
+      ref="formRef"
+      :model="formData"
+      :label-col="{ span: isBatch ? 7 : 5 }"
+      :wrapper-col="{ span: isBatch ? 16 : 18 }"
+      :rules="rules"
+    >
+      <!-- 批量编辑模式 -->
+      <template v-if="isBatch">
+        <!-- 已选择的广告账户列表 -->
+        <a-form-item :label="t('pages.adAccount.edit.selectedAccounts')" :colon="false">
+          <div class="selected-accounts-list">
+            <div
+              v-for="account in selectedAccounts"
+              :key="account.id"
+              class="account-item"
+            >
+              <component :is="getPlatformIcon(account.platform)" class="account-platform-icon" />
+              <div class="account-info">
+                <span class="account-id">{{ account.accountId }}</span>
+                <span class="account-name">{{ account.accountName }}</span>
+              </div>
+            </div>
+          </div>
+        </a-form-item>
+
+        <!-- 统一设置所属人员 -->
+        <a-form-item :label="t('pages.adAccount.edit.unifiedOwner')" :colon="false">
+          <a-checkbox v-model:checked="formData.unifiedOwner">
+            {{ t('pages.adAccount.edit.unifiedOwnerLabel') }}
+          </a-checkbox>
+        </a-form-item>
+
+        <!-- 所属人员（勾选后显示） -->
+        <a-form-item
+          v-show="formData.unifiedOwner"
+          :label="t('pages.adAccount.edit.owner')"
+          name="owner"
+          :label-col="{ span: 7 }"
+          :wrapper-col="{ span: 16 }"
+        >
+          <a-cascader
+            v-model:value="formData.owner"
+            :options="ownerCascaderData"
+            :placeholder="t('pages.adAccount.edit.selectOwner')"
+            show-search
+            :filter-option="filterCascaderOption"
+            :dropdown-style="{ maxHeight: '400px', overflow: 'auto' }"
+          />
+        </a-form-item>
+
+        <!-- 统一设置协助人员 -->
+        <a-form-item :label="t('pages.adAccount.edit.unifiedAssistants')" :colon="false">
+          <a-checkbox v-model:checked="formData.unifiedAssistants">
+            {{ t('pages.adAccount.edit.unifiedAssistantsLabel') }}
+          </a-checkbox>
+        </a-form-item>
+
+        <!-- 协助人员（勾选后显示） -->
+        <a-form-item
+          v-show="formData.unifiedAssistants"
+          :label="t('pages.adAccount.edit.assistants')"
+          :label-col="{ span: 7 }"
+          :wrapper-col="{ span: 16 }"
+        >
+          <a-tree-select
+            v-model:value="formData.assistants"
+            :placeholder="t('pages.adAccount.edit.searchPlaceholder')"
+            :tree-data="assistantTreeData"
+            tree-checkable
+            show-search
+            :tree-default-expand-all="false"
+            :max-tag-count="2"
+            multiple
+            :dropdown-style="{ maxHeight: '400px', overflow: 'auto' }"
+          />
+        </a-form-item>
+      </template>
+
+      <!-- 单个编辑模式 -->
+      <template v-else>
+        <!-- 渠道（只读） -->
+        <a-form-item :label="t('pages.adAccount.edit.channel')">
+          <span class="channel-text">{{ platformLabel }}</span>
+        </a-form-item>
+
+        <!-- 所属人员（必填） -->
+        <a-form-item
+          :label="t('pages.adAccount.edit.owner')"
+          name="owner"
+        >
+          <a-cascader
+            v-model:value="formData.owner"
+            :options="ownerCascaderData"
+            :placeholder="t('pages.adAccount.edit.selectOwner')"
+            show-search
+            :filter-option="filterCascaderOption"
+            :dropdown-style="{ maxHeight: '400px', overflow: 'auto' }"
+          />
+        </a-form-item>
+
+        <!-- 协助人员（可选，带搜索） -->
+        <a-form-item :label="t('pages.adAccount.edit.assistants')">
+          <a-tree-select
+            v-model:value="formData.assistants"
+            :placeholder="t('pages.adAccount.edit.searchPlaceholder')"
+            :tree-data="assistantTreeData"
+            tree-checkable
+            show-search
+            :tree-default-expand-all="false"
+            :max-tag-count="2"
+            multiple
+            :dropdown-style="{ maxHeight: '400px', overflow: 'auto' }"
+          />
+        </a-form-item>
+      </template>
+    </a-form>
+  </a-modal>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { TreeSelect, Cascader, Checkbox } from 'ant-design-vue';
+import type { FormInstance } from 'ant-design-vue';
+import type { PlatformType } from '../types';
+
+// Register components
+const ATreeSelect = TreeSelect;
+const ACascader = Cascader;
+const ACheckbox = Checkbox;
+
+// Platform icons (simplified inline components)
+const createPlatformIcon = (name: string) => ({
+  template: `<span class="platform-icon">${name}</span>`,
+});
+
+const platformIcons: Record<PlatformType, any> = {
+  meta: createPlatformIcon('Meta'),
+  google: createPlatformIcon('Google'),
+  tiktok: createPlatformIcon('TikTok'),
+};
+
+interface TreeNode {
+  title: string;
+  value: string;
+  key: string;
+  children?: TreeNode[];
+}
+
+interface SelectedAccount {
+  id: string;
+  accountId: string;
+  accountName: string;
+  platform: PlatformType;
+}
+
+interface Props {
+  open: boolean;
+  platform?: PlatformType;
+  isBatch?: boolean;
+  record?: any;
+  ownerOptions?: any[];
+  assistantOptions?: any[];
+  selectedAccounts?: SelectedAccount[];
+}
+
+interface Emits {
+  (e: 'update:open', value: boolean): void;
+  (e: 'confirm', value: any): void;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  open: false,
+  platform: 'meta',
+  isBatch: false,
+  ownerOptions: () => [],
+  assistantOptions: () => [],
+  selectedAccounts: () => [],
+});
+
+// 已选择的账户列表
+const selectedAccounts = computed(() => props.selectedAccounts);
+
+const emit = defineEmits<Emits>();
+
+const { t, locale } = useI18n();
+
+const formRef = ref<FormInstance>();
+const loading = ref(false);
+
+const visible = computed({
+  get: () => props.open,
+  set: (val) => emit('update:open', val),
+});
+
+const isBatch = computed(() => props.isBatch);
+
+// 根据语言环境返回平台标签
+const platformLabel = computed(() => {
+  const isZh = locale.value.startsWith('zh');
+  const platformConfig: Record<PlatformType, { name: string; nameEn: string }> = {
+    meta: { name: 'Meta', nameEn: 'Meta' },
+    google: { name: 'Google', nameEn: 'Google' },
+    tiktok: { name: 'TikTok', nameEn: 'TikTok' },
+  };
+  const config = platformConfig[props.platform || 'meta'];
+  return isZh ? config.name : config.nameEn;
+});
+
+// 平台图标
+const platformIcon = computed(() => {
+  return platformIcons[props.platform || 'meta'];
+});
+
+// 获取平台图标
+const getPlatformIcon = (platform: PlatformType) => {
+  return platformIcons[platform || 'meta'];
+};
+
+// 弹窗标题
+const modalTitle = computed(() => {
+  return props.isBatch
+    ? t('pages.adAccount.edit.batchTitle')
+    : t('pages.adAccount.edit.title');
+});
+
+// 表单数据
+const formData = ref({
+  // 批量编辑字段
+  unifiedOwner: false,
+  unifiedAssistants: false,
+  // 通用字段
+  owner: [] as string[],
+  assistants: [] as string[],
+});
+
+// 转换选项为级联选择器数据结构
+const convertToCascaderData = (options: any[]) => {
+  return [
+    {
+      label: '客户服务部',
+      value: 'dept-customer-service',
+      children: options.slice(0, 3).map((opt) => ({
+        label: opt.label,
+        value: opt.value,
+      })),
+    },
+    {
+      label: '市场部',
+      value: 'dept-marketing',
+      children: options.slice(2, 5).map((opt) => ({
+        label: opt.label,
+        value: opt.value,
+      })),
+    },
+    {
+      label: '技术部',
+      value: 'dept-tech',
+      children: options.slice(4).map((opt) => ({
+        label: opt.label,
+        value: opt.value,
+      })),
+    },
+  ];
+};
+
+// 转换选项为树形结构
+const convertToTreeData = (options: any[], parentKey = ''): TreeNode[] => {
+  // 模拟树形数据结构
+  const treeData: TreeNode[] = [
+    {
+      title: '客户服务部',
+      value: 'dept-customer-service',
+      key: 'dept-customer-service',
+      children: options.slice(0, 3).map((opt) => ({
+        title: opt.label,
+        value: opt.value,
+        key: opt.value,
+      })),
+    },
+    {
+      title: '市场部',
+      value: 'dept-marketing',
+      key: 'dept-marketing',
+      children: options.slice(2, 5).map((opt) => ({
+        title: opt.label,
+        value: opt.value,
+        key: opt.value,
+      })),
+    },
+    {
+      title: '技术部',
+      value: 'dept-tech',
+      key: 'dept-tech',
+      children: options.slice(4).map((opt) => ({
+        title: opt.label,
+        value: opt.value,
+        key: opt.value,
+      })),
+    },
+  ];
+  return treeData;
+};
+
+// 所属人员级联选择器数据
+const ownerCascaderData = computed(() => convertToCascaderData(props.ownerOptions));
+
+// 协助人员树形数据
+const assistantTreeData = computed(() => convertToTreeData(props.assistantOptions));
+
+// 级联选择器过滤选项
+const filterCascaderOption = (input: string, path: any[]) => {
+  return path.some((option) =>
+    option.label?.toLowerCase().includes(input.toLowerCase())
+  );
+};
+
+// 表单验证规则
+const rules = computed(() => {
+  const baseRules: any = {};
+
+  // 单个编辑模式：所属人员必填
+  if (!isBatch.value) {
+    baseRules.owner = [
+      {
+        required: true,
+        message: t('pages.adAccount.edit.ownerRequired'),
+        type: 'array',
+        min: 2,
+      },
+    ];
+  } else {
+    // 批量编辑模式：只有勾选了统一设置所属人员时才需要验证
+    if (formData.value.unifiedOwner) {
+      baseRules.owner = [
+        {
+          required: true,
+          message: t('pages.adAccount.edit.ownerRequired'),
+          type: 'array',
+          min: 2,
+        },
+      ];
+    }
+  }
+
+  return baseRules;
+});
+
+// 初始化表单数据
+const initFormData = () => {
+  if (isBatch.value) {
+    // 批量编辑模式：重置所有字段
+    formData.value.unifiedOwner = false;
+    formData.value.unifiedAssistants = false;
+    formData.value.owner = [];
+    formData.value.assistants = [];
+  } else {
+    // 单个编辑模式
+    if (props.record) {
+      // 级联选择器需要完整路径 [部门ID, 用户ID]
+      formData.value.owner = props.record.owner ? ['dept-customer-service', props.record.owner] : [];
+      formData.value.assistants = props.record.assistants || [];
+    } else {
+      formData.value.owner = [];
+      formData.value.assistants = [];
+    }
+  }
+};
+
+// 监听弹窗打开
+watch(() => props.open, (val) => {
+  if (val) {
+    initFormData();
+    formRef.value?.clearValidate();
+  }
+});
+
+// 监听统一设置复选框变化，清除或添加验证
+watch([() => formData.value.unifiedOwner, () => formData.value.unifiedAssistants], () => {
+  if (isBatch.value) {
+    formRef.value?.clearValidate();
+  }
+});
+
+// 确定按钮
+const handleOk = async () => {
+  try {
+    // 批量编辑模式下，只有勾选了统一设置才需要验证对应字段
+    if (isBatch.value) {
+      if (formData.value.unifiedOwner) {
+        await formRef.value?.validate(['owner']);
+      }
+      // 协助人员是可选的，不需要验证
+    } else {
+      // 单个编辑模式，需要验证所有必填字段
+      await formRef.value?.validate();
+    }
+
+    loading.value = true;
+    // 模拟API调用
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const result: any = {};
+
+    if (isBatch.value) {
+      // 批量编辑模式
+      // 级联选择器返回的是路径数组，取最后一个值作为选中的用户ID
+      if (formData.value.unifiedOwner && Array.isArray(formData.value.owner) && formData.value.owner.length > 0) {
+        result.owner = formData.value.owner[formData.value.owner.length - 1];
+      }
+
+      // 树形选择器需要过滤掉部门节点
+      if (formData.value.unifiedAssistants) {
+        const getLeafValues = (values: string[]): string[] => {
+          return values.filter((v) => !v.startsWith('dept-'));
+        };
+        result.assistants = getLeafValues(formData.value.assistants);
+      }
+    } else {
+      // 单个编辑模式
+      // 级联选择器返回的是路径数组，取最后一个值作为选中的用户ID
+      const ownerValue = Array.isArray(formData.value.owner) && formData.value.owner.length > 0
+        ? formData.value.owner[formData.value.owner.length - 1]
+        : '';
+
+      // 树形选择器需要过滤掉部门节点
+      const getLeafValues = (values: string[]): string[] => {
+        return values.filter((v) => !v.startsWith('dept-'));
+      };
+
+      result.owner = ownerValue;
+      result.assistants = getLeafValues(formData.value.assistants);
+    }
+
+    emit('confirm', result);
+    formRef.value?.resetFields();
+  } finally {
+    loading.value = false;
+  }
+};
+
+// 取消按钮
+const handleCancel = () => {
+  formRef.value?.resetFields();
+  visible.value = false;
+};
+
+// 暴露初始化方法
+defineExpose({
+  initFormData,
+});
+</script>
+
+<style scoped lang="less">
+:deep(.ant-modal) {
+  .ant-modal-header {
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  .ant-modal-body {
+    padding: 24px;
+  }
+
+  .ant-modal-footer {
+    border-top: 1px solid #f0f0f0;
+  }
+}
+
+:deep(.ant-form-item) {
+  margin-bottom: 24px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.channel-text {
+  color: rgba(0, 0, 0, 0.85);
+  font-size: 14px;
+}
+
+.channel-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #fff;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 6px;
+}
+
+.selected-accounts-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  padding: 8px;
+  background: #fafafa;
+
+  .account-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px;
+    margin-bottom: 4px;
+    background: #fff;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+
+    &:hover {
+      background: #f5f5f5;
+    }
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+
+    .account-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1;
+      min-width: 0;
+    }
+  }
+
+  .account-platform-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 6px;
+    font-size: 10px;
+    font-weight: 500;
+    color: #fff;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+
+  .account-id {
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.45);
+    font-family: 'Courier New', monospace;
+  }
+
+  .account-name {
+    font-size: 13px;
+    color: rgba(0, 0, 0, 0.85);
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+:deep(.ant-tree-select) {
+  .ant-select-selector {
+    padding: 4px 11px;
+  }
+}
+
+:deep(.ant-cascader) {
+  .ant-select-selector {
+    padding: 4px 11px;
+  }
+}
+</style>

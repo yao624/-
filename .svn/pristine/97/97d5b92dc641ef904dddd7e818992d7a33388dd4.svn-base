@@ -1,0 +1,21 @@
+[2026-03-28 04:02:15] production.ERROR: 404 occurred  
+[2026-03-28 04:02:27] production.INFO: info_no_tenant  
+[2026-03-28 04:02:27] production.DEBUG: auth id: 1  
+[2026-03-28 04:02:28] production.ERROR: 404 occurred  
+[2026-03-28 04:02:28] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-28 04:02:28] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-28 04:02:28] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-28 04:02:28] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-28 04:02:28] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-28 04:05:53] production.INFO: info_no_tenant  
+[2026-03-28 04:05:53] production.DEBUG: auth id: 1  
+[2026-03-28 04:05:54] production.ERROR: 404 occurred  
+[2026-03-28 04:20:55] production.INFO: info_no_tenant  
+[2026-03-28 04:20:55] production.DEBUG: auth id: 1  
+[2026-03-28 04:20:56] production.ERROR: 404 occurred  
+[2026-03-28 04:20:57] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-28 04:20:57] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-28 04:20:57] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-28 04:20:57] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-28 04:20:57] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-28 04:20:57] production.WARNING: Tenant UUID not found in token for user: 1  

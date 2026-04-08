@@ -1,0 +1,512 @@
+<template>
+  <a-modal
+    v-model:open="visible"
+    :title="t('pages.materialEditorManage.createTask.title')"
+    :width="1200"
+    :footer="null"
+    :destroy-on-close="true"
+    @cancel="handleCancel"
+  >
+    <div class="create-task-modal">
+      <!-- Step Indicator -->
+      <div class="step-indicator">
+        <span class="step-text">{{ t('pages.materialEditorManage.createTask.step') }} {{ currentStep }}{{ t('pages.materialEditorManage.createTask.stepOf', { total: 2 }) }}</span>
+      </div>
+
+      <!-- Step 1 Content -->
+      <div v-show="currentStep === 1" class="step-content">
+        <a-form ref="formRef" :model="form" layout="vertical" :label-col="{ span: 24 }" :wrapper-col="{ span: 24 }">
+          <!-- 素材类型 -->
+          <a-form-item :label="t('pages.materialEditorManage.createTask.materialType')" required>
+            <a-radio-group v-model:value="form.materialType" button-style="solid">
+              <a-radio-button value="image">{{ t('pages.materialEditorManage.createTask.materialType.image') }}</a-radio-button>
+              <a-radio-button value="video">{{ t('pages.materialEditorManage.createTask.materialType.video') }}</a-radio-button>
+            </a-radio-group>
+          </a-form-item>
+
+          <!-- 选择素材 -->
+          <a-form-item :label="t('pages.materialEditorManage.createTask.selectMaterial')" required>
+            <a-button block @click="handleSelectMaterial">
+              <PlusOutlined />
+              {{ t('pages.materialEditorManage.createTask.selectMaterial') }}
+            </a-button>
+            <div v-if="form.materials.length > 0" class="selected-tip">
+              {{ t('pages.materialEditorManage.materialPicker.selected', { count: form.materials.length }) }}
+            </div>
+          </a-form-item>
+
+          <!-- 目标文件夹 -->
+          <a-form-item :label="t('pages.materialEditorManage.createTask.targetFolder')" required>
+            <a-radio-group v-model:value="form.folderOption" button-style="solid">
+              <a-radio-button value="original">{{ t('pages.materialEditorManage.createTask.originalFolder') }}</a-radio-button>
+              <a-radio-button value="new">{{ t('pages.materialEditorManage.createTask.newFolder') }}</a-radio-button>
+            </a-radio-group>
+
+            <!-- 新文件夹选择 (仅当选择新文件夹时显示) -->
+            <div v-if="form.folderOption === 'new'" class="folder-select-wrapper">
+              <a-select
+                v-model:value="form.targetFolderId"
+                :placeholder="t('pages.materialEditorManage.createTask.selectFolder')"
+                allow-clear
+                show-search
+                :filter-option="filterOption"
+                style="width: 100%;"
+              >
+                <a-select-option v-for="folder in folderList" :key="folder.id" :value="folder.id">
+                  {{ folder.name }}
+                </a-select-option>
+              </a-select>
+            </div>
+          </a-form-item>
+
+          <!-- 标签 -->
+          <a-form-item :label="t('pages.materialEditorManage.createTask.tags')">
+            <a-radio-group v-model:value="form.tagMode" button-style="solid">
+              <a-radio-button value="original">{{ t('pages.materialEditorManage.createTask.option.original') }}</a-radio-button>
+              <a-radio-button value="unified">{{ t('pages.materialEditorManage.createTask.option.unified') }}</a-radio-button>
+              <a-radio-button value="smart">{{ t('pages.materialEditorManage.createTask.option.smart') }}</a-radio-button>
+            </a-radio-group>
+
+            <!-- 统一设置下拉框 -->
+            <div v-if="form.tagMode === 'unified'" class="option-select-wrapper">
+              <a-select
+                v-model:value="form.tags"
+                mode="multiple"
+                :placeholder="t('pages.materialEditorManage.createTask.tagsPlaceholder')"
+                allow-clear
+                :options="tagOptions"
+                style="width: 100%;"
+              >
+              </a-select>
+            </div>
+
+            <!-- 智能识别下拉框 -->
+            <div v-if="form.tagMode === 'smart'" class="option-select-wrapper">
+              <a-select
+                v-model:value="form.smartTagId"
+                :placeholder="t('pages.materialEditorManage.createTask.tagsPlaceholder')"
+                allow-clear
+                show-search
+                :filter-option="filterOption"
+                style="width: 100%;"
+              >
+                <a-select-option v-for="tag in tagList" :key="tag.id" :value="tag.id">
+                  {{ tag.name }}
+                </a-select-option>
+              </a-select>
+            </div>
+          </a-form-item>
+
+          <!-- 设计师 -->
+          <a-form-item :label="t('pages.materialEditorManage.createTask.designer')">
+            <a-radio-group v-model:value="form.designerMode" button-style="solid">
+              <a-radio-button value="original">{{ t('pages.materialEditorManage.createTask.option.original') }}</a-radio-button>
+              <a-radio-button value="unified">{{ t('pages.materialEditorManage.createTask.option.unified') }}</a-radio-button>
+              <a-radio-button value="smart">{{ t('pages.materialEditorManage.createTask.option.smart') }}</a-radio-button>
+            </a-radio-group>
+
+            <!-- 统一设置下拉框 -->
+            <div v-if="form.designerMode === 'unified'" class="option-select-wrapper">
+              <a-select
+                v-model:value="form.designerId"
+                :placeholder="t('pages.materialEditorManage.createTask.designerPlaceholder')"
+                allow-clear
+                show-search
+                :filter-option="filterOption"
+                style="width: 100%;"
+              >
+                <a-select-option v-for="designer in designerList" :key="designer.id" :value="designer.id">
+                  {{ designer.name }}
+                </a-select-option>
+              </a-select>
+            </div>
+
+            <!-- 智能识别下拉框 -->
+            <div v-if="form.designerMode === 'smart'" class="option-select-wrapper">
+              <a-select
+                v-model:value="form.smartDesignerId"
+                :placeholder="t('pages.materialEditorManage.createTask.designerPlaceholder')"
+                allow-clear
+                show-search
+                :filter-option="filterOption"
+                style="width: 100%;"
+              >
+                <a-select-option v-for="designer in designerList" :key="designer.id" :value="designer.id">
+                  {{ designer.name }}
+                </a-select-option>
+              </a-select>
+            </div>
+          </a-form-item>
+
+          <!-- 创意人 -->
+          <a-form-item :label="t('pages.materialEditorManage.createTask.creative')">
+            <a-radio-group v-model:value="form.creativeMode" button-style="solid">
+              <a-radio-button value="original">{{ t('pages.materialEditorManage.createTask.option.original') }}</a-radio-button>
+              <a-radio-button value="unified">{{ t('pages.materialEditorManage.createTask.option.unified') }}</a-radio-button>
+              <a-radio-button value="smart">{{ t('pages.materialEditorManage.createTask.option.smart') }}</a-radio-button>
+            </a-radio-group>
+
+            <!-- 统一设置下拉框 -->
+            <div v-if="form.creativeMode === 'unified'" class="option-select-wrapper">
+              <a-select
+                v-model:value="form.creativeId"
+                :placeholder="t('pages.materialEditorManage.createTask.creativePlaceholder')"
+                allow-clear
+                show-search
+                :filter-option="filterOption"
+                style="width: 100%;"
+              >
+                <a-select-option v-for="creative in creativeList" :key="creative.id" :value="creative.id">
+                  {{ creative.name }}
+                </a-select-option>
+              </a-select>
+            </div>
+
+            <!-- 智能识别下拉框 -->
+            <div v-if="form.creativeMode === 'smart'" class="option-select-wrapper">
+              <a-select
+                v-model:value="form.smartCreativeId"
+                :placeholder="t('pages.materialEditorManage.createTask.creativePlaceholder')"
+                allow-clear
+                show-search
+                :filter-option="filterOption"
+                style="width: 100%;"
+              >
+                <a-select-option v-for="creative in creativeList" :key="creative.id" :value="creative.id">
+                  {{ creative.name }}
+                </a-select-option>
+              </a-select>
+            </div>
+          </a-form-item>
+
+          <!-- 素材名称 -->
+          <a-form-item :label="t('pages.materialEditorManage.createTask.materialName')">
+            <a-input
+              v-model:value="form.materialName"
+              :placeholder="t('pages.materialEditorManage.createTask.materialNamePlaceholder')"
+              allow-clear
+            />
+          </a-form-item>
+        </a-form>
+      </div>
+
+      <!-- Step 2 Content -->
+      <div v-show="currentStep === 2" class="step-content step2-content">
+        <!-- Playturbo Workbench iframe -->
+        <div class="workbench-wrapper">
+          <iframe
+            src="https://app.playturbo.com/cloud-clip/#/workbench"
+            class="workbench-iframe"
+            frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen
+          ></iframe>
+        </div>
+      </div>
+
+      <!-- Footer Buttons -->
+      <div class="modal-footer">
+        <a-space>
+          <a-button v-if="currentStep === 1" @click="handleCancel">
+            {{ t('pages.materialEditorManage.createTask.cancel') }}
+          </a-button>
+          <a-button v-if="currentStep === 2" @click="handlePrevious">
+            {{ t('pages.materialEditorManage.createTask.previous') }}
+          </a-button>
+          <a-button v-if="currentStep === 1" type="primary" @click="handleNext">
+            {{ t('pages.materialEditorManage.createTask.next') }}
+          </a-button>
+          <a-button v-if="currentStep === 2" type="primary" @click="handleFinish">
+            {{ t('pages.materialEditorManage.createTask.finish') }}
+          </a-button>
+        </a-space>
+      </div>
+    </div>
+
+    <!-- Material Picker Modal -->
+    <material-picker-modal
+      v-model:open="materialPickerVisible"
+      :material-type="form.materialType"
+      @confirm="handleMaterialPickerConfirm"
+    />
+  </a-modal>
+</template>
+
+<script setup lang="ts">
+import { ref, reactive, computed, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { message } from 'ant-design-vue';
+import { PlusOutlined } from '@ant-design/icons-vue';
+import type { CreateTaskForm, FolderInfo, DesignerInfo, CreativeInfo, TagInfo, MaterialType, FieldMode } from '../types';
+import MaterialPickerModal from './MaterialPickerModal.vue';
+
+const { t } = useI18n();
+
+const props = defineProps<{
+  open: boolean;
+  folderList?: FolderInfo[];
+  designerList?: DesignerInfo[];
+  creativeList?: CreativeInfo[];
+  tagList?: TagInfo[];
+}>();
+
+const emit = defineEmits<{
+  'update:open': [value: boolean];
+  'create': [form: CreateTaskForm];
+  'select-material': []; // 埋点: 选择素材
+}>();
+
+// Current step
+const currentStep = ref(1);
+
+// Modal visibility
+const visible = computed({
+  get: () => props.open,
+  set: (val) => emit('update:open', val),
+});
+
+// Form data
+const form = reactive<{
+  materialType: MaterialType | undefined;
+  materials: any[];
+  folderOption: 'original' | 'new';
+  targetFolderId: string | undefined;
+  tagMode: FieldMode;
+  tags: string[];
+  smartTagId: string | undefined;
+  designerMode: FieldMode;
+  designerId: string | undefined;
+  smartDesignerId: string | undefined;
+  creativeMode: FieldMode;
+  creativeId: string | undefined;
+  smartCreativeId: string | undefined;
+  materialName: string;
+}>({
+  materialType: 'image',
+  materials: [],
+  folderOption: 'original',
+  targetFolderId: undefined,
+  tagMode: 'original',
+  tags: [],
+  smartTagId: undefined,
+  designerMode: 'original',
+  designerId: undefined,
+  smartDesignerId: undefined,
+  creativeMode: 'original',
+  creativeId: undefined,
+  smartCreativeId: undefined,
+  materialName: '',
+});
+
+// Mock data lists
+const mockFolderList: FolderInfo[] = [
+  { id: 'folder1', name: '项目A文件夹' },
+  { id: 'folder2', name: '项目B文件夹' },
+  { id: 'folder3', name: '项目C文件夹' },
+];
+
+const mockDesignerList: DesignerInfo[] = [
+  { id: 'd1', name: '张三' },
+  { id: 'd2', name: '李四' },
+  { id: 'd3', name: '王五' },
+];
+
+const mockCreativeList: CreativeInfo[] = [
+  { id: 'c1', name: '创意A' },
+  { id: 'c2', name: '创意B' },
+  { id: 'c3', name: '创意C' },
+];
+
+const mockTagList: TagInfo[] = [
+  { id: 't1', name: '促销', color: 'red' },
+  { id: 't2', name: '节日', color: 'blue' },
+  { id: 't3', name: '品牌', color: 'green' },
+  { id: 't4', name: '活动', color: 'orange' },
+];
+
+const folderList = computed(() => props.folderList || mockFolderList);
+const designerList = computed(() => props.designerList || mockDesignerList);
+const creativeList = computed(() => props.creativeList || mockCreativeList);
+const tagList = computed(() => props.tagList || mockTagList);
+const tagOptions = computed(() =>
+  tagList.value.map(tag => ({
+    label: tag.name,
+    value: tag.id,
+  }))
+);
+
+// Filter option for select
+const filterOption = (input: string, option: any) => {
+  return option?.label?.toLowerCase().includes(input.toLowerCase());
+};
+
+
+// Reset form
+const resetForm = () => {
+  currentStep.value = 1;
+  form.materialType = 'image';
+  form.materials = [];
+  form.folderOption = 'original';
+  form.targetFolderId = undefined;
+  form.tagMode = 'original';
+  form.tags = [];
+  form.smartTagId = undefined;
+  form.designerMode = 'original';
+  form.designerId = undefined;
+  form.smartDesignerId = undefined;
+  form.creativeMode = 'original';
+  form.creativeId = undefined;
+  form.smartCreativeId = undefined;
+  form.materialName = '';
+};
+
+// Handle cancel
+const handleCancel = () => {
+  resetForm();
+  visible.value = false;
+};
+
+// Handle next step
+const handleNext = () => {
+  // Validate
+  if (!form.materialType) {
+    message.error(t('pages.materialEditorManage.createTask.pleaseSelectMaterialType'));
+    return;
+  }
+  if (form.folderOption === 'new' && !form.targetFolderId) {
+    message.error(t('pages.materialEditorManage.createTask.pleaseSelectTargetFolder'));
+    return;
+  }
+
+  // Validate materials - 用户必须选择至少一个素材
+  if (form.materials.length === 0) {
+    message.error(t('pages.materialEditorManage.createTask.pleaseSelectMaterials'));
+    return;
+  }
+
+  currentStep.value = 2;
+};
+
+// Handle previous step
+const handlePrevious = () => {
+  currentStep.value = 1;
+};
+
+// Handle finish
+const handleFinish = () => {
+  // Build create form
+  const createForm: CreateTaskForm = {
+    materialType: form.materialType,
+    materials: form.materials,
+    folderOption: form.folderOption,
+    targetFolderId: form.targetFolderId,
+    tags: form.tagMode === 'unified' ? form.tags : [],
+    designerId: form.designerMode === 'unified' ? form.designerId : undefined,
+    creativeId: form.creativeMode === 'unified' ? form.creativeId : undefined,
+    materialName: form.materialName,
+  };
+
+  emit('create', createForm);
+  message.success(t('pages.materialEditorManage.createTask.taskCreated'));
+  resetForm();
+  visible.value = false;
+};
+
+// Material picker modal
+const materialPickerVisible = ref(false);
+
+// Handle select material
+const handleSelectMaterial = () => {
+  materialPickerVisible.value = true;
+};
+
+// Handle material picker confirm
+const handleMaterialPickerConfirm = (selectedMaterials: any[]) => {
+  // Convert selected materials to the format expected by the form
+  form.materials = selectedMaterials.map(m => ({
+    id: String(m.id),
+    name: m.material_name,
+    type: m.material_type === 0 ? 'image' : 'video',
+    previewUrl: m.thumbnail_url || m.file_url || '',
+  }));
+
+  materialPickerVisible.value = false;
+  message.success(t('pages.materialEditorManage.materialPicker.selected', { count: selectedMaterials.length }));
+};
+
+// Reset form when modal opens/closes
+watch(visible, (val) => {
+  if (!val) {
+    resetForm();
+  }
+});
+</script>
+
+<style scoped lang="less">
+.create-task-modal {
+  padding: 8px 0;
+
+  .step-indicator {
+    text-align: center;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #f0f0f0;
+
+    .step-text {
+      font-size: 14px;
+      font-weight: 500;
+      color: #262626;
+    }
+  }
+
+  .step-content {
+    min-height: 350px;
+
+    :deep(.ant-form-item) {
+      margin-bottom: 16px;
+    }
+
+    :deep(.ant-form-item-label > label) {
+      font-size: 14px;
+      color: #262626;
+      font-weight: 500;
+    }
+
+    .selected-tip {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #52c41a;
+    }
+
+    .folder-select-wrapper,
+    .option-select-wrapper {
+      margin-top: 12px;
+    }
+  }
+
+  .step2-content {
+    .workbench-wrapper {
+      width: 100%;
+      height: 500px;
+      border: 1px solid #f0f0f0;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+
+      .workbench-iframe {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+    }
+  }
+
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 16px;
+    border-top: 1px solid #f0f0f0;
+    margin-top: 8px;
+  }
+}
+</style>

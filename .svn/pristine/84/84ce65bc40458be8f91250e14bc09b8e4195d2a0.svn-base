@@ -1,0 +1,734 @@
+<?php
+
+use App\Http\Controllers\AccountManage\AdAccountPageController;
+use App\Http\Controllers\AdLogController;
+use App\Http\Controllers\AdsMediaController;
+use App\Http\Controllers\AgentController;
+use App\Http\Controllers\BaseController;
+use App\Http\Controllers\CardController;
+use App\Http\Controllers\CardFbAdAccountController;
+use App\Http\Controllers\CardProviderController;
+use App\Http\Controllers\CardBinController;
+use App\Http\Controllers\CardTransactionController;
+use App\Http\Controllers\CloudflareController;
+use App\Http\Controllers\CopywritingController;
+use App\Http\Controllers\CronJobController;
+use App\Http\Controllers\MetaAutoRuleController;
+use App\Http\Controllers\MetaTagFoldersController;
+use App\Http\Controllers\MetaTagOptionsController;
+use App\Http\Controllers\MetaTagsController;
+use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\InsightsController;
+use App\Http\Controllers\SearchBookmarkController;
+use App\Http\Controllers\FbAccountController;
+use App\Http\Controllers\FbAdAccountController;
+use App\Http\Controllers\FbAdController;
+use App\Http\Controllers\FbAdsetController;
+use App\Http\Controllers\FbAdTemplateController;
+use App\Http\Controllers\FbApiTokenController;
+use App\Http\Controllers\FbBmController;
+use App\Http\Controllers\FbCampaignController;
+use App\Http\Controllers\FbCatalogController;
+use App\Http\Controllers\FbPageController;
+use App\Http\Controllers\FbPageFormController;
+use App\Http\Controllers\FbPixelController;
+use App\Http\Controllers\FraudConfigController;
+use App\Http\Controllers\LanguageController;
+use App\Http\Controllers\LinkController;
+use App\Http\Controllers\MaterialController;
+use App\Http\Controllers\MetaCopy\MetaCopyFolderController;
+use App\Http\Controllers\MetaCopy\MetaCopyItemController;
+use App\Http\Controllers\MetaCopy\MetaCopyLibraryController;
+use App\Http\Controllers\MetaFb\MetaFbToolController;
+use App\Http\Controllers\MetaTask\TaskCenterController;
+use App\Http\Controllers\MetaTask\ScheduledReportController;
+use App\Http\Controllers\MetaTask\NotificationCenterController;
+use App\Http\Controllers\MetaReport\MetaReportDashboardCardController;
+use App\Http\Controllers\MetaReport\MetaReportDashboardController;
+use App\Http\Controllers\MetaReport\MetaReportDashboardFolderController;
+use App\Http\Controllers\MetaAdCreationCreativeGroupController;
+use App\Http\Controllers\MetaAdCreationDraftController;
+use App\Http\Controllers\MetaAdCreationRecordController;
+use App\Http\Controllers\MetaAdCreationRegionGroupController;
+use App\Http\Controllers\MetaAdCreationBmGraphController;
+use App\Http\Controllers\MetaAdCreationTemplateController;
+use App\Http\Controllers\AdTemplate\TemplateManageController;
+use App\Http\Controllers\AdTemplate\TemplateShareController;
+use App\Http\Controllers\NetworkController;
+use App\Http\Controllers\NoticesController;
+use App\Http\Controllers\ProxyController;
+use App\Http\Controllers\RuleController;
+use App\Http\Controllers\RuleTemplatesController;
+use App\Http\Controllers\SubidMappingController;
+use App\Http\Controllers\SystemManageController;
+use App\Http\Controllers\TagController;
+use App\Http\Controllers\TrackerController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\RequestLogController;
+use App\Http\Controllers\RoleController;
+use App\Http\Controllers\TenantController;
+use App\Http\Controllers\XmpFoldersController;
+use App\Http\Controllers\XmpMaterialGroupsController;
+use App\Http\Controllers\XmpMaterialsController;
+use App\Http\Controllers\XmpColumnTemplatesController;
+use App\Http\Controllers\XmpOptionsController;
+use App\Http\Controllers\MetaMediaMaterialController;
+use App\Http\Controllers\MetaMaterialEditorTaskController;
+use App\Http\Controllers\AccountManage\FbAccountController as AccountManageFbAccountController;
+use App\Http\Controllers\AccountManage\FbAdAccountController as AccountManageFbAdAccountController;
+use App\Models\CronJob;
+use App\Models\Material;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Response;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
+
+/*
+|--------------------------------------------------------------------------
+| API Routes
+|--------------------------------------------------------------------------
+|
+| Here is where you can register API routes for your application. These
+| routes are loaded by the RouteServiceProvider and all of them will
+| be assigned to the "api" middleware group. Make something great!
+|
+*/
+
+
+Route::prefix('/v2')->group(function () {
+    //    Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
+//        return $request->user();
+//    });
+
+    Route::post('/fb-accounts/update-token', [FbAccountController::class, 'update_token']);
+
+    // 这个不需要认证，通过key来处理
+    Route::post('/overview-ads/provider-spending-summary', [FbCampaignController::class, 'provider_spending_summary']);
+    Route::post('/overview-ads/cw-partner-spending-summary', [FbCampaignController::class, 'cw_partner_spending_summary']);
+
+    Route::middleware(['auth:sanctum'])->group(function () {
+        // 语言接口 - 需要认证
+        Route::get('/languages', [LanguageController::class, 'getLanguages']);
+        Route::get('/languages/simple', [LanguageController::class, 'getLanguagesSimple']);
+        Route::get('/languages/{labelName}', [LanguageController::class, 'getLanguageByLabel']);
+
+        // ads-media 接口 - 需要认证
+        Route::get('/ads-media', [AdsMediaController::class, 'getMediaUrl']);
+        Route::get('/video-thumbnail', [AdsMediaController::class, 'getVideoThumbnail']);
+
+        // 搜索书签接口 - 需要认证
+        Route::get('/search-bookmarks', [SearchBookmarkController::class, 'index']);
+        Route::post('/search-bookmarks', [SearchBookmarkController::class, 'store']);
+        Route::get('/search-bookmarks/{id}', [SearchBookmarkController::class, 'show']);
+        Route::delete('/search-bookmarks/{id}', [SearchBookmarkController::class, 'destroy']);
+
+        // 请求日志接口 - 需要管理员权限
+        Route::middleware('role:admin')->group(function () {
+            Route::get('/request-logs', [RequestLogController::class, 'index']);
+            Route::get('/request-logs/statistics', [RequestLogController::class, 'statistics']);
+            Route::delete('/request-logs/cleanup', [RequestLogController::class, 'cleanup']);
+            Route::get('/request-logs/{id}', [RequestLogController::class, 'show']);
+        });
+        Route::post('/user/logout', [UserController::class, 'logout']);
+        Route::post('/user/change-password', [UserController::class, 'change_password']);
+
+        // 管理台模板通知角标（暂无业务数据时返回空列表）
+        Route::get('/notices', fn() => response()->json([]));
+        Route::post('/fb-accounts/{fbAccount}/sync-resources', [FbAccountController::class, 'syncResource']);
+        Route::patch('/fb-accounts/{fbAccount}/set-token-valid', [FbAccountController::class, 'setTokenValid']);
+        Route::post('/fb-accounts/batch-sync-resources', [FbAccountController::class, 'batchSyncResource']);
+        Route::post('/fb-accounts/archive', [FbAccountController::class, 'archive']);
+        Route::post('/fb-accounts/unarchive', [FbAccountController::class, 'unarchive']);
+
+        Route::post('/fb-ad-accounts/archive', [FbAdAccountController::class, 'archive']);
+        Route::post('/fb-ad-accounts/unarchive', [FbAdAccountController::class, 'unarchive']);
+        Route::post('/fb-ad-accounts/enable-rule', [FbAdAccountController::class, 'enableRule']);
+        Route::post('/fb-ad-accounts/disable-rule', [FbAdAccountController::class, 'disableRule']);
+        Route::post('/fb-ad-accounts/fetch-data', [FbCampaignController::class, 'fetchFbCampaignData']);
+        Route::post('/fb-ad-accounts/fetch-data-recently', [FbCampaignController::class, 'fetchFbCampaignDataRecently']);
+        Route::post('/fb-ad-accounts/auto-sync', [FbAdAccountController::class, 'auto_sync']);
+        Route::post('/fb-ad-accounts/set-account-spend-cap', [FbAdAccountController::class, 'set_account_spend_cap']);
+        Route::post('/fb-ad-accounts/update-filters', [FbAdAccountController::class, 'updateFilters']);
+        Route::post('/fb-ad-accounts/clear-filters', [FbAdAccountController::class, 'clearFilters']);
+        Route::post('/fb-ad-accounts/toggle-topup', [FbAdAccountController::class, 'toggle_topup']);
+        Route::post('/fb-ad-accounts/sync-ad-account', [FbAdAccountController::class, 'sync_ad_account']);
+        Route::post('/fb-ad-accounts/sync-account-spend-info', [FbAdAccountController::class, 'sync_account_spend_info']);
+        Route::post('/fb-ad-accounts/subscribe-app', [FbAdAccountController::class, 'subscribe_app']);
+
+
+        // 只获取本身层级的数据
+        Route::post('/fb-ad-accounts/sync-ad-account-data', [FbCampaignController::class, 'sync_ad_account_insights']);
+        Route::post('/fb-ad-accounts/sync-campaign-data', [FbCampaignController::class, 'sync_campaign_insights']);
+        Route::post('/fb-ad-accounts/sync-adset-data', [FbCampaignController::class, 'sync_adset_insights']);
+        Route::post('/fb-ad-accounts/sync-ad-data', [FbCampaignController::class, 'sync_ad_insights']);
+
+        Route::post('/fb-ad-accounts/fetch-insights', [FbCampaignController::class, 'fetchFbInsights']);
+        Route::post('/fb-ad-accounts/fetch-ad-account-info', [FbCampaignController::class, 'fetchFbAdAccountInfo']);
+
+        Route::post('/fb-pixels/share-to-ad-accounts', [FbPixelController::class, 'shareToAdAccount']);
+
+        Route::post('/fb-ads/quick-launch-ads', [FbAdController::class, 'quick_launch_ads']);
+        Route::post('/fb-ads/launch', [FbAdController::class, 'launch_ads_v2']);
+        Route::post('/fb-ads/update', [FbAdController::class, 'updateAds']);
+        Route::post('/fb-ads/multi-lang-preview', [FbAdController::class, 'getMultiLangPreview']);
+        Route::post('/fb-ads/add-languages', [FbAdController::class, 'addLanguagesToAds']);
+        Route::post('/fb-ads/set-auto-add-languages', [FbAdController::class, 'setAutoAddLanguages']);
+        Route::post('/fb-ads/copy', [FbAdController::class, 'copyAds']);
+        Route::post('/fb-ads/copy-ad-2-adsets', [FbAdController::class, 'copyAdToAdsets']);
+        Route::post('/fb-debug', [BaseController::class, 'fb_debug']);
+
+        // 编辑 adset 语言设置接口
+        Route::post('/fb-adsets/update-targeting', [FbAdsetController::class, 'updateTargeting']);
+
+        Route::post('/overview-ads/insights-ad-account', [FbCampaignController::class, 'account_insights']);
+        Route::post('/overview-ads/insights-campaign', [FbCampaignController::class, 'campaign_insights']);
+        Route::post('/overview-ads/insights-adset', [FbCampaignController::class, 'adsets_insights']);
+        Route::post('/overview-ads/insights-ad', [FbCampaignController::class, 'ad_insights']);
+        Route::post('/insights/overview', [InsightsController::class, 'overview']);
+        Route::post('/insights/overview/users', [InsightsController::class, 'overviewUsers']);
+        Route::post('/insights/overview/ad-accounts', [InsightsController::class, 'overviewAdAccounts']);
+        Route::post('/insights/overview/campaigns', [InsightsController::class, 'overviewCampaigns']);
+        Route::post('/insights/overview/adsets', [InsightsController::class, 'overviewAdsets']);
+        Route::post('/insights/overview/offers', [InsightsController::class, 'overviewOffers']);
+        Route::post('/insights/overview/campaign-tags', [InsightsController::class, 'overviewCampaignTags']);
+        Route::post('/insights/trends', [InsightsController::class, 'trends']);
+        Route::post('/insights/trends/users', [InsightsController::class, 'trendsUsers']);
+        // Route::post('/insights/trends/ad-accounts', [InsightsController::class, 'trendsAdAccounts']);
+        // Route::post('/insights/trends/campaigns', [InsightsController::class, 'trendsCampaigns']);
+        // Route::post('/insights/trends/adsets', [InsightsController::class, 'trendsAdsets']);
+        Route::post('/insights/trends/offers', [InsightsController::class, 'trendsOffers']);
+        Route::post('/insights/overview-with-foreach', [InsightsController::class, 'overviewWithForeach']);
+        Route::post('/overview-ads/quick-launch-ads', [FbAdController::class, 'quick_launch_ads']);
+
+        Route::post('/overview-ads/batch-update-object-status', [FbCampaignController::class, 'batch_update_object_status']);
+        Route::post('/overview-ads/update-object-budget', [FbCampaignController::class, 'update_object_budget']);
+        Route::post('/overview-ads/batch-update-object-budget', [FbCampaignController::class, 'batch_update_object_budget']);
+        Route::post('/overview-ads/copy-object', [FbCampaignController::class, 'copy_object']);
+        Route::post('/overview-ads/rename-object', [FbCampaignController::class, 'rename_object']);
+        Route::post('/overview-ads/update-bid-amount', [FbCampaignController::class, 'update_bid_amount']);
+        Route::post('/overview-ads/update-bid-strategy', [FbCampaignController::class, 'update_bid_strategy']);
+
+        Route::post('/fb-campaigns/fetch-data', [FbCampaignController::class, 'fetchFbCampaignData']);
+        Route::post('/fb-campaigns/fetch-insights', [FbCampaignController::class, 'fetchFbInsights']);
+        Route::post('/fb-campaigns/archive', [FbCampaignController::class, 'archive']);
+        Route::post('/fb-campaigns/unarchive', [FbCampaignController::class, 'unarchive']);
+        Route::post('/fb-campaigns/delete', [FbCampaignController::class, 'delte_objects']);
+        Route::post('/fb-campaigns/cbo-2-abo', [FbCampaignController::class, 'cbo_2_abo']);
+
+        Route::post('/networks/fetch-clicks', [NetworkController::class, 'fetch_clicks']);
+        Route::post('/networks/fetch-conversions', [NetworkController::class, 'fetch_conversions']);
+        Route::post('/networks/fetch-all', [NetworkController::class, 'fetch_all']);
+        Route::post('/networks/fetch-keitaro', [NetworkController::class, 'fetch_keitaro']);
+        Route::post('/networks/test-connection', [NetworkController::class, 'testConnection']);
+        Route::post('/networks/map-subid', [NetworkController::class, 'associateNetworksToSubidMapping']);
+        Route::post('/networks/delete-cv', [NetworkController::class, 'delete_network_cv']);
+        Route::post('/networks/delete-clicks', [NetworkController::class, 'delete_network_clicks']);
+
+
+        Route::get('/networks/clicks', [NetworkController::class, 'clicks']);
+        Route::get('/networks/conversions', [NetworkController::class, 'conversions']);
+
+        Route::post('/cards/freeze', [CardController::class, 'freeze']);
+        Route::post('/cards/unfreeze', [CardController::class, 'unfreeze']);
+        Route::post('/cards/cancel', [CardController::class, 'cancel']);
+        Route::post('/cards/transfer-in', [CardController::class, 'transfer_in']);
+        Route::post('/cards/transfer-out', [CardController::class, 'transfer_out']);
+        Route::post('/cards/sync-all', [CardController::class, 'sync_all']);
+        Route::post('/cards/sync', [CardController::class, 'sync']);
+        Route::post('/cards/one-shot-total-limit', [CardController::class, 'one_shot_total_limit']);
+        Route::post('/cards/one-shot-per-trans', [CardController::class, 'one_shot_per_transaction']);
+        Route::post('/cards/total-limit', [CardController::class, 'set_total_limit']);
+        Route::post('/cards/set-balance', [CardController::class, 'set_balance']);
+        Route::post('/cards/set-single-trans-limit', [CardController::class, 'set_single_trans_limit']);
+
+        // Card & FB Ad Account 关联管理路由
+        Route::post('/cards/attach-to-fb-ad-account', [CardFbAdAccountController::class, 'attachCards']);
+        Route::post('/cards/detach-from-fb-ad-account', [CardFbAdAccountController::class, 'detachCards']);
+        Route::post('/cards/set-default-for-fb-ad-account', [CardFbAdAccountController::class, 'setDefaultCard']);
+        Route::get('/cards/fb-ad-account-cards', [CardFbAdAccountController::class, 'getAccountCards']);
+        Route::get('/cards/card-fb-ad-accounts', [CardFbAdAccountController::class, 'getCardAccounts']);
+        Route::post('/cards/freeze-account-cards', [CardFbAdAccountController::class, 'freezeAccountCards']);
+        Route::post('/cards/unfreeze-account-cards', [CardFbAdAccountController::class, 'unfreezeAccountCards']);
+
+        Route::post('/card-transactions/sync', [CardTransactionController::class, 'sync']);
+        Route::post('/card-transactions/sync-all', [CardTransactionController::class, 'sync_all']);
+        Route::post('/card-transactions/sync-all-60-days', [CardTransactionController::class, 'sync_all_60_days']);
+
+        // Card Provider 管理路由
+        Route::get('/card-providers', [CardProviderController::class, 'index']);
+        Route::post('/card-providers', [CardProviderController::class, 'store']);
+        Route::get('/card-providers/{cardProvider}', [CardProviderController::class, 'show']);
+        Route::put('/card-providers/{cardProvider}', [CardProviderController::class, 'update']);
+        Route::delete('/card-providers/{cardProvider}', [CardProviderController::class, 'destroy']);
+        Route::get('/card-providers-for-selection', [CardProviderController::class, 'listForSelection']);
+        Route::get('/card-provider-types', [CardProviderController::class, 'getAvailableTypes']);
+        Route::post('/card-providers/{cardProvider}/test-connection', [CardProviderController::class, 'testConnection']);
+
+        // Card Bin 管理路由
+        Route::get('/card-bins', [CardBinController::class, 'index']);
+        Route::post('/card-bins', [CardBinController::class, 'store']);
+        Route::get('/card-bins/{cardBin}', [CardBinController::class, 'show']);
+        Route::put('/card-bins/{cardBin}', [CardBinController::class, 'update']);
+        Route::delete('/card-bins/{cardBin}', [CardBinController::class, 'destroy']);
+        Route::get('/card-providers/{cardProvider}/card-bins', [CardBinController::class, 'getByProvider']);
+        Route::post('/card-bins/batch-update-status', [CardBinController::class, 'batchUpdateStatus']);
+        Route::post('/card-bins/batch-delete', [CardBinController::class, 'batchDestroy']);
+
+        Route::post('/rules/assign', [RuleController::class, 'assign_rules']);
+        Route::post('/rules/batch-delete', [RuleController::class, 'batch_delete']);
+        Route::post('/rules/batch-active', [RuleController::class, 'active']);
+        Route::post('/rules/batch-inactive', [RuleController::class, 'inactive']);
+        Route::post('/rules/trigger-automation-pipeline', [RuleController::class, 'triggerAutomationPipeline']);
+
+        
+
+        Route::get('/rules/templates', [RuleTemplatesController::class, 'list']);
+        Route::get('/auto-rules', [MetaAutoRuleController::class, 'list']);
+        Route::post('/auto-rules', [MetaAutoRuleController::class, 'create']);
+        Route::put('/auto-rules/{id}', [MetaAutoRuleController::class, 'update']);
+        Route::delete('/auto-rules', [MetaAutoRuleController::class, 'delete']);
+        Route::get('/auto-rules/summary', [MetaAutoRuleController::class, 'summary']);
+        Route::get('/auto-rules/creators', [MetaAutoRuleController::class, 'creators']);
+        Route::post('/auto-rules/batch-active', [MetaAutoRuleController::class, 'batchActive']);
+        Route::post('/auto-rules/batch-inactive', [MetaAutoRuleController::class, 'batchInactive']);
+        Route::post('/auto-rules/audit', [MetaAutoRuleController::class, 'audit']);
+        Route::get('/auto-rules/{id}', [MetaAutoRuleController::class, 'show']);
+
+
+
+        Route::post('/jobs/batch-delete', [CronJobController::class, 'batchDelete']);
+
+        Route::get('fb-ad-templates/targeting-search', [FbAdTemplateController::class, 'target_search']);
+        Route::get('fb-ad-templates/locale-search', [FbAdTemplateController::class, 'locale_search']);
+        Route::get('fb-ad-templates/interests-search', [FbAdTemplateController::class, 'interests_search']);
+
+        Route::post('fb-bms/share-pixel', [FbBmController::class, 'share_pixel']);
+        Route::post('fb-bms/sync', [FbBmController::class, 'sync']);
+        Route::post('fb-bms/claim-pages', [FbBmController::class, 'claim_pages']);
+        Route::post('fb-bms/assign-user-account', [FbBmController::class, 'assign_user_account']);
+        Route::post('fb-bms/assign-user-page', [FbBmController::class, 'assign_user_page']);
+        Route::post('fb-catalog/update-product-set', [FbCatalogController::class, 'update_product_set']);
+        Route::post('fb-catalog/update-product', [FbCatalogController::class, 'update_product']);
+        Route::post('fb-catalog/bulk-create-product', [FbCatalogController::class, 'bulk_create_product']);
+        Route::post('fb-catalog/bulk-create-product-set', [FbCatalogController::class, 'bulk_create_product_set']);
+        Route::post('fb-catalog/create-catalog', [FbCatalogController::class, 'create_catalog']);
+        Route::post('fb-catalog/update-product-video', [FbCatalogController::class, 'update_product_video']);
+        Route::post('fb-catalog/set-operator', [FbCatalogController::class, 'set_operator']);
+        Route::post('fb-bms/assign-user-catalog', [FbBmController::class, 'assign_user_catalog']);
+
+
+        // Route::group(['middleware' => ['role:admin,sanctum']], function () {
+
+        Route::apiResources([
+            'cloudflare' => CloudflareController::class,
+            'fb-api-token' => FbApiTokenController::class,
+        ]);
+        //  ******已废弃,等待移除
+        Route::get('/system-manage/roles', [SystemManageController::class, 'roles']);
+        Route::get('/system-manage/permissions', [SystemManageController::class, 'permissions']);
+        // ******
+
+        Route::get('/permissions', [PermissionController::class, 'index']);
+        Route::get('/notices', [NoticesController::class, 'index']);
+        Route::post('/permissions', [PermissionController::class, 'store']);
+        Route::get('/permissions/{id}', [PermissionController::class, 'show']);
+        Route::put('/permissions/{id}', [PermissionController::class, 'update']);
+        Route::delete('/permissions/{id}', [PermissionController::class, 'destroy']);
+
+        Route::get('/roles', [RoleController::class, 'index']);
+        Route::post('/roles', [RoleController::class, 'store']);
+        Route::get('/roles/{id}', [RoleController::class, 'show']);
+        Route::put('/roles/{id}', [RoleController::class, 'update']);
+        Route::delete('/roles/{id}', [RoleController::class, 'destroy']);
+        Route::post('/roles/{id}/permissions', [RoleController::class, 'assignPermissions']);
+
+
+        Route::get('/meta-tags', [MetaTagsController::class, 'list']);
+        Route::post('/meta-tags', [MetaTagsController::class, 'create']);
+        Route::get('/meta-tags/{id}', [MetaTagsController::class, 'show']);
+        Route::put('/meta-tags/{id}', [MetaTagsController::class, 'update']);
+        Route::delete('/meta-tags/{id}', [MetaTagsController::class, 'delete']);
+        // MetaTag 选项管理
+        Route::get('/meta-tag-options', [MetaTagOptionsController::class, 'list']);
+        Route::post('/meta-tag-options', [MetaTagOptionsController::class, 'create']);
+        Route::put('/meta-tag-options', [MetaTagOptionsController::class, 'update']);
+        Route::delete('/meta-tag-options', [MetaTagOptionsController::class, 'delete']);
+        Route::post('/meta-tag-options/upload-image', [MetaTagOptionsController::class, 'uploadImage']);
+        // MetaTag 文件夹和标签管理
+        Route::get('/meta-tag-folders', [MetaTagFoldersController::class, 'list']);
+        Route::post('/meta-tag-folders', [MetaTagFoldersController::class, 'create']);
+        Route::get('/meta-tag-folders/{id}', [MetaTagFoldersController::class, 'show']);
+        Route::put('/meta-tag-folders/{id}', [MetaTagFoldersController::class, 'update']);
+        Route::delete('/meta-tag-folders/{id}', [MetaTagFoldersController::class, 'delete']);
+
+
+        Route::post('/system-manage/roles/', [SystemManageController::class, 'storeRole']);
+        Route::put('/system-manage/roles/{role}', [SystemManageController::class, 'updateRole']);
+        Route::delete('/system-manage/roles/{id}', [SystemManageController::class, 'destroyRole']);
+
+        Route::post('/user/register', [UserController::class, 'createUser']);
+        Route::get('/user/list', [UserController::class, 'list']);
+        Route::get('/user/options', [UserController::class, 'options']);
+        Route::post('/user/batch-delete', [UserController::class, 'batchDelete']);
+        Route::put('/user/update/{user}', [UserController::class, 'updateUser']);
+        Route::post('/user/token/{id}', [UserController::class, 'token']);
+
+        // 租户管理路由（仅管理员）
+        Route::get('/tenants', [TenantController::class, 'index']);
+        Route::get('/tenants/{id}', [TenantController::class, 'show']);
+        Route::post('/tenants', [TenantController::class, 'store']);
+        Route::put('/tenants/{id}', [TenantController::class, 'update']);
+        Route::delete('/tenants/{id}', [TenantController::class, 'destroy']);
+        Route::post('/tenants/batch-delete', [TenantController::class, 'batchDelete']);
+        Route::post('/tenants/{id}/test-connection', [TenantController::class, 'testConnection']);
+        Route::post('/tenants/{id}/create-database', [TenantController::class, 'createDatabase']);
+
+        Route::post('/fb-accounts/assign', [FbAccountController::class, 'assign']);
+
+        Route::post('/misc/sync-lander-path-to-kv', [CloudflareController::class, 'sync_lander_path_to_kv']);
+
+        Route::post('/fb-ad-accounts/sync-api-resource', [FbAdAccountController::class, 'sync_api_resource']);
+        Route::post('/fb-ad-accounts/assign-users', [FbAdAccountController::class, 'assign_users']);
+        Route::post('/fb-ad-accounts/remove-users', [FbAdAccountController::class, 'remove_users']);
+
+        Route::apiResource('/fraud-config', FraudConfigController::class);
+
+        // });
+
+        Route::get('/user/tags/{model}', [TagController::class, 'getUserModelTags']);
+
+        Route::post('/tags/{model}', [TagController::class, 'manageTags']);
+        Route::get('/tags/{model}', [TagController::class, 'listTags']);
+
+        Route::post('/trackers/trigger-fetch-data', [TrackerController::class, 'fetchData']);
+        Route::post('/trackers/status', [TrackerController::class, 'status']);
+
+        Route::post('materials/share', [MaterialController::class, 'share']);
+        Route::post('materials/unshare', [MaterialController::class, 'unshare']);
+        Route::post('materials/upload-to-fb', [MaterialController::class, 'uploadToFb']);
+        Route::post('copywritings/share', [CopywritingController::class, 'share']);
+        Route::post('copywritings/unshare', [CopywritingController::class, 'unshare']);
+
+        // Meta 文案库（XMP 式：库 / 文件夹 / 文案；数据在 tenant 中间件切换后的当前库）
+        Route::post('meta-copy-items/batch-delete', [MetaCopyItemController::class, 'batchDestroy']);
+        Route::get('meta-copy-items', [MetaCopyItemController::class, 'index']);
+        Route::post('meta-copy-items', [MetaCopyItemController::class, 'store']);
+        Route::patch('meta-copy-items/{item}', [MetaCopyItemController::class, 'update']);
+        Route::delete('meta-copy-items/{item}', [MetaCopyItemController::class, 'destroy']);
+        Route::get('meta-copy-folders/tree', [MetaCopyFolderController::class, 'tree']);
+        Route::post('meta-copy-folders', [MetaCopyFolderController::class, 'store']);
+        Route::post('meta-copy-folders/reorder', [MetaCopyFolderController::class, 'reorder']);
+        Route::patch('meta-copy-folders/{folder}', [MetaCopyFolderController::class, 'update']);
+        Route::delete('meta-copy-folders/{folder}', [MetaCopyFolderController::class, 'destroy']);
+        Route::get('meta-copy-libraries', [MetaCopyLibraryController::class, 'index']);
+        Route::post('meta-copy-libraries', [MetaCopyLibraryController::class, 'store']);
+        Route::get('meta-copy-libraries/{library}', [MetaCopyLibraryController::class, 'show']);
+        Route::patch('meta-copy-libraries/{library}', [MetaCopyLibraryController::class, 'update']);
+        Route::delete('meta-copy-libraries/{library}', [MetaCopyLibraryController::class, 'destroy']);
+
+        // Meta Facebook 工具页：主页管理 / 评论管理 / 关键词回复
+        Route::get('meta-fb/pages', [MetaFbToolController::class, 'pages']);
+        Route::get('meta-fb/comments', [MetaFbToolController::class, 'comments']);
+        Route::get('meta-fb/keyword-packs', [MetaFbToolController::class, 'keywordPacks']);
+        Route::get('meta-fb/page-options', [MetaFbToolController::class, 'pageOptions']);
+        Route::get('meta-fb/pages/{id}/auto-rule', [MetaFbToolController::class, 'getAutoRule']);
+        Route::put('meta-fb/pages/{id}/auto-rule', [MetaFbToolController::class, 'saveAutoRule']);
+        Route::post('meta-fb/pages/batch-sync-latest', [MetaFbToolController::class, 'batchSyncLatest']);
+        Route::post('meta-fb/comments/batch-action', [MetaFbToolController::class, 'batchCommentAction']);
+        Route::post('meta-fb/comments/batch-hide', [MetaFbToolController::class, 'batchHideComments']);
+        Route::post('meta-fb/comments/batch-delete', [MetaFbToolController::class, 'batchDeleteComments']);
+        Route::post('meta-fb/keyword-packs/batch-delete', [MetaFbToolController::class, 'batchDeleteKeywordPacks']);
+
+        // 关键词包 CRUD
+        Route::post('meta-fb/keyword-packs', [MetaFbToolController::class, 'createKeywordPack']);
+        Route::patch('meta-fb/keyword-packs/{id}', [MetaFbToolController::class, 'updateKeywordPack']);
+        Route::delete('meta-fb/keyword-packs/{id}', [MetaFbToolController::class, 'deleteKeywordPack']);
+        Route::get('meta-fb/keyword-packs/{id}/keywords', [MetaFbToolController::class, 'getKeywordPackKeywords']);
+
+        // Meta 工具页：任务中心（列表/详情/操作日志/复制/重试）
+        Route::get('meta-tasks', [TaskCenterController::class, 'index']);
+        Route::get('meta-tasks/{id}', [TaskCenterController::class, 'show']);
+        Route::get('meta-tasks/{id}/operation-logs', [TaskCenterController::class, 'operationLogs']);
+        Route::post('meta-tasks/{id}/copy', [TaskCenterController::class, 'copy']);
+        Route::post('meta-tasks/{id}/retry-failed', [TaskCenterController::class, 'retryFailed']);
+
+        // Meta 工具页：定时报表（列表/详情/增删改/下载）
+        Route::get('meta-scheduled-reports', [ScheduledReportController::class, 'index']);
+        Route::post('meta-scheduled-reports', [ScheduledReportController::class, 'store']);
+        Route::get('meta-scheduled-reports/{id}', [ScheduledReportController::class, 'show']);
+        Route::patch('meta-scheduled-reports/{id}', [ScheduledReportController::class, 'update']);
+        Route::delete('meta-scheduled-reports/{id}', [ScheduledReportController::class, 'destroy']);
+        // 下载接口依然走 auth 中间件，但用 POST，前端通过 axios 携带 token，并在前端触发浏览器下载
+        Route::post('meta-scheduled-reports/{id}/download', [ScheduledReportController::class, 'download']);
+
+        // Meta 报表看板：看板 + 卡片配置
+        Route::get('meta-report-dashboards', [MetaReportDashboardController::class, 'index']);
+        Route::post('meta-report-dashboards', [MetaReportDashboardController::class, 'store']);
+        Route::get('meta-report-dashboards/{metaReportDashboard}', [MetaReportDashboardController::class, 'show']);
+        Route::patch('meta-report-dashboards/{metaReportDashboard}', [MetaReportDashboardController::class, 'update']);
+        Route::delete('meta-report-dashboards/{metaReportDashboard}', [MetaReportDashboardController::class, 'destroy']);
+        Route::post('meta-report-dashboards/{metaReportDashboard}/save', [MetaReportDashboardController::class, 'save']);
+        Route::post('meta-report-dashboards/{metaReportDashboard}/duplicate', [MetaReportDashboardController::class, 'duplicate']);
+        Route::get('meta-report-dashboards/{metaReportDashboard}/cards', [MetaReportDashboardCardController::class, 'index']);
+        Route::post('meta-report-dashboards/{metaReportDashboard}/cards', [MetaReportDashboardCardController::class, 'store']);
+        Route::patch('meta-report-dashboard-cards/{metaReportDashboardCard}', [MetaReportDashboardCardController::class, 'update']);
+        Route::delete('meta-report-dashboard-cards/{metaReportDashboardCard}', [MetaReportDashboardCardController::class, 'destroy']);
+        Route::get('meta-report-dashboard-folders', [MetaReportDashboardFolderController::class, 'index']);
+        Route::post('meta-report-dashboard-folders', [MetaReportDashboardFolderController::class, 'store']);
+        Route::patch('meta-report-dashboard-folders/{metaReportDashboardFolder}', [MetaReportDashboardFolderController::class, 'update']);
+        Route::delete('meta-report-dashboard-folders/{metaReportDashboardFolder}', [MetaReportDashboardFolderController::class, 'destroy']);
+        Route::post('links/share', [LinkController::class, 'share']);
+        Route::post('links/unshare', [LinkController::class, 'unshare']);
+        Route::post('fb-ad-templates/share', [FbAdTemplateController::class, 'share']);
+        Route::post('fb-ad-templates/unshare', [FbAdTemplateController::class, 'unshare']);
+
+        Route::post('fb-pages/refresh-token', [FbPageController::class, 'refreshToken']);
+        Route::post('fb-pages/sync-page-forms', [FbPageController::class, 'sync_page_forms']);
+        Route::post('fb-pages/{fbPage}/set-pbia', [FbPageController::class, 'setPbia']);
+        Route::post('meta-ad-creation/sync-bm-graph-assets', [MetaAdCreationBmGraphController::class, 'sync']);
+        Route::get('meta-ad-creation/bm-personal-accounts', [MetaAdCreationBmGraphController::class, 'listBmPersonalFbAccounts']);
+        /** 与 fb-ad-templates/targeting-search 相同实现，九步创建地区搜索走此前缀 */
+        Route::get('meta-ad-creation/targeting-search', [FbAdTemplateController::class, 'target_search']);
+        /** Meta Marketing API：targetingbrowse / targetingsearch（需广告账户 act_ + BM Graph token） */
+        Route::get('meta-ad-creation/targeting-browse', [FbAdTemplateController::class, 'targeting_browse']);
+        Route::get('meta-ad-creation/targeting-search-detailed', [FbAdTemplateController::class, 'targeting_search_detailed']);
+        Route::get('meta-ad-creation-drafts/tags', [MetaAdCreationDraftController::class, 'tags']);
+        Route::post('meta-ad-creation-records/{id}/sync', [MetaAdCreationRecordController::class, 'syncFromAdLog']);
+
+
+        Route::model('job', CronJob::class);
+        Route::apiResources([
+            'tags' => TagController::class,
+            'networks' => NetworkController::class,
+            'links' => LinkController::class,
+            'proxies' => ProxyController::class,
+            'agents' => AgentController::class,
+            'copywritings' => CopywritingController::class,
+            'fb-accounts' => FbAccountController::class,
+            'materials' => MaterialController::class,
+            'rules' => RuleController::class,
+            'jobs' => CronJobController::class,
+            'trackers' => TrackerController::class,
+            'fb-ad-templates' => FbAdTemplateController::class,
+            'subid-mapping' => SubidMappingController::class
+        ]);
+
+        Route::get('materials/{id}/file', [MaterialController::class, 'show'])->name('getAdMaterial');
+
+        Route::apiResource('fb-pages', FbPageController::class)->only(['index', 'show', 'update']);
+        Route::apiResource('fb-page-forms', FbPageFormController::class)->only(['index', 'show', 'update']);
+        Route::apiResource('fb-bms', FbBmController::class)->only(['index', 'show', 'update']);
+        Route::apiResource('fb-ad-accounts', FbAdAccountController::class)->only(['index', 'show', 'update']);
+        Route::apiResource('fb-pixels', FbPixelController::class)->only(['index', 'show', 'update']);
+        Route::apiResource('fb-campaigns', FbCampaignController::class)->only(['index', 'show', 'update']);
+        Route::apiResource('fb-adsets', FbAdsetController::class)->only(['index', 'show', 'update']);
+        Route::apiResource('fb-ads', FbAdController::class)->only(['index', 'show', 'update']);
+        Route::apiResource('meta-ad-creation-templates', MetaAdCreationTemplateController::class)->only(['index', 'store', 'show', 'destroy']);
+
+        // 模板管理路由
+        Route::prefix('templates')->group(function () {
+            Route::get('list', [TemplateManageController::class, 'list']);
+            Route::put('update', [TemplateManageController::class, 'update']);
+            Route::post('share', [TemplateManageController::class, 'share']);
+            Route::delete('delete', [TemplateManageController::class, 'delete']);
+        });
+
+        // 模板分享路由
+        Route::prefix('template-shares')->group(function () {
+            Route::get('/', [TemplateShareController::class, 'index']);
+            Route::post('share', [TemplateShareController::class, 'share']);
+            Route::post('batchShare', [TemplateShareController::class, 'batchShare']);
+            Route::post('unshare', [TemplateShareController::class, 'unshare']);
+        });
+
+        Route::apiResource('meta-ad-creation-drafts', MetaAdCreationDraftController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
+        Route::apiResource('meta-ad-creation-region-groups', MetaAdCreationRegionGroupController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
+        Route::apiResource('meta-ad-creation-creative-groups', MetaAdCreationCreativeGroupController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
+        Route::apiResource('meta-ad-creation-records', MetaAdCreationRecordController::class)->only(['index', 'store', 'show', 'destroy']);
+
+        Route::apiResource('cards', CardController::class)->only(['index', 'store']);
+        Route::apiResource('card-transactions', CardTransactionController::class)->only(['index', 'show']);
+        Route::apiResource('ad-logs', AdLogController::class)->only(['index']);
+
+        // AccountManage 模块路由 - 账户管理
+        Route::prefix('account-manage')->group(function () {
+            // ========== FbAccount 路由（FB个人号管理） ==========
+            Route::apiResource('fb-accounts', AccountManageFbAccountController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
+
+            // 同步资源
+            Route::post('fb-accounts/{fbAccount}/sync-resource', [AccountManageFbAccountController::class, 'syncResource']);
+            Route::post('fb-accounts/batch-sync-resource', [AccountManageFbAccountController::class, 'batchSyncResource']);
+
+            // Token 管理
+            Route::patch('fb-accounts/{fbAccount}/set-token-valid', [AccountManageFbAccountController::class, 'setTokenValid']);
+            Route::post('fb-accounts/update-token', [AccountManageFbAccountController::class, 'updateToken']);
+
+            // 归档管理
+            Route::post('fb-accounts/archive', [AccountManageFbAccountController::class, 'archive']);
+            Route::post('fb-accounts/unarchive', [AccountManageFbAccountController::class, 'unarchive']);
+
+            // 分配与授权
+            Route::post('fb-accounts/assign', [AccountManageFbAccountController::class, 'assign']);
+            Route::patch('fb-accounts/{fbAccount}/authorization-status', [AccountManageFbAccountController::class, 'updateAuthorizationStatus']);
+
+            // ========== FbAdAccount 路由（广告账户管理） ==========
+            Route::apiResource('fb-ad-accounts', AccountManageFbAdAccountController::class)->only(['index', 'show', 'update']);
+
+            // 归档管理
+            Route::post('fb-ad-accounts/archive', [AccountManageFbAdAccountController::class, 'archive']);
+            Route::post('fb-ad-accounts/unarchive', [AccountManageFbAdAccountController::class, 'unarchive']);
+
+            // 规则管理
+            Route::post('fb-ad-accounts/enable-rule', [AccountManageFbAdAccountController::class, 'enableRule']);
+            Route::post('fb-ad-accounts/disable-rule', [AccountManageFbAdAccountController::class, 'disableRule']);
+
+            // 同步与数据获取
+            Route::post('fb-ad-accounts/sync-api-resource', [AccountManageFbAdAccountController::class, 'syncApiResource']);
+            Route::post('fb-ad-accounts/sync-ad-account', [AccountManageFbAdAccountController::class, 'syncAdAccount']);
+            Route::post('fb-ad-accounts/sync-account-spend-info', [AccountManageFbAdAccountController::class, 'syncAccountSpendInfo']);
+            Route::post('fb-ad-accounts/auto-sync', [AccountManageFbAdAccountController::class, 'autoSync']);
+
+            // 用户分配
+            Route::post('fb-ad-accounts/assign-users', [AccountManageFbAdAccountController::class, 'assignUsers']);
+            Route::post('fb-ad-accounts/remove-users', [AccountManageFbAdAccountController::class, 'removeUsers']);
+
+            // 消费上限管理
+            Route::post('fb-ad-accounts/set-account-spend-cap', [AccountManageFbAdAccountController::class, 'setAccountSpendCap']);
+
+            // 过滤器管理
+            Route::post('fb-ad-accounts/update-filters', [AccountManageFbAdAccountController::class, 'updateFilters']);
+            Route::post('fb-ad-accounts/clear-filters', [AccountManageFbAdAccountController::class, 'clearFilters']);
+
+            // 充值账户管理
+            Route::post('fb-ad-accounts/toggle-topup', [AccountManageFbAdAccountController::class, 'toggleTopup']);
+
+            // App 订阅
+            Route::post('fb-ad-accounts/subscribe-app', [AccountManageFbAdAccountController::class, 'subscribeApp']);
+
+            // ========== 广告账户页面统一接口 - 支持多平台 ==========
+
+            // 用户列表（FB个人号列表）
+            Route::get('accounts', [AdAccountPageController::class, 'getUserList']);
+            Route::post('accounts/delete', [AdAccountPageController::class, 'deleteUser']); // 保留原有接口兼容
+            Route::delete('accounts/{id}', [AdAccountPageController::class, 'destroyAccount']); // RESTful 风格
+            Route::patch('accounts/{id}/auto-bind', [AdAccountPageController::class, 'updateAutoBind']);
+
+            // 广告账户列表
+            Route::get('ad-accounts', [AdAccountPageController::class, 'getAdAccountList']);
+            Route::delete('ad-accounts/{id}', [AdAccountPageController::class, 'destroyAdAccount']); // RESTful 单个删除
+
+            // 广告账户编辑
+            Route::post('ad-accounts/edit', [AdAccountPageController::class, 'editAdAccount']);
+            Route::post('ad-accounts/batch-edit', [AdAccountPageController::class, 'batchEditAdAccount']);
+            Route::post('ad-accounts/batch-unbind', [AdAccountPageController::class, 'batchUnbind']);
+            Route::post('ad-accounts/batch-delete', [AdAccountPageController::class, 'batchDelete']);
+            Route::post('ad-accounts/batch-modify-fb-account', [AdAccountPageController::class, 'batchModifyFbAccount']);
+
+            // 配置与选项
+            Route::get('auth-limit', [AdAccountPageController::class, 'getAuthLimit']);
+            Route::get('fb-accounts-list', [AdAccountPageController::class, 'getFbAccountsList']);
+            Route::get('user-options', [AdAccountPageController::class, 'getUserOptions']);
+        });
+
+    });
+
+    // 素材库相关接口
+    Route::middleware('auth:sanctum')->prefix('material-library')->group(function () {
+        Route::get('/media-materials/list', [MetaMediaMaterialController::class, 'index']);
+
+        // 素材编辑任务接口
+        Route::prefix('material-editor')->group(function () {
+            Route::get('/tasks', [MetaMaterialEditorTaskController::class, 'index']);
+            Route::post('/tasks', [MetaMaterialEditorTaskController::class, 'store']);
+            Route::get('/tasks/{id}', [MetaMaterialEditorTaskController::class, 'show']);
+        });
+    });
+
+
+    Route::post('/user/login', [UserController::class, 'login']);
+    // 用户信息：仅需登录态，不依赖 tenant 中间件（最终路径：GET /api/v2/user/info）
+    Route::middleware('auth:sanctum')->get('/user/info', [UserController::class, 'info']);
+    Route::middleware('auth:sanctum')->get('/currentUserNav', [UserController::class, 'currentUserNav']);
+    Route::get('/health', [UserController::class, 'health']);
+
+
+    Route::get('/download', function (Request $request) {
+        if (!$request->hasValidSignature()) {
+            abort(401);
+        }
+
+        $adMaterial = Material::findOrFail($request->query('id'));
+        $filePath = Storage::disk('public')->path($adMaterial->filepath);
+
+        return Response::file($filePath);
+    })->name('download');
+});
+
+// XMP 素材库：文件夹树/侧边栏 & 基础列表接口（不挂载 /v2）
+// Route::prefix('material-library')->middleware(['auth:sanctum', 'tenant'])->group(function () {
+Route::prefix('material-library')->group(function () {
+    Route::get('/column-templates', [XmpColumnTemplatesController::class, 'index']);
+    Route::post('/column-templates', [XmpColumnTemplatesController::class, 'store']);
+
+    Route::get('/folders', [XmpFoldersController::class, 'index']);
+    Route::get('/folders/{id}/children', [XmpFoldersController::class, 'children']);
+    Route::post('/folders', [XmpFoldersController::class, 'store']);
+    Route::delete('/folders/{id}', [XmpFoldersController::class, 'destroy']);
+    Route::put('/folders/{id}/move', [XmpFoldersController::class, 'move']);
+
+    Route::get('/materials', [XmpMaterialsController::class, 'index']);
+    Route::get('/materials/favorites', [XmpMaterialsController::class, 'favorites']);
+    Route::post('/materials/upload', [XmpMaterialsController::class, 'upload']);
+    // 上传素材：临时分片上传 + 断点续传 + commit 落库
+    Route::post('/materials/upload-temp/session', [XmpMaterialsController::class, 'uploadTempSessionInit']);
+    Route::put('/materials/upload-temp/session/{sessionId}/chunk', [XmpMaterialsController::class, 'uploadTempSessionChunk']);
+    // 兼容：某些环境下 PUT + multipart/form-data 普通字段解析不完整
+    // 因此增加 POST 兜底路由，前端也会使用 POST
+    Route::post('/materials/upload-temp/session/{sessionId}/chunk', [XmpMaterialsController::class, 'uploadTempSessionChunk']);
+    Route::get('/materials/upload-temp/session/{sessionId}/files/status', [XmpMaterialsController::class, 'uploadTempSessionFilesStatus']);
+    Route::post('/materials/upload-temp/session/{sessionId}/commit', [XmpMaterialsController::class, 'uploadTempSessionCommit']);
+    Route::delete('/materials/upload-temp/session/{sessionId}', [XmpMaterialsController::class, 'uploadTempSessionDelete']);
+    Route::put('/materials/{id}', [XmpMaterialsController::class, 'update']);
+    Route::put('/materials/{id}/production-cost', [XmpMaterialsController::class, 'updateProductionCost']);
+    Route::delete('/materials/{id}', [XmpMaterialsController::class, 'destroy']);
+    Route::post('/materials/batch-actions', [XmpMaterialsController::class, 'batchActions']);
+
+    // 7.9 审核工作流
+    Route::post('/materials/{id}/audit', [XmpMaterialsController::class, 'audit']);
+
+    // 7.10 数据导出
+    Route::post('/materials/export', [XmpMaterialsController::class, 'export']);
+
+    // 7.11 投放数据/统计
+    Route::get('/materials/statistics', [XmpMaterialsController::class, 'statistics']);
+
+    // 7.12 XMP 标签自动更新
+    Route::post('/materials/auto-update-xmp-tags', [XmpMaterialsController::class, 'autoUpdateXmpTags']);
+
+    // 7.13 媒体素材同步
+    Route::post('/media-materials/sync', [XmpMaterialsController::class, 'syncMediaMaterials']);
+    Route::get('/media-materials/syncs/{syncId}', [XmpMaterialsController::class, 'getMediaMaterialsSyncStatus']);
+    Route::get('/media-materials', [XmpMaterialsController::class, 'listMediaMaterials']);
+
+    // 7.14 使用记录
+    Route::get('/materials/{id}/usages', [XmpMaterialsController::class, 'usages']);
+
+    Route::post('/enterprise-libraries', [XmpFoldersController::class, 'createEnterpriseLibrary']);
+
+    Route::get('/tags', [XmpOptionsController::class, 'tags']);
+    Route::get('/designers', [XmpOptionsController::class, 'designers']);
+    Route::get('/creators', [XmpOptionsController::class, 'creators']);
+    Route::get('/reject-reason-options', [XmpOptionsController::class, 'rejectReasonOptions']);
+    Route::get('/system-tags', [XmpOptionsController::class, 'systemTags']);
+    Route::get('/material-groups', [XmpMaterialGroupsController::class, 'index']);
+    Route::post('/material-groups', [XmpMaterialGroupsController::class, 'store']);
+    Route::put('/material-groups/{id}', [XmpMaterialGroupsController::class, 'update']);
+    Route::delete('/material-groups/{id}', [XmpMaterialGroupsController::class, 'destroy']);
+});
+
+// VCC Callback 接口 - 不限流
+Route::post('/v2/vcc-callback', [App\Http\Controllers\WebhookController::class, 'vccCallback']);
+
+// Facebook Webhook 接口 - 不限流，不需要授权
+Route::post('/v2/fb-webhook', [App\Http\Controllers\WebhookController::class, 'fbWebhook']);

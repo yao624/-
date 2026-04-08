@@ -1,0 +1,79 @@
+import request from '@/utils/request';
+
+/** 自动规则列表 */
+export async function getRulesList(params: {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  channel?: string;
+  monitoring_object?: string;
+  user_id?: string;
+}) {
+  const res = await request.get('/auto-rules', { params });
+  // 后端返回格式：{ status, message, data: [...] }
+  const list = Array.isArray(res?.data) ? res.data : [];
+  const total = res?.total ?? list.length;
+  return { data: list, total };
+}
+
+/** 自动规则汇总统计 */
+export async function getSummaryData() {
+  const res = await request.get('/auto-rules/summary');
+  return res?.data ?? res ?? {
+    sendNotification: 0,
+    sendNotificationHours: 0,
+    toggleAds: 0,
+    toggleAdsHours: 0,
+    modifyBid: 0,
+    modifyBidHours: 0,
+    modifyBudget: 0,
+    modifyBudgetHours: 0,
+    allActions: 0,
+    allActionsHours: 0,
+  };
+}
+
+export async function getCreators() {
+  const res = await request.get('/auto-rules/creators');
+  return res?.data ?? res ?? [];
+}
+
+export async function getRuleTemplates(monitoringObject: string) {
+  const res = await request.get('/rules/templates', {
+    params: { monitoringObject },
+  });
+
+  const data = Array.isArray(res) ? res : (res?.data ?? []);
+  return Array.isArray(data) ? data : [];
+}
+
+/** 创建自动规则 */
+export async function createRule(data: any) {
+  return request.post('/auto-rules', data);
+}
+
+/** 批量启用 */
+export async function batchActiveRule(ids: number[]) {
+  return request.post('/auto-rules/batch-active', { ids });
+}
+
+/** 批量停用 */
+export async function batchInactiveRule(ids: number[]) {
+  return request.post('/auto-rules/batch-inactive', { ids });
+}
+
+/** 批量删除 */
+export async function batchDeleteRule(ids: number[]) {
+  return request.delete('/auto-rules', { data: { ids } });
+}
+
+/** 审核规则 */
+export async function auditRule(id: number, auditStatus: number, auditReason?: string) {
+  return request.post('/auto-rules/audit', { id, audit_status: auditStatus, audit_reason: auditReason });
+}
+
+/** 更新自动规则 */
+export async function updateRule(id: number, data: any) {
+  return request.put(`/auto-rules/${id}`, data);
+}
+

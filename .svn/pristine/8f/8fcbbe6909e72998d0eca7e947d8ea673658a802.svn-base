@@ -1,0 +1,35 @@
+{
+    "templates": [
+        {
+            "id": "1774965461513",
+            "name": "11",
+            "selectedKeys": [
+                "fixedMaterial",
+                "fixedLocalId",
+                "designerId",
+                "creatorId",
+                "tags",
+                "sizeLevel",
+                "duration",
+                "shape",
+                "type",
+                "createTime",
+                "rejectReason",
+                "materialGroupId",
+                "auditStatus",
+                "remarks",
+                "productionCost",
+                "materialCount",
+                "size",
+                "rating",
+                "source"
+            ],
+            "fixedLeftKeys": [
+                "fixedMaterial",
+                "fixedLocalId"
+            ],
+            "updated_at": "2026-03-31 13:57:41",
+            "created_at": "2026-03-31 13:57:41"
+        }
+    ]
+}

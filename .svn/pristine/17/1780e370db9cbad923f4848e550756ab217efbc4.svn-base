@@ -1,0 +1,185 @@
+import request from '@/utils/request';
+import type { RequestError } from '@/utils/request';
+import { resolveApiBaseUrl } from '@/utils/api-base';
+
+export type LoginType = 'account' | 'telephone';
+export type LoginStatus = 'ok' | 'error';
+
+export interface LoginParams {
+  type: LoginType;
+  username: string;
+  password: string;
+}
+
+export interface LoginResp {
+  type: LoginType;
+  success: boolean;
+  token: string;
+  // currentAuthority: string;
+}
+
+export enum Action {
+  ADD = 'add',
+  DELETE = 'delete',
+  UPDATE = 'update',
+  QUERY = 'query',
+  IMPORT = 'import',
+  EXPORT = 'export',
+  COPY = 'copy',
+  SHARE = 'share',
+  PREVIEW = 'preview',
+}
+
+export interface Permission {
+  /* 权限ID */
+  id: string | number;
+  /* 权限归属的角色 */
+  roleId?: string | number;
+  /* 权限名称 */
+  name: string;
+  /* 权限显示的名字 */
+  label?: string;
+  /* 权限拥有的操作 [增,删,改,查] */
+  actions?: Action[];
+}
+
+export interface Role {
+  /* 角色ID */
+  id: string | number;
+  /* 角色名称 */
+  name: string;
+  /* 角色描述 */
+  describe?: string;
+  /* 角色绑定的权限 */
+  permissions?: Permission[];
+}
+
+export interface UserInfo {
+  id: string | number;
+  address: string;
+  avatar: string;
+  country: string;
+  email: string;
+  group: string;
+  name: string;
+  phone: string;
+  signature: string;
+  permissions: string[]; // 后端返回的权限字符串数组，如 ['user:query', 'user:add']
+  is_super: number; // 超级管理员标识，1=是，0=否
+  role?: Role;
+  unreadCount?: number;
+  totalCount?: number;
+}
+
+export interface CaptchaResp {
+  captcha: number;
+}
+
+export interface SmsCaptchaRequest {
+  mobile: string;
+}
+
+// 后端的结构体定义
+export type RouteItem = {
+  id: number | string;
+  parentId: number | string;
+  name: string;
+  path: string;
+  redirect: string;
+  component: string;
+  meta: {
+    title: string | false;
+    icon?: string;
+    target?: '_blank' | '_self';
+    hideInMenu?: boolean;
+    hideChildrenInMenu?: boolean;
+    hideInBreadcrumb?: boolean;
+    authority?: string | string[];
+    [key: string]: any;
+  };
+};
+
+function buildLoginAbsoluteUrl(): string {
+  const base = resolveApiBaseUrl();
+  const path = `${String(base).replace(/\/$/, '')}/user/login`;
+  if (typeof window === 'undefined') {
+    return path;
+  }
+  return new URL(path.startsWith('/') ? path : `/${path}`, window.location.origin).href;
+}
+
+/**
+ * 使用 fetch + redirect:manual，在 301/302 时仍用 POST 请求 Location，避免默认跟随重定向时被改成 GET。
+ */
+async function fetchLoginPost(startUrl: string, body: LoginParams): Promise<Response> {
+  const init: RequestInit = {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(body),
+    credentials: 'same-origin',
+    cache: 'no-store',
+    redirect: 'manual',
+  };
+
+  let currentUrl = startUrl;
+  let res = await fetch(currentUrl, init);
+  for (let hop = 0; hop < 5; hop++) {
+    if (res.status < 300 || res.status >= 400) {
+      break;
+    }
+    const loc = res.headers.get('Location');
+    if (!loc) {
+      break;
+    }
+    currentUrl = new URL(loc, currentUrl).href;
+    res = await fetch(currentUrl, init);
+  }
+  return res;
+}
+
+export async function postAccountLogin(params: LoginParams): Promise<LoginResp> {
+  const url = buildLoginAbsoluteUrl();
+  const res = await fetchLoginPost(url, params);
+
+  let data: Record<string, unknown> = {};
+  try {
+    data = (await res.json()) as Record<string, unknown>;
+  } catch {
+    /* empty */
+  }
+
+  if (!res.ok) {
+    const err = new Error(String(data.message || res.statusText || 'Login failed')) as RequestError;
+    err.response = {
+      status: res.status,
+      statusText: res.statusText,
+      data,
+      headers: res.headers as any,
+      config: {} as any,
+    };
+    return Promise.reject(err);
+  }
+
+  return data as unknown as LoginResp;
+}
+
+export async function getCurrentUser() {
+  return request.get<any, UserInfo>('/user/info');
+}
+
+export async function getCurrentUserNav() {
+  return request.get<any, RouteItem[]>('/currentUserNav');
+}
+
+export async function postLogout() {
+  return request.post<any, any>('/logout');
+}
+
+export async function getSmsCaptcha(params: SmsCaptchaRequest) {
+  return request.get<SmsCaptchaRequest, CaptchaResp>('/message/captcha/sms', {
+    params,
+  });
+}

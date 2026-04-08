@@ -1,0 +1,616 @@
+import type { Component } from 'vue';
+import { defineAsyncComponent, h } from 'vue';
+import type { RouteRecordRaw } from 'vue-router';
+import { createRouter, createWebHashHistory } from 'vue-router';
+import type { MenuDataItem } from './typing';
+import Layout from '@/layouts/index.vue';
+import UserLayout2 from '@/layouts/user-layout2.vue';
+import RouteView from '@/layouts/route-view.vue';
+const AsyncWorkplace = defineAsyncComponent(
+  () => import(/* webpackChunkName: "dashboard" */ '@/views/dashboard/workplace/index_v2.vue'),
+);
+const AsyncAdaccount = defineAsyncComponent(
+  () => import(/* webpackChunkName: "dashboard" */ '@/views/adaccount/index_v2.vue'),
+);
+const AsyncCreateAds = defineAsyncComponent(
+  () => import(/* webpackChunkName: "dashboard" */ '@/views/ads/create-ads/create-ads.vue'),
+);
+const AsyncCreateAdsV2 = defineAsyncComponent(
+  () => import(/* webpackChunkName: "dashboard" */ '@/views/ads/create-ads-v2/create-ads.vue'),
+);
+const AsyncMetaAdCreation = defineAsyncComponent(
+  () => import(/* webpackChunkName: "dashboard" */ '@/views/ads/meta-ad-creation/index.vue'),
+);
+const AsyncRule = defineAsyncComponent(
+  () => import(/* webpackChunkName: "dashboard" */ '@/views/rule/index_v2.vue'),
+);
+const AsyncJob = defineAsyncComponent(
+  () => import(/* webpackChunkName: "dashboard" */ '@/views/rule/jobs.vue'),
+);
+// const AsyncOperator = defineAsyncComponent(
+//   () => import(/* webpackChunkName: "dashboard" */ '@/views/operator/index.vue'),
+// );
+const AsyncExpense = defineAsyncComponent(
+  () => import(/* webpackChunkName: "dashboard" */ '@/views/expense/index.vue'),
+);
+const AsyncNetworks = defineAsyncComponent(
+  () => import(/* webpackChunkName: "dashboard" */ '@/views/networks/index.vue'),
+);
+// const AsyncFbAccounts = defineAsyncComponent(
+//   () => import(/* webpackChunkName: "dashboard" */ '@/views/fb_accounts/index_v2.vue'),
+// );
+const AsyncPages = defineAsyncComponent(
+  () => import(/* webpackChunkName: "dashboard" */ '@/views/pages/index.vue'),
+);
+const AsyncPageForms = defineAsyncComponent(
+  () => import(/* webpackChunkName: "dashboard" */ '@/views/page-forms/index_v2.vue'),
+);
+const AsyncBusinessManager = defineAsyncComponent(
+  () => import(/* webpackChunkName: "dashboard" */ '@/views/business_manager/index_v2.vue'),
+);
+// const AsyncOverviewAds = defineAsyncComponent(
+//   () => import(/* webpackChunkName: "dashboard" */ '@/views/overview_ads/index_v2.vue'),
+// );
+const AsyncPixels = defineAsyncComponent(
+  () => import(/* webpackChunkName: "dashboard" */ '@/views/pixels/index.vue'),
+);
+const AsyncClicks = defineAsyncComponent(
+  () => import(/* webpackChunkName: "dashboard" */ '@/views/clicks/index.vue'),
+);
+const AsyncConversions = defineAsyncComponent(
+  () => import(/* webpackChunkName: "dashboard" */ '@/views/conversions/index.vue'),
+);
+const AsyncLinks = defineAsyncComponent(() => import('@/views/links/index_v2.vue'));
+const ChangePwd = defineAsyncComponent(() => import('@/views/user/change-pwd.vue'));
+const AsyncProxies = defineAsyncComponent(() => import('@/views/proxies/index.vue'));
+const AsyncAgents = defineAsyncComponent(() => import('@/views/agents/index.vue'));
+const AsyncCopywritings = defineAsyncComponent(() => import('@/views/copywritings/index_v2.vue'));
+const AsyncMaterials = defineAsyncComponent(() => import('@/views/materials/index_v2.vue'));
+const AsyncMaterialLibrary = defineAsyncComponent(
+  () => import('@/views/material-library/index.vue'),
+);
+const AsyncMaterialGroups = defineAsyncComponent(
+  () => import('@/views/material-library/groups.vue'),
+);
+const AsyncPromotionReports = defineAsyncComponent(
+  () => import('@/views/promotion/reports/index.vue'),
+);
+const AsyncAutoOptimization = defineAsyncComponent(
+  () => import('@/views/promotion/auto-optimization/index.vue'),
+);
+const AsyncCreateRule = defineAsyncComponent(
+  () => import('@/views/promotion/auto-optimization/create-rule.vue'),
+);
+const AsyncPromotionDashboard = defineAsyncComponent(
+  () => import('@/views/promotion/dashboard/index.vue'),
+);
+const LaunchAD = defineAsyncComponent(() => import('@/views/adaccount/launch_ad.vue'));
+const AsyncCardList = defineAsyncComponent(() => import('@/views/virtual_cards/cards/index.vue'));
+const AsyncCardTransactionsList = defineAsyncComponent(
+  () => import('@/views/virtual_cards/transactions/index.vue'),
+);
+const AsyncOverviewAds = defineAsyncComponent(() => import('@/views/ads/index_v2.vue'));
+const AsyncTemplates = defineAsyncComponent(() => import('@/views/templates/templates.vue'));
+const FraudConfig = defineAsyncComponent(() => import('@/views/fraud_config/index_v2.vue'));
+
+export const routes: MenuDataItem[] = [
+  {
+    name: 'index',
+    path: '/',
+    redirect: '/workplace',
+    component: Layout,
+    children: [
+      {
+        path: '/workplace',
+        name: 'Workplace',
+        meta: {
+          authority: ['dashboard'],
+          icon: 'DashboardOutlined',
+          title: 'pages.dashboard.title',
+          hideInBreadcrumb: true,
+        },
+        component: h(RouteView, null, () => h(AsyncWorkplace)),
+      },
+      // {
+      //   path: '/accounts',
+      //   name: 'accounts',
+      //   meta: { title: 'pages.accounts.title', icon: 'FacebookOutlined', authority: ['accounts'] },
+      //   component: h(RouteView, null, () => h(AsyncFbAccounts)),
+      // },
+      {
+        path: '/adaccount',
+        name: 'adaccount',
+        meta: {
+          title: 'pages.adaccounts.title',
+          icon: 'AccountBookOutlined',
+          authority: ['adaccounts'],
+        },
+        component: h(RouteView, null, () => h(AsyncAdaccount)),
+      },
+      {
+        path: '/ads',
+        name: 'ads',
+        meta: { title: 'pages.campaigns.title', icon: 'FundOutlined', authority: ['ads'] },
+        component: h(RouteView, null, () => h(AsyncOverviewAds)),
+      },
+      {
+        path: '/ads/create_ads',
+        name: 'create_ads',
+        meta: {
+          title: 'Create Ads',
+          icon: 'DollarCircleOutlined',
+          authority: ['adaccounts'],
+          hideInMenu: true,
+        },
+        component: h(RouteView, null, () => h(AsyncCreateAds)),
+      },
+      {
+        path: '/ads/meta-ad-creation',
+        name: 'MetaAdCreation',
+        meta: {
+          title: 'pages.metaAdCreation.title',
+          icon: 'FacebookOutlined',
+          authority: ['ads'],
+          hideInMenu: true,
+        },
+        redirect: '/promotion',
+      },
+      // 推广：一级菜单（先选「从模板选择 / 复制历史任务 / 新创」，再进入创建流程）
+      {
+        path: '/promotion',
+        name: 'Promotion',
+        meta: {
+          title: 'pages.promotion.title',
+          icon: 'RocketOutlined',
+          authority: ['ads'],
+        },
+        component: h(RouteView, null, () => h(AsyncMetaAdCreation)),
+      },
+      {
+        path: '/promotion/meta-ad-creation',
+        redirect: '/promotion',
+        meta: { hideInMenu: true },
+      },
+      // 推广报表：一级菜单
+      {
+        path: '/promotion/reports',
+        name: 'PromotionReports',
+        meta: {
+          title: 'pages.promotionReports.title',
+          icon: 'BarChartOutlined',
+          authority: ['ads'],
+        },
+        component: h(RouteView, null, () => h(AsyncPromotionReports)),
+      },
+      // 素材库：一级菜单
+      {
+        path: '/promotion/material-library',
+        name: 'MaterialLibrary',
+        meta: {
+          title: 'pages.materialLibrary.title',
+          icon: 'FolderOutlined',
+          authority: ['materials'],
+        },
+        component: h(RouteView, null, () => h(AsyncMaterialLibrary)),
+      },
+      {
+        path: '/promotion/material-groups',
+        name: 'MaterialGroups',
+        meta: {
+          title: 'pages.materialGroups.title',
+          icon: 'AppstoreOutlined',
+          authority: ['materials'],
+        },
+        component: h(RouteView, null, () => h(AsyncMaterialGroups)),
+      },
+      // 看板：一级菜单
+      {
+        path: '/promotion/dashboard',
+        name: 'PromotionDashboard',
+        meta: {
+          title: 'pages.promotionDashboard.title',
+          icon: 'DashboardOutlined',
+          authority: ['ads'],
+        },
+        component: h(RouteView, null, () => h(AsyncPromotionDashboard)),
+      },
+      // 自动优化：一级菜单（内含 create-rule 子路由，不展示在菜单）
+      {
+        path: '/promotion/auto-optimization',
+        name: 'AutoOptimization',
+        meta: {
+          title: 'pages.autoOptimization.title',
+          icon: 'RobotOutlined',
+          authority: ['ads'],
+          hideChildrenInMenu: true,
+        },
+        component: RouteView,
+        children: [
+          {
+            path: '',
+            name: 'AutoOptimizationIndex',
+            meta: { authority: ['ads'] },
+            component: AsyncAutoOptimization,
+          },
+          {
+            path: 'create-rule',
+            name: 'CreateAutoRule',
+            meta: {
+              title: 'pages.createAutoRule.title',
+              icon: 'PlusOutlined',
+              authority: ['ads'],
+              hideInMenu: true,
+            },
+            component: AsyncCreateRule,
+          },
+        ],
+      },
+      {
+        path: '/ads/create-ads-v2',
+        name: 'create_ads_v2',
+        meta: {
+          title: 'Create Ads V2',
+          icon: 'DollarCircleOutlined',
+          authority: ['adaccounts'],
+          hideInMenu: true,
+        },
+        component: h(RouteView, null, () => h(AsyncCreateAdsV2)),
+      },
+      {
+        path: '/templates',
+        name: 'templates',
+        meta: { title: 'pages.template.title', icon: 'FileTextOutlined', authority: ['templates'], hideInMenu: true },
+        component: h(RouteView, null, () => h(AsyncTemplates)),
+      },
+      // {
+      //   path: '/rules',
+      //   name: 'rules',
+      //   meta: { title: 'pages.rule.title', icon: 'FormOutlined', authority: ['rules'] },
+      //   component: h(RouteView, null, () => h(AsyncRule)),
+      // },
+      {
+        path: '/auto',
+        name: 'auto',
+        meta: { title: 'pages.auto.title', icon: 'RobotOutlined', authority: ['rules'], hideInMenu: true },
+        component: RouteView,
+        children: [
+          {
+            path: '/auto/rules',
+            name: 'rules',
+            meta: { title: 'pages.rule.title', icon: 'AimOutlined', authority: ['rules'] },
+            component: AsyncRule,
+          },
+          {
+            path: '/auto/jobs',
+            name: 'jobs',
+            meta: { title: 'pages.jobs.title', icon: 'ClockCircleOutlined', authority: ['rules'] },
+            component: AsyncJob,
+          },
+          {
+            path: '/auto/ad-logs',
+            name: 'ad-logs',
+            meta: { title: 'Ad Logs', icon: 'FileSearchOutlined', authority: ['rules'] },
+            component: (): Component =>
+              import(/* webpackChunkName: "adlogs" */ '@/views/ads/ad-logs/index.vue'),
+          },
+        ],
+      },
+      {
+        path: '/creative',
+        name: 'creative',
+        meta: { title: 'pages.creative.title', icon: 'BulbOutlined', authority: ['materials'] },
+        component: RouteView,
+        children: [
+          {
+            path: '/creative/materials',
+            name: 'materials',
+            meta: {
+              title: 'pages.materials.title',
+              icon: 'FileImageOutlined',
+              authority: ['materials'],
+              hideInMenu: true,
+            },
+            component: AsyncMaterials,
+          },
+          {
+            path: '/creative/copywritings',
+            name: 'copywritings',
+            meta: {
+              title: 'pages.copywritings.title',
+              icon: 'FileTextOutlined',
+              authority: ['copywritings'],
+            },
+            component: AsyncCopywritings,
+          },
+
+          {
+            path: '/creative/links',
+            name: 'links',
+            meta: { title: 'pages.links.title', icon: 'LinkOutlined', authority: ['links'] },
+            component: AsyncLinks,
+          },
+        ],
+      },
+      {
+        path: '/resource',
+        name: 'resource',
+        meta: { title: 'pages.resource.title', icon: 'DatabaseOutlined', authority: ['pages'] },
+        component: RouteView,
+        children: [
+          {
+            path: '/resource/pages',
+            name: 'pages',
+            meta: { title: 'pages.pages.title', icon: 'FileOutlined', authority: ['pages'] },
+            component: AsyncPages,
+          },
+          {
+            path: '/resource/forms',
+            name: 'forms',
+            meta: { title: 'Page Forms', icon: 'FormOutlined', authority: ['pages'] },
+            component: AsyncPageForms,
+          },
+          {
+            path: '/resource/business-manager',
+            name: 'business-manager',
+            meta: {
+              title: 'pages.business.manager.title',
+              icon: 'ShopOutlined',
+              authority: ['bms'],
+            },
+            component: AsyncBusinessManager,
+          },
+          {
+            path: '/resource/pixels',
+            name: 'pixels',
+            meta: { title: 'pages.pixels.title', icon: 'CodeOutlined', authority: ['pixels'] },
+            component: AsyncPixels,
+          },
+        ],
+      },
+      {
+        path: '/network',
+        name: 'network',
+        meta: { title: 'pages.convp.title', icon: 'PieChartOutlined', authority: ['networks'], hideInMenu: true },
+        component: RouteView,
+        children: [
+          {
+            path: '/network/clicks',
+            name: 'clicks',
+            meta: { title: 'pages.clicks.title', icon: 'SelectOutlined', authority: ['clicks'] },
+            component: AsyncClicks,
+          },
+          {
+            path: '/network/conversions',
+            name: 'conversions',
+            meta: {
+              title: 'pages.conversions.title',
+              icon: 'FunnelPlotOutlined',
+              authority: ['conversions'],
+            },
+            component: AsyncConversions,
+          },
+        ],
+      },
+      {
+        path: '/vcc',
+        name: 'Card',
+        meta: {
+          title: 'pages.virtual.card.title',
+          icon: 'CreditCardOutlined',
+          authority: ['vcc'],
+          hideInMenu: true,
+        },
+        component: RouteView,
+        children: [
+          {
+            path: '/virtualCard/cards',
+            name: 'cards',
+            meta: { title: 'pages.cards.title', icon: 'IdcardOutlined', authority: ['vcc'] },
+            component: AsyncCardList,
+          },
+          {
+            path: '/virtualCard/transactions',
+            name: 'transactions',
+            meta: {
+              title: 'pages.transactions.title',
+              icon: 'SwapOutlined',
+              hiddenHeaderContent: 'true',
+              authority: ['vcc'],
+            },
+            component: AsyncCardTransactionsList,
+          },
+        ],
+      },
+      {
+        path: '/miscellaneous',
+        name: 'miscellaneous',
+        meta: {
+          title: 'pages.miscellaneous.title',
+          icon: 'AppstoreOutlined',
+          authority: ['roles'],
+          hideInMenu: true,
+        },
+        component: RouteView,
+        children: [
+          {
+            path: '/miscellaneous/proxies',
+            name: 'proxies',
+            meta: {
+              title: 'pages.proxies.title',
+              icon: 'NodeIndexOutlined',
+              authority: ['proxies'],
+            },
+            component: AsyncProxies,
+          },
+          {
+            path: '/miscellaneous/agents',
+            name: 'agents',
+            meta: { title: 'pages.agents.title', icon: 'TeamOutlined', authority: ['agents'] },
+            component: AsyncAgents,
+          },
+          {
+            path: '/miscellaneous/networks',
+            name: 'networks',
+            meta: {
+              title: 'pages.networks.title',
+              icon: 'GlobalOutlined',
+              authority: ['networks'],
+            },
+            component: AsyncNetworks,
+          },
+          // {
+          //   path: '/miscellaneous/commentHelper',
+          //   name: 'commentHelper',
+          //   meta: {
+          //     title: 'pages.comment.helper.title',
+          //     icon: 'TableOutlined',
+          //     authority: ['ads'],
+          //   },
+          //   component: RouteView,
+          // },
+          {
+            path: '/miscellaneous/expense',
+            name: 'expense',
+            meta: {
+              title: 'pages.expense.title',
+              icon: 'MoneyCollectOutlined',
+              authority: ['expense'],
+            },
+            component: AsyncExpense,
+          },
+        ],
+      },
+      {
+        path: '/changePwd',
+        name: 'changePwd',
+        meta: { title: 'atavar.meun.changepwd', icon: 'TableOutlined', hideInMenu: true },
+        component: h(RouteView, null, () => h(ChangePwd)),
+      },
+      {
+        path: '/launchAD',
+        name: 'launchAD',
+        meta: {
+          title: 'pages.ad.accounts.launch.title',
+          icon: 'TableOutlined',
+          hideInMenu: true,
+          authority: ['ads'],
+        },
+        component: h(RouteView, null, () => h(LaunchAD)),
+      },
+
+      // system
+      {
+        path: '/system',
+        name: 'system',
+        meta: { title: 'pages.system.title', icon: 'SettingOutlined', authority: ['roles'] },
+        component: RouteView,
+        redirect: '/system/permission-list',
+        children: [
+          {
+            path: '/system/permission-list',
+            name: 'permission-list',
+            meta: {
+              title: 'pages.system.permission.title',
+              icon: 'SafetyCertificateOutlined',
+              authority: ['roles'],
+            },
+            component: (): Component =>
+              import(/* webpackChunkName: "system" */ '@/views/system/permission.vue'),
+          },
+          {
+            path: '/system/role-list',
+            name: 'role-list',
+            meta: {
+              title: 'pages.system.role-list.title',
+              icon: 'SafetyCertificateOutlined',
+              authority: ['roles'],
+            },
+            component: (): Component =>
+              import(/* webpackChunkName: "system" */ '@/views/system/role-list.vue'),
+          },
+          {
+            path: '/system/user-list',
+            name: 'user-list',
+            meta: { title: 'pages.modal.users', icon: 'UserOutlined', authority: ['roles'] },
+            component: (): Component =>
+              import(/* webpackChunkName: "system" */ '@/views/system/user-list.vue'),
+          },
+          {
+            path: '/system/fb-api-token',
+            name: 'fb-api-list',
+            meta: { title: 'Fb API Token', icon: 'ApiOutlined', authority: ['roles'] },
+            component: (): Component =>
+              import(/* webpackChunkName: "system" */ '@/views/fb-api-token/index_v2.vue'),
+          },
+          {
+            path: '/system/fraud-config',
+            name: 'fraud-config',
+            meta: { title: 'Fraud Config', icon: 'SecurityScanOutlined', authority: ['roles'] },
+            component: FraudConfig,
+          },
+          {
+            path: '/system/audit',
+            name: 'audit',
+            meta: { title: 'pages.system.audit.title', icon: 'FileSearchOutlined', authority: ['roles'] },
+            component: (): Component =>
+              import(/* webpackChunkName: "system" */ '@/views/system/audit.vue'),
+          },
+        ],
+      },
+    ],
+  },
+];
+
+export const staticRoutes: MenuDataItem[] = [
+  {
+    path: '/user/login',
+    name: 'login',
+    meta: { title: 'pages.login.accountLogin.tab' },
+    component: () => import(/* webpackChunkName: "user" */ '@/views/user/login.vue'),
+  },
+  {
+    path: '/user',
+    name: 'user',
+    meta: { hideInMenu: true, title: 'pages.layouts.userLayout.title' },
+    component: UserLayout2,
+    children: [
+      // {
+      //   path: '/user/login',
+      //   name: 'login',
+      //   meta: { title: 'pages.login.accountLogin.tab' },
+      //   component: () => import(/* webpackChunkName: "user" */ '@/views/user/login.vue'),
+      // },
+      {
+        path: '/user/register',
+        name: 'register',
+        meta: { title: 'pages.login.registerAccount' },
+        component: () => import(/* webpackChunkName: "user" */ '@/views/user/register.vue'),
+      },
+      {
+        path: '/user/register-result',
+        name: 'register-result',
+        meta: { title: 'pages.login.registerAccount' },
+        component: () => import(/* webpackChunkName: "user" */ '@/views/user/register-result.vue'),
+      },
+    ],
+  },
+  {
+    path: '/:pathMatch(.*)',
+    component: () => import(/* webpackChunkName: "exception" */ '@/views/exception/404.vue'),
+  },
+];
+
+const router = createRouter({
+  history: createWebHashHistory(process.env.VUE_APP_PUBLIC_PATH),
+  routes: staticRoutes as RouteRecordRaw[],
+  scrollBehavior: (to, from) => {
+    if (to.path !== from.path) {
+      setTimeout(() => {
+        document.getElementById('app').scrollTop = 0;
+      });
+    }
+    return { top: 0 };
+  },
+});
+
+export default router;

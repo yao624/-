@@ -1,0 +1,59 @@
+import request from '@/utils/request';
+
+/**
+ * Get material editor tasks list with pagination and filtering
+ * GET /api/v2/material-library/material-editor/tasks
+ */
+export async function getMaterialEditorTasks(params: {
+  pageNo: number;
+  pageSize: number;
+  task_name?: string;
+  status?: string;
+  created_by?: string;
+  creator_id?: string;
+  create_time_start?: string;
+  create_time_end?: string;
+}) {
+  return request('material-library/material-editor/tasks', {
+    method: 'GET',
+    params,
+  });
+}
+
+/**
+ * Get material editor task detail with nested material items
+ * GET /api/v2/material-library/material-editor/tasks/{taskId}
+ */
+export async function getMaterialEditorTaskDetail(taskId: string | number) {
+  return request(`material-library/material-editor/tasks/${taskId}`, {
+    method: 'GET',
+  });
+}
+
+/**
+ * Create a new material editor task
+ * POST /api/v2/material-library/material-editor/tasks
+ */
+export async function createMaterialEditorTask(payload: {
+  task_name: string;
+  material_type?: 'image' | 'video';
+  folder_option: 'original' | 'new';
+  folder_id?: number;
+  designer_id?: number;
+  creator_id?: number;
+  tags?: string[];
+  materials?: Array<{
+    material_id: number;
+    material_name?: string;
+    preview_url?: string;
+    original_preview_url?: string;
+    edit_content?: string;
+    reason?: string;
+  }>;
+  created_by: number;
+}) {
+  return request('material-library/material-editor/tasks', {
+    method: 'POST',
+    data: payload,
+  });
+}

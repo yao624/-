@@ -1,0 +1,61 @@
+/**
+ * Filter field types supported by the component
+ */
+export type FilterFieldType = 'input' | 'select' | 'date-range' | 'number-range';
+
+/**
+ * Option for select type fields
+ */
+export interface FilterFieldOption {
+  /** Display label for the option */
+  label: string;
+  /** Value for the option */
+  value: string;
+}
+
+/**
+ * Configuration for a single filter field
+ */
+export interface FilterFieldConfig {
+  /** Unique key for the filter field */
+  key: string;
+  /** Display label for the filter field */
+  label: string;
+  /** Type of input field */
+  type: FilterFieldType;
+  /** Options for select type fields */
+  options?: FilterFieldOption[];
+  /** Custom placeholder text (overrides default) */
+  placeholder?: string;
+  /** Whether to show this field in the filter list */
+  visible?: boolean;
+}
+
+/**
+ * Filter value object with field keys as properties
+ */
+export type FilterValue = Record<string, string | number | boolean | (string | number)[] | undefined>;
+
+/**
+ * Props for FilterSection component
+ */
+export interface FilterSectionProps {
+  /** Array of filter field configurations */
+  fields: FilterFieldConfig[];
+  /** Keys of filters to show by default */
+  defaultVisibleKeys?: string[];
+  /** localStorage key for persisting visible filters */
+  storageKey?: string;
+  /** i18n translation prefix */
+  i18nPrefix?: string;
+  /** Whether to show modal button for selecting visible fields */
+  showModal?: boolean;
+}
+
+/**
+ * Events emitted by FilterSection component
+ */
+export interface FilterEmits {
+  /** Emitted when filter values change */
+  (e: 'search', filters: FilterValue): void;
+}

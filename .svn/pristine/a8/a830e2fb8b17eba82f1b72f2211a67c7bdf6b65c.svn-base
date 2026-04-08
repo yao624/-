@@ -1,0 +1,107 @@
+export type TaskStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
+export type MaterialEditStatus = 'success' | 'failed' | 'pending';
+
+export type MaterialType = 'image' | 'video';
+
+export type FolderOption = 'original' | 'new';
+
+export type FieldMode = 'original' | 'unified' | 'smart';
+
+export interface MaterialEditorTask {
+  id: number;              // 任务Id
+  status: TaskStatus;      // 状态
+  createdAt: string;       // 创建时间
+  creator: string;         // 创建人
+  folderId?: number;       // 文件夹ID
+  folderName?: string;     // 文件夹名称
+}
+
+export interface MaterialEditItem {
+  id: number;
+  materialId: number;
+  materialName: string;
+  previewUrl: string;
+  originalPreviewUrl: string;
+  originalMaterialName: string;
+  status: MaterialEditStatus;
+  editContent: string;
+  reason: string;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+// Task Detail - Full detail response from API
+export interface TaskDetail {
+  id: number;
+  taskName: string;
+  status: TaskStatus;
+  materialType: MaterialType;
+  folderOption: 'new' | 'existing';
+  folderId?: number;
+  folderName?: string;
+  designerId: number;
+  designerName: string;
+  creatorId: number;
+  creatorName: string;
+  tags: string[];
+  totalCount: number;
+  successCount: number;
+  failedCount: number;
+  pendingCount: number;
+  errorMessage: string | null;
+  createdBy: number;
+  creator: string;
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+  items: MaterialEditItem[];
+}
+
+export interface TaskFilter {
+  taskId?: string;
+  status?: TaskStatus;
+  startTime?: string;
+  endTime?: string;
+  createdBy?: string;
+}
+
+// Create Task Modal Types
+export interface MaterialItem {
+  id: string;
+  name: string;
+  type: MaterialType;
+  previewUrl: string;
+}
+
+export interface CreateTaskForm {
+  materialType: MaterialType | undefined;
+  materials: MaterialItem[];
+  folderOption: FolderOption;
+  targetFolderId: string | undefined;
+  tags: string[];
+  designerId: string | undefined;
+  creativeId: string | undefined;
+  materialName: string;
+}
+
+export interface FolderInfo {
+  id: string;
+  name: string;
+}
+
+export interface DesignerInfo {
+  id: string;
+  name: string;
+}
+
+export interface CreativeInfo {
+  id: string;
+  name: string;
+}
+
+export interface TagInfo {
+  id: string;
+  name: string;
+  color?: string;
+}

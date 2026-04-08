@@ -1,0 +1,335 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Resources\TagResource;
+use App\Models\FbAccount;
+use App\Models\FbAd;
+use App\Models\FbAdAccount;
+use App\Models\FbAdset;
+use App\Models\FbCampaign;
+use App\Models\Tag;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+
+class TagController extends BaseController
+{
+    /**
+     * Display a listing of the resource.
+     */
+    public function index(Request $request)
+    {
+        $sortField = $request->get('sortField', 'created_at');
+        $sortDirection = $request->get('sortOrder', 'asc');
+        $pageSize = $request->get('pageSize', 10);
+        $pageNo = $request->get('pageNo', 1);
+        $type = $request->get('type');
+
+        $searchableFields = [
+            'name' => $request->get('name'),
+            'date_start' => $request->get('date_start'),
+            'date_stop' => $request->get('date_end')
+        ];
+
+        $allowedTypes = ['networks', 'ad_accounts'];
+
+        $tags = Tag::search($searchableFields);
+        // 如果提供了类型参数，并且它是允许的类型之一，那么只获取与该类型关联的标签
+        if ($type !== null && in_array($type, $allowedTypes)) {
+            $tags = $tags->whereHas($type);
+        }
+
+        $tags = $tags->orderBy($sortField, $sortDirection)
+            ->orderBy('id', $sortDirection)
+            ->paginate($pageSize, ['*'], 'page', $pageNo);
+
+        return [
+            'data' => TagResource::collection($tags->items()),
+            'pageSize' => $tags->perPage(),
+            'pageNo' => $tags->currentPage(),
+            'totalPage' => $tags->lastPage(),
+            'totalCount' => $tags->total(),
+        ];
+
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     */
+//    public function store(Request $request)
+//    {
+////        $request->validate([
+////            'name' => 'required|unique:tags',
+////        ]);
+//
+//        $user_id = auth()->id();;
+//        $tag = Tag::create([
+//            'name' => $request->input('name'),
+//            'user_id' => $user_id
+//        ]);
+//
+//        return response()->json($tag, 201);
+//    }
+
+    /**
+     * Display the specified resource.
+     */
+    public function show(Tag $tag)
+    {
+        return new TagResource($tag);
+    }
+
+    /**
+     * Update the specified resource in storage.
+     */
+//    public function update(Request $request, Tag $tag)
+//    {
+//        $validator = Validator::make($request->all(), [
+//            'name' => [
+//                'required',
+//                Rule::unique('tags')->ignore($tag->id),
+//            ],
+//        ]);
+//
+//        if ($validator->fails()) {
+//            throw new ValidationException($validator);
+//        }
+//        $input = $request->all();
+//        $tag->update($input);
+//        $tag->save();
+//
+//        return new TagResource($tag);
+//    }
+
+    /**
+     * Remove the specified resource from storage.
+     */
+//    public function destroy(Tag $tag)
+//    {
+//        $tag->delete();
+//        return response()->json(null, 204);
+//    }
+
+    public function getUserModelTags($model, Request $request)
+    {
+        // 获取当前认证用户的ID
+        $userId = Auth::id();
+
+        // 构建模型类名
+        $modelClass = 'App\\Models\\' . Str::studly($model);
+
+        // 检查模型是否存在
+        if (!class_exists($modelClass)) {
+            return response()->json(['error' => 'Invalid model type'], 400);
+        }
+
+        // 获取当前用户关联的所有标签
+        $tags = Tag::whereHasMorph('taggable', [$modelClass], function ($query) use ($userId) {
+            $query->where('user_id', $userId);
+        })->get();
+
+        return response()->json($tags);
+    }
+
+    private function getUserAuthorizedFbAdAccountIds($userId)
+    {
+        return FbAdAccount::whereHas('users', function ($query) use ($userId) {
+            $query->where('user_id', $userId);
+        })
+            ->orWhereHas('fbAccount', function ($query) use ($userId) {
+                $query->whereHas('users', function ($q) use ($userId) {
+                    $q->where('user_id', $userId);
+                });
+            })
+            ->pluck('id')
+            ->toArray();
+    }
+
+    public function manageTags(Request $request, $model)
+    {
+        $userID = auth()->user()->id;
+
+        $action = $request->input('action');
+        $ids = $request->input('ids');
+        $names = $request->input('names');
+
+        if (!method_exists($this, $action . 'Tags')) {
+            return response()->json(['message' => 'Invalid action.'], 400);
+        }
+
+        $modelName = Str::singular($model);
+        $modeNameMapping = [
+            'fbaccount' => 'FbAccount',
+            'fbadaccount' => 'FbAdAccount',
+            'fbcampaign' => 'FbCampaign',
+            'fbadset' => 'FbAdset',
+            'fbad' => 'FbAd',
+            'fbbm' => 'FbBm',
+            'material' => 'Material',
+            'copywriting' => 'Copywriting',
+            'link' => 'Link',
+            'fbcatalogproduct' => 'FbCatalogProduct',
+            'fbcatalogproductset' => 'FbCatalogProductSet'
+        ];
+        $modelClass = 'App\\Models\\' . $modeNameMapping[$modelName];
+
+        if (!class_exists($modelClass)) {
+            return response()->json(['message' => 'Model not found.'], 404);
+        }
+
+        $models = $modelClass::findMany($ids);
+
+        if ($models->isEmpty()) {
+            return response()->json(['message' => 'Not found.'], 404);
+        }
+
+        // 检查用户是否对所有模型都有权限，除非他们是管理员
+        if (!auth()->user()->hasRole('admin')) {
+            foreach ($models as $model) {
+                // 对于特定的模型，检查 user_id
+                if (in_array($modelClass, ['App\Models\Link', 'App\Models\Material', 'App\Models\Network',
+                        'App\Models\Proxy', 'App\Models\Rule', 'App\Models\Card'])
+                    && $model->user_id != $userID) {
+                    return response()->json(['message' => 'Access denied.'], 403);
+                }
+
+                // 对于其它模型，检查关联的 fb_account 的 user_id
+//                if (!in_array($modelClass, ['App\Models\Link', 'App\Models\Material', 'App\Models\Network',
+//                        'App\Models\Proxy', 'App\Models\Rule', 'App\Models\Card'])
+//                    && !$model->fbAccounts()->pluck('user_id')->contains($userID)) {
+//                    return response()->json(['message' => 'Access denied.'], 403);
+//                }
+                Log::debug("modal class: $modelClass");
+                if ($modelClass === 'App\Models\FbAccount') {
+                    if ($model->user_id != $userID) {
+                        return response()->json(['message' => 'Access denied.'], 403);
+                    }
+                } else if ($modelClass === 'App\Models\FbAdAccount') {
+                    if (!$this->userHasAccessToFbAdAccount($model, $userID)) {
+                        return response()->json(['message' => 'Access denied.'], 403);
+                    }
+                } else if ($modelClass === 'App\Models\FbCampaign') {
+                    if (!$this->userHasAccessToFbCampaign($model, $userID)) {
+                        return response()->json(['message' => 'Access denied.'], 403);
+                    }
+                } else if ($modelClass === 'App\Models\FbAdset') {
+                    if (!$this->userHasAccessToFbAdset($model, $userID)) {
+                        return response()->json(['message' => 'Access denied.'], 403);
+                    }
+                } else if ($modelClass === 'App\Models\FbAd') {
+                    if (!$this->userHasAccessToFbAd($model, $userID)) {
+                        return response()->json(['message' => 'Access denied.'], 403);
+                    }
+                } else if ($modelClass === 'App\Models\FbBm') {
+                } else {
+                    if (!$model->fbAccounts()->pluck('user_id')->contains($userID)) {
+                        return response()->json(['message' => 'Access denied.'], 403);
+                    }
+                }
+            }
+        }
+
+        return $this->{$action . 'Tags'}($models, $names);
+    }
+
+    private function userHasAccessToFbAdAccount(FbAdAccount $fbAdAccount, $userId)
+    {
+        // 检查用户是否直接关联到 FbAdAccount
+        if ($fbAdAccount->users()->where('user_id', $userId)->exists()) {
+            return true;
+        }
+
+        // 检查通过 FbAccount 的关联
+        return $fbAdAccount->fbAccounts()->whereHas('users', function($query) use ($userId) {
+            $query->where('user_id', $userId);
+        })->exists();
+    }
+
+    private function userHasAccessToFbCampaign(FbCampaign $fbCampaign, $userId)
+    {
+        $user = User::query()->firstWhere('id', $userId);
+        $fbAdAccount = $fbCampaign->fbAdAccount;
+        if (!$user->can('operate', $fbAdAccount)) {
+            return false;
+        }
+        return true;
+    }
+
+    private function userHasAccessToFbAdset(FbAdset $fbAdset, $userId)
+    {
+        $user = User::query()->firstWhere('id', $userId);
+        $fbAdAccount = $fbAdset->fbAdAccount;
+        if (!$user->can('operate', $fbAdAccount)) {
+            return false;
+        }
+        return true;
+    }
+
+    private function userHasAccessToFbAd(FbAd $fbAd, $userId)
+    {
+        $user = User::query()->firstWhere('id', $userId);
+        $fbAdAccount = $fbAd->fbAdAccount;
+        if (!$user->can('operate', $fbAdAccount)) {
+            return false;
+        }
+        return true;
+    }
+
+    protected function addTags($models, $names)
+    {
+        foreach ($models as $model) {
+            foreach ($names as $name) {
+                $tag = Tag::firstOrCreate(['name' => $name, 'user_id' => auth()->user()->id]);
+
+                if (!$model->tags->contains($tag->id)) {
+                    $model->tags()->attach($tag->id, ['user_id' => auth()->user()->id]);
+                }
+            }
+        }
+
+        return response()->json(['message' => 'Tags added successfully.']);
+    }
+
+    protected function deleteTags($models, $names)
+    {
+        foreach ($models as $model) {
+            foreach ($names as $name) {
+                $tag = Tag::where(['name' => $name, 'user_id' => auth()->user()->id])->first();
+
+                if ($tag && $model->tags->contains($tag->id)) {
+                    $model->tags()->detach($tag->id);
+                }
+            }
+        }
+
+        return response()->json(['message' => 'Tags deleted successfully.']);
+    }
+
+    public function listTags(Request $request, $model)
+    {
+        $modelMethod = Str::camel($model);
+
+        if (!method_exists(Tag::class, $modelMethod)) {
+            return response()->json(['message' => 'Model not found.'], 404);
+        }
+
+        // 如果用户是管理员，获取所有的标签
+        // fb campaigns tag 按帐号来，管理员不用看全部的 materials, fbcampaigns
+        if (auth()->user()->hasRole('admin') && !in_array($modelMethod, ['materials', 'fbcampaigns', 'copywritings', 'links'])) {
+            Log::debug('you are the admin,' . $modelMethod);
+            $tags = Tag::whereHas($modelMethod)->get();
+        } else {
+            // 否则，只获取当前用户创建的标签
+            $tags = Tag::where('user_id', auth()->user()->id)->whereHas($modelMethod)->get();
+        }
+
+        return response()->json(['data' => TagResource::collection($tags)]);
+    }
+
+}

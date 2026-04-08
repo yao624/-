@@ -1,0 +1,356 @@
+<template>
+  <page-container :showPageHeader="false">
+    <div class="material-editor-manage-page">
+      <div class="content-card">
+        <!-- 筛选区域 -->
+        <filter-section
+          :fields="filterFields"
+          :default-visible-keys="['taskId', 'status', 'createdBy', 'createdAt']"
+          :show-modal="false"
+          storage-key="material-editor-filter-keys"
+          @search="handleFilterSearch"
+        />
+
+        <!-- 操作栏 -->
+        <div class="action-bar">
+          <a-space>
+            <a-button type="primary" @click="handleCreateTask">
+              {{ t('pages.materialEditorManage.actions.createTask') }}
+            </a-button>
+            <a-button @click="handleGoToPlayturbo">
+              {{ t('pages.materialEditorManage.actions.goToPlayturbo') }}
+            </a-button>
+          </a-space>
+          <a-button @click="handleRefresh">
+            {{ t('pages.materialEditorManage.actions.refresh') }}
+          </a-button>
+        </div>
+
+        <!-- 表格区域 -->
+        <div class="table-area">
+          <task-table
+            :data-source="taskData"
+            :loading="loading"
+            :pagination="pagination"
+            @page-change="handlePageChange"
+            @detail="handleDetail"
+            @view-folder="handleViewFolder"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- 详情弹窗 -->
+    <a-modal
+      v-model:open="detailModalVisible"
+      :title="t('pages.materialEditorManage.actions.detail')"
+      width="1600px"
+      :footer="null"
+    >
+      <div class="detail-content">
+        <!-- 任务信息 -->
+        <a-descriptions :column="2" bordered class="task-info">
+          <a-descriptions-item :label="t('pages.materialEditorManage.table.taskId')">
+            {{ currentTask?.id }}
+          </a-descriptions-item>
+          <a-descriptions-item :label="t('pages.materialEditorManage.table.status')">
+            <a-tag :color="getStatusColor(currentTask?.status)">
+              {{ currentTask ? t(`pages.materialEditorManage.status.${currentTask.status}`) : '-' }}
+            </a-tag>
+          </a-descriptions-item>
+          <a-descriptions-item :label="t('pages.materialEditorManage.table.createdAt')">
+            {{ currentTask?.createdAt }}
+          </a-descriptions-item>
+          <a-descriptions-item :label="t('pages.materialEditorManage.table.createdBy')">
+            {{ currentTask?.createdBy }}
+          </a-descriptions-item>
+          <a-descriptions-item v-if="currentTask?.folderName" :label="t('pages.materialEditorManage.table.folderName')" :span="2">
+            {{ currentTask?.folderName }}
+          </a-descriptions-item>
+        </a-descriptions>
+
+        <!-- 素材编辑列表 -->
+        <div class="material-list-section">
+          <div class="section-title">{{ t('pages.materialEditorManage.detailTable.title') }}</div>
+          <material-edit-table
+            :data-source="materialItems"
+            :loading="materialItemsLoading"
+            :pagination="materialItemsPagination"
+            @page-change="handleMaterialPageChange"
+          />
+        </div>
+      </div>
+    </a-modal>
+
+    <!-- 新增任务弹窗 -->
+    <create-task-modal
+      v-model:open="createTaskModalVisible"
+      @create="handleTaskCreated"
+      @select-material="handleSelectMaterialLog"
+    />
+  </page-container>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { message } from 'ant-design-vue';
+import type { Dayjs } from 'dayjs';
+import TaskTable from './components/TaskTable.vue';
+import MaterialEditTable from './components/MaterialEditTable.vue';
+import CreateTaskModal from './components/CreateTaskModal.vue';
+import FilterSection from '@/components/filter-section/FilterSection.vue';
+import type { FilterFieldConfig } from '@/components/filter-section/types';
+import { getTaskList, getTaskMaterialItems } from './mock-data';
+import type { MaterialEditorTask, MaterialEditItem, TaskStatus, CreateTaskForm } from './types';
+
+const { t } = useI18n();
+
+// Filter fields configuration
+const filterFields = computed<FilterFieldConfig[]>(() => [
+  {
+    key: 'taskId',
+    label: t('pages.materialEditorManage.filter.taskId'),
+    type: 'input',
+    placeholder: t('pages.materialEditorManage.filter.taskIdPlaceholder'),
+  },
+  {
+    key: 'status',
+    label: t('pages.materialEditorManage.filter.status'),
+    type: 'select',
+    placeholder: t('pages.materialEditorManage.filter.statusPlaceholder'),
+    options: [
+      { value: 'pending', label: t('pages.materialEditorManage.status.pending') },
+      { value: 'processing', label: t('pages.materialEditorManage.status.processing') },
+      { value: 'completed', label: t('pages.materialEditorManage.status.completed') },
+      { value: 'failed', label: t('pages.materialEditorManage.status.failed') },
+    ],
+  },
+  {
+    key: 'createdBy',
+    label: t('pages.materialEditorManage.filter.createdBy'),
+    type: 'input',
+    placeholder: t('pages.materialEditorManage.filter.createdByPlaceholder'),
+  },
+  {
+    key: 'createdAt',
+    label: t('pages.materialEditorManage.filter.createdAt'),
+    type: 'date-range',
+  },
+]);
+
+// Data
+const taskData = ref<MaterialEditorTask[]>([]);
+const loading = ref(false);
+const currentPage = ref(1);
+const pageSize = ref(20);
+const total = ref(0);
+
+// Detail Modal
+const detailModalVisible = ref(false);
+const currentTask = ref<MaterialEditorTask | null>(null);
+const materialItems = ref<MaterialEditItem[]>([]);
+const materialItemsLoading = ref(false);
+const materialItemsCurrentPage = ref(1);
+const materialItemsPageSize = ref(10);
+const materialItemsTotal = ref(0);
+
+// Create Task Modal
+const createTaskModalVisible = ref(false);
+
+// 筛选条件
+const currentTaskId = ref<string | undefined>();
+const currentStatus = ref<TaskStatus | undefined>();
+const currentCreatedBy = ref<string | undefined>();
+const dateRange = ref<[Dayjs, Dayjs] | undefined>();
+const currentStartDate = ref<string | undefined>();
+const currentEndDate = ref<string | undefined>();
+
+// Handle filter search from filter-section component
+const handleFilterSearch = (filters: Record<string, any>) => {
+  // Process date range
+  if (filters.createdAt && filters.createdAt.length === 2) {
+    currentStartDate.value = filters.createdAt[0].format('YYYY-MM-DD');
+    currentEndDate.value = filters.createdAt[1].format('YYYY-MM-DD');
+  } else {
+    currentStartDate.value = undefined;
+    currentEndDate.value = undefined;
+  }
+
+  // Update filter values
+  currentTaskId.value = filters.taskId;
+  currentStatus.value = filters.status;
+  currentCreatedBy.value = filters.createdBy;
+  dateRange.value = filters.createdAt;
+
+  currentPage.value = 1;
+  loadData();
+};
+
+// Computed
+const pagination = computed(() => ({
+  current: currentPage.value,
+  pageSize: pageSize.value,
+  total: total.value,
+  showSizeChanger: true,
+  showQuickJumper: true,
+  showTotal: (total: number) => t('pages.materialEditorManage.messages.total', { count: total }),
+}));
+
+const materialItemsPagination = computed(() => ({
+  current: materialItemsCurrentPage.value,
+  pageSize: materialItemsPageSize.value,
+  total: materialItemsTotal.value,
+  showSizeChanger: true,
+  showQuickJumper: true,
+  showTotal: (total: number) => t('pages.materialEditorManage.messages.total', { count: total }),
+}));
+
+// Methods
+const loadData = async () => {
+  loading.value = true;
+  try {
+    const response = await getTaskList({
+      page: currentPage.value,
+      pageSize: pageSize.value,
+      taskId: currentTaskId.value,
+      status: currentStatus.value,
+      createdBy: currentCreatedBy.value,
+      startTime: currentStartDate.value,
+      endTime: currentEndDate.value,
+    });
+    taskData.value = response.data;
+    total.value = response.total;
+  } finally {
+    loading.value = false;
+  }
+};
+
+const loadMaterialItems = async () => {
+  if (!currentTask.value) return;
+
+  materialItemsLoading.value = true;
+  try {
+    const response = await getTaskMaterialItems({
+      taskId: currentTask.value.id,
+      page: materialItemsCurrentPage.value,
+      pageSize: materialItemsPageSize.value,
+    });
+    materialItems.value = response.data;
+    materialItemsTotal.value = response.total;
+  } finally {
+    materialItemsLoading.value = false;
+  }
+};
+
+const handlePageChange = (page: number, size: number) => {
+  currentPage.value = page;
+  pageSize.value = size;
+  loadData();
+};
+
+const handleMaterialPageChange = (page: number, size: number) => {
+  materialItemsCurrentPage.value = page;
+  materialItemsPageSize.value = size;
+  loadMaterialItems();
+};
+
+const handleDetail = (record: MaterialEditorTask) => {
+  currentTask.value = record;
+  materialItemsCurrentPage.value = 1;
+  detailModalVisible.value = true;
+  loadMaterialItems();
+};
+
+const handleViewFolder = (record: MaterialEditorTask) => {
+  // TODO: 查看文件夹功能 - 埋点
+  console.log('查看文件夹:', record);
+  message.info(t('pages.materialEditorManage.messages.viewFolderInfo', { folder: record.folderName || record.id }));
+};
+
+const getStatusColor = (status?: TaskStatus): string => {
+  if (!status) return 'default';
+  const colorMap: Record<string, string> = {
+    pending: 'default',
+    processing: 'processing',
+    completed: 'success',
+    failed: 'error',
+  };
+  return colorMap[status] || 'default';
+};
+
+const handleCreateTask = () => {
+  createTaskModalVisible.value = true;
+};
+
+const handleTaskCreated = (form: CreateTaskForm) => {
+  // TODO: Call API to create task
+  console.log('创建任务:', form);
+  // Reload data after creation
+  loadData();
+};
+
+const handleSelectMaterialLog = () => {
+  // 埋点: 选择素材
+  console.log('埋点: 选择素材');
+};
+
+const handleGoToPlayturbo = () => {
+  console.log('前往Playturbo编辑');
+  message.info(t('pages.materialEditorManage.messages.goToPlayturbo'));
+};
+
+const handleRefresh = () => {
+  loadData();
+};
+
+// Lifecycle
+onMounted(() => {
+  loadData();
+});
+</script>
+
+<style scoped lang="less">
+.material-editor-manage-page {
+  height: calc(100vh - 120px);
+  min-height: 500px;
+
+  .content-card {
+    background: #fff;
+    border-radius: 8px;
+    padding: 16px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+
+    .action-bar {
+      flex-shrink: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .table-area {
+      flex: 1;
+      overflow: hidden;
+      min-height: 0;
+    }
+  }
+}
+
+.detail-content {
+  .task-info {
+    margin-bottom: 16px;
+  }
+
+  .material-list-section {
+    .section-title {
+      font-size: 16px;
+      font-weight: 500;
+      margin-bottom: 12px;
+      color: #262626;
+    }
+  }
+}
+</style>

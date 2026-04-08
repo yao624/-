@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>Simple Canadian Secret Restored My Bladder Control</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter','Segoe UI',Arial,sans-serif;
+      background: #040813;
+      color: #f8fafc;
+      min-height: 100vh;
+      padding: clamp(12px, 4vw, 32px);
+    }
+    .shell {
+      max-width: 560px;
+      margin: 0 auto;
+      border-radius: 32px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(11,18,34,0.92);
+      box-shadow: 0 40px 80px rgba(0,0,0,0.45);
+      overflow: hidden;
+    }
+    header {
+      padding: 32px 28px 26px;
+      background: linear-gradient(120deg,#0284c7,#38bdf8,#67e8f9);
+      color: #00192f;
+    }
+    header h1 { font-size: clamp(24px,5vw,30px); font-weight: 800; line-height: 1.25; }
+    .alert {
+      background: rgba(250,204,21,0.12);
+      color: #fcd34d;
+      padding: 14px 22px;
+      font-size: 14px;
+      text-align: center;
+      border-bottom: 1px solid rgba(250,204,21,0.25);
+    }
+    .content {
+      padding: 28px 26px 10px;
+      font-size: 17px;
+      line-height: 1.75;
+      color: #e2e8f0;
+    }
+    .content p { margin-bottom: 18px; }
+    .content strong { color: #67e8f9; }
+    .content h2 {
+      font-size: 22px;
+      color: #67e8f9;
+      margin: 32px 0 18px;
+      font-weight: 700;
+    }
+    .content h3 {
+      font-size: 19px;
+      color: #38bdf8;
+      margin: 26px 0 14px;
+      font-weight: 600;
+    }
+    .content ul {
+      margin: 18px 0;
+      padding-left: 24px;
+    }
+    .content li {
+      margin-bottom: 10px;
+      line-height: 1.6;
+    }
+    figure {
+      margin: 24px 0;
+      border-radius: 20px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.03);
+    }
+    figure img { width: 100%; display: block; }
+    figure figcaption {
+      font-size: 13px;
+      color: #94a3b8;
+      padding: 10px 14px;
+      background: rgba(15,23,42,0.6);
+    }
+    .expert-box {
+      background: rgba(56,189,248,0.1);
+      border: 1px solid rgba(56,189,248,0.3);
+      border-radius: 18px;
+      padding: 20px;
+      margin: 24px 0;
+    }
+    .expert-box p {
+      font-style: italic;
+      color: #cbd5f5;
+      margin-bottom: 12px;
+    }
+    .expert-box .author {
+      font-weight: 600;
+      color: #67e8f9;
+      font-style: normal;
+    }
+    .testimonial {
+      background: rgba(255,255,255,0.04);
+      border-left: 3px solid #38bdf8;
+      border-radius: 12px;
+      padding: 18px;
+      margin: 20px 0;
+    }
+    .testimonial .quote {
+      font-size: 16px;
+      line-height: 1.6;
+      margin-bottom: 12px;
+      color: #e2e8f0;
+    }
+    .testimonial .author {
+      font-weight: 600;
+      color: #67e8f9;
+      font-size: 15px;
+    }
+    .benefits-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+      margin: 24px 0;
+    }
+    .benefit-card {
+      background: rgba(56,189,248,0.08);
+      border: 1px solid rgba(56,189,248,0.2);
+      border-radius: 14px;
+      padding: 16px;
+    }
+    .benefit-card h4 {
+      color: #38bdf8;
+      font-size: 17px;
+      margin-bottom: 8px;
+    }
+    .benefit-card p {
+      font-size: 15px;
+      color: #cbd5f5;
+      margin: 0;
+    }
+    .guarantee-box {
+      background: linear-gradient(135deg, rgba(34,211,238,0.15), rgba(56,189,248,0.15));
+      border: 2px solid rgba(56,189,248,0.4);
+      border-radius: 20px;
+      padding: 24px;
+      margin: 28px 0;
+      text-align: center;
+    }
+    .guarantee-box h3 {
+      color: #67e8f9;
+      font-size: 20px;
+      margin-bottom: 12px;
+    }
+    .guarantee-box p {
+      color: #cbd5f5;
+      font-size: 15px;
+      margin-bottom: 8px;
+    }
+    .cta-block {
+      padding: 24px 26px 36px;
+      text-align: center;
+    }
+    .cta-main {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      gap: 10px;
+      padding: 18px;
+      border-radius: 18px;
+      background: linear-gradient(120deg,#38bdf8,#22d3ee);
+      color: #03172a;
+      font-weight: 700;
+      font-size: 18px;
+      text-decoration: none;
+      letter-spacing: .3px;
+      border: 1px solid rgba(255,255,255,0.35);
+      box-shadow: 0 25px 45px rgba(56,189,248,0.35);
+    }
+    .cta-sub {
+      margin-top: 12px;
+      font-size: 14px;
+      color: #9ca3af;
+    }
+    .urgency {
+      background: rgba(239,68,68,0.15);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 14px;
+      padding: 16px;
+      margin: 24px 0;
+      text-align: center;
+    }
+    .urgency p {
+      color: #fca5a5;
+      font-weight: 600;
+      margin: 0;
+    }
+    footer {
+      background: rgba(6,10,20,0.9);
+      text-align: center;
+      padding: 24px 18px 32px;
+      font-size: 11px;
+      color: #94a3b8;
+    }
+    footer a { color: #67e8f9; text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <h1>Simple Canadian Secret Restored My Bladder Control</h1>
+    </header>
+
+    <div class="alert">⚠️ Private story — access may be removed without notice. Keep this page open.</div>
+
+    <section class="content">
+      <p>My leak anxiety started small… I'd leak a little when I laughed too hard, or had to plan my shopping trips around the nearest washroom.</p>
+      <p>At first, I brushed it off as a normal part of ageing. But then I started avoiding my weekly catch-ups with friends… always wearing dark pants "just in case"… and that's when I knew this was stealing my life.</p>
+      <p>I tried every medication my doctor prescribed, endless pelvic floor exercises, and spent a fortune on pads and liners, but none of them made a difference.</p>
+      <p>The embarrassment never lifted. Every cough felt like a risk. I couldn't even trust myself on a long car ride, and whenever I wanted to play with the grandkids, I'd hold back… just in case.</p>
+      <p>The hardest part? My family noticed. They never said it out loud, but I saw the look on my daughter's face… they stopped asking me to babysit the grandkids overnight.</p>
+      <p>I tried special diets, uncomfortable procedures, weekly specialist visits… but nothing helped. The only thing that changed was the name on my prescription—and the price going up every time.</p>
+      <p>I was losing hope. When I refused another useless prescription, they hit me with the ultimate scare tactic: "If this keeps up with the recurring infections, you'll need assisted living—and that's not cheap."</p>
+      <p>I was at my lowest when an old friend from university reached out.</p>
+      <p>We caught up, and after hearing what I'd been through, she told me something that floored me: the pills and pads I was wasting my money on are designed to manage the problem, not solve it. They're part of a billion-dollar industry that profits from my suffering.</p>
+      <p>I thought I was the only one failing… but I wasn't.</p>
+      <p>Then she sent me a short video. It was from one of Canada's leading medical researchers. It explained the real root cause of my weakened bladder—a hidden mineral deficiency my family doctor never even mentioned—and revealed a simple at-home method I could start using immediately.</p>
+      
+      <figure>
+        <img src="tt.png" alt="Canadian researcher video snapshot" loading="lazy">
+        <figcaption>The short video my friend sent me — recorded by a Canadian medical researcher from the University of Toronto.</figcaption>
+      </figure>
+
+      <p>I tried it that day… and everything changed.</p>
+      <p>No more expensive pads. No more uncomfortable procedures or side effects from pills. I didn't have to give up my morning coffee.</p>
+      <p>Within days, the difference was unbelievable. I stopped mapping out washrooms everywhere I went. I could get through a whole night without waking up. Conversations became confident again—I wasn't constantly worried about a sudden cough or sneeze.</p>
+      <p>And the best part? I picked up my granddaughter the other day and swung her around, laughing, without a single moment of panic. It feels like I've gotten my life back.</p>
+      <p>I can't thank my friend—or the researcher who uncovered this—enough. It truly felt like an answered prayer. 🙏</p>
+
+      <h2>What the Canadian Research Revealed</h2>
+      
+      <div class="expert-box">
+        <p>"This breakthrough discovery from the University of Toronto's urology research division addresses the root cause of bladder weakness that most doctors overlook—a critical mineral deficiency affecting pelvic floor muscle function. Unlike medications that only mask symptoms, this method restores natural bladder control by correcting the underlying nutritional imbalance."</p>
+        <p class="author">— Dr. Sarah Mitchell, MD, Urology Specialist, University of Toronto Medical Center</p>
+      </div>
+
+      <p>According to the research team at the University of Toronto, over <strong>73% of women over 40</strong> suffer from some form of bladder weakness, yet most are never told about the simple mineral deficiency that's causing it.</p>
+
+      <p>The study, published in the Canadian Medical Association Journal, found that a specific combination of minerals—when properly absorbed—can strengthen the pelvic floor muscles and restore bladder control naturally, without surgery or expensive medications.</p>
+
+      <h3>Why Traditional Methods Fail</h3>
+      
+      <p>Most treatments you've probably tried focus on managing symptoms, not fixing the cause:</p>
+      <ul>
+        <li><strong>Pads and liners:</strong> They catch leaks but don't stop them. You're still living in fear.</li>
+        <li><strong>Pelvic floor exercises:</strong> Helpful, but incomplete. Without the right minerals, your muscles can't fully recover.</li>
+        <li><strong>Prescription medications:</strong> Often cause side effects like dry mouth, constipation, or dizziness. And they're expensive.</li>
+        <li><strong>Surgical procedures:</strong> Invasive, costly, and not always effective. Plus, recovery time can be months.</li>
+      </ul>
+
+      <h3>How This Canadian Method Works</h3>
+
+      <p>The breakthrough comes from understanding that <strong>bladder control depends on strong pelvic floor muscles</strong>, and these muscles need specific minerals to function properly. When you're deficient in these minerals—which most people over 40 are—your muscles weaken, leading to leaks.</p>
+
+      <div class="benefits-grid">
+        <div class="benefit-card">
+          <h4>🎯 Addresses Root Cause</h4>
+          <p>Unlike medications that mask symptoms, this method corrects the mineral deficiency that weakens your pelvic floor muscles.</p>
+        </div>
+        <div class="benefit-card">
+          <h4>⚡ Works in Days, Not Months</h4>
+          <p>Many women report improvement within 3-7 days. No waiting weeks or months to see results.</p>
+        </div>
+        <div class="benefit-card">
+          <h4>💊 No Pills, No Side Effects</h4>
+          <p>This is a simple dietary adjustment method. No medications, no chemicals, no risk of side effects.</p>
+        </div>
+        <div class="benefit-card">
+          <h4>🏠 Do It at Home, Privately</h4>
+          <p>Everything can be done in the privacy of your own home. No doctor visits, no embarrassing procedures.</p>
+        </div>
+        <div class="benefit-card">
+          <h4>💰 Saves Money Long-Term</h4>
+          <p>No more expensive pads, medications, or procedures. This is a one-time solution that works for life.</p>
+        </div>
+        <div class="benefit-card">
+          <h4>✅ Scientifically Backed</h4>
+          <p>Based on peer-reviewed research from one of Canada's top medical universities. Not a fad or trend.</p>
+        </div>
+      </div>
+
+      <h2>Real Stories from Women Who Tried It</h2>
+
+      <div class="testimonial">
+        <p class="quote">"I suffered with leaks for 8 years. I tried everything—pads, exercises, medications. Nothing worked. After just 5 days of following this method, I noticed I wasn't leaking when I laughed anymore. By week 2, I could go through a whole day without even thinking about it. It's been 6 months now, and I feel like I'm 30 again."</p>
+        <p class="author">— Margaret Thompson, 58, Toronto</p>
+      </div>
+
+      <div class="testimonial">
+        <p class="quote">"The embarrassment was the worst part. I stopped going to yoga class, avoided long car trips, always wore dark pants. My daughter noticed and it broke my heart. This method changed everything. I can play with my grandkids without worry, go on road trips, and I'm back at yoga. My confidence is back."</p>
+        <p class="author">— Linda Chen, 52, Vancouver</p>
+      </div>
+
+      <div class="testimonial">
+        <p class="quote">"I was spending $80 a month on pads and liners. My doctor kept prescribing new medications, each one more expensive than the last. When I found this method, I was skeptical—but desperate. Within a week, I stopped needing pads. It's been 4 months and I haven't bought a single pad. This saved me money and my dignity."</p>
+        <p class="author">— Patricia Williams, 61, Calgary</p>
+      </div>
+
+      <div class="testimonial">
+        <p class="quote">"After my third child, my bladder control was terrible. I thought it was just something I had to live with. My doctor suggested surgery, but I was terrified. This method was so simple—just a few dietary changes—and it worked. No surgery, no medications, just natural healing. I wish I'd known about this years ago."</p>
+        <p class="author">— Jennifer Martinez, 45, Montreal</p>
+      </div>
+
+      <h2>Why This Method Is Different</h2>
+
+      <p>Unlike other treatments that require ongoing purchases or repeated doctor visits, this method teaches you how to correct the mineral deficiency naturally. Once you learn it, you can maintain your results for life.</p>
+
+      <p><strong>The key difference:</strong> This isn't a product you buy repeatedly. It's knowledge—a simple method you learn once and use forever. That's why the medical industry doesn't promote it. They can't profit from it.</p>
+
+      <h3>What You'll Learn in the Video</h3>
+
+      <ul>
+        <li>The specific mineral deficiency affecting 73% of women over 40</li>
+        <li>Why your doctor likely never mentioned it (and why that matters)</li>
+        <li>The exact foods and timing that restore mineral balance</li>
+        <li>How to strengthen your pelvic floor muscles naturally</li>
+        <li>A simple 5-minute daily routine that makes all the difference</li>
+        <li>How to maintain results long-term without ongoing costs</li>
+      </ul>
+
+      <div class="guarantee-box">
+        <h3>🛡️ 30-Day Money-Back Guarantee</h3>
+        <p>We're so confident this method will work for you that we offer a full 30-day money-back guarantee.</p>
+        <p>If you don't see improvement in your bladder control, or if you're not completely satisfied for any reason, simply contact us within 30 days and we'll refund every penny—no questions asked.</p>
+        <p><strong>You have nothing to lose and everything to gain.</strong></p>
+      </div>
+
+      <div class="urgency">
+        <p>⏰ Limited Access: This video may be removed due to pressure from pharmaceutical companies. Secure your access now before it's taken down.</p>
+      </div>
+
+      <p>If you're tired of leaks and pads controlling your life, don't wait until it gets worse.</p>
+      <p><strong>Tap "Learn More" now and see how it works before it disappears.</strong></p>
+    </section>
+
+    <section class="cta-block">
+      <a class="cta-main" href="#" onclick="return startAccess(event)">LEARN MORE BEFORE IT'S TAKEN DOWN</a>
+      <div class="cta-sub">✅ Instant access • ✅ No pills required • ✅ Works at home in minutes • ✅ 30-day guarantee</div>
+    </section>
+
+    <section class="content" style="padding-top: 0;">
+      <h2>Frequently Asked Questions</h2>
+
+      <h3>Is this method safe?</h3>
+      <p>Yes. This method involves simple dietary adjustments based on natural minerals. There are no medications, no chemicals, and no side effects. It's been studied and validated by researchers at the University of Toronto.</p>
+
+      <h3>How long until I see results?</h3>
+      <p>Most women notice improvement within 3-7 days. Full results typically appear within 2-4 weeks, depending on how severe your deficiency is.</p>
+
+      <h3>Do I need a prescription?</h3>
+      <p>No. This is a natural method that doesn't require any prescription medications. Everything you need can be found at your local grocery store.</p>
+
+      <h3>Will this work if I've tried other treatments?</h3>
+      <p>Yes. This method addresses the root cause that other treatments miss. Many women who've tried medications, exercises, and even surgery have found success with this approach.</p>
+
+      <h3>Is my information private?</h3>
+      <p>Absolutely. We use SSL encryption to protect your data. Your information is never shared with third parties. All access is completely private and discreet.</p>
+
+      <h3>What if it doesn't work for me?</h3>
+      <p>We offer a 30-day money-back guarantee. If you're not satisfied for any reason, contact us and we'll refund your payment in full—no questions asked.</p>
+    </section>
+
+    <footer>
+      <p>© 2025 Confidence Labs. All rights reserved.</p>
+      <p><a href="#">Privacy Policy</a> • <a href="#">Terms of Service</a> • <a href="#">Refund Policy</a> • <a href="#">Contact Us</a></p>
+      <p style="margin-top:10px;opacity:.7">This story shares personal experience and educational information. Always consult a healthcare professional for medical guidance. Individual results may vary.</p>
+      <p style="margin-top:8px;opacity:.6">Research references available upon request. Method based on peer-reviewed studies from the University of Toronto Medical Center.</p>
+    </footer>
+  </div>
+
+  <script>
+    function startAccess(e) {
+      e.preventDefault();
+      alert('Loading the private video...');
+      // window.location.href = 'https://your-landing-link.com/learn-more';
+      return false;
+    }
+  </script>
+</body>
+</html>

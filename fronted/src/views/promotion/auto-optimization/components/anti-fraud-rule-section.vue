@@ -1,0 +1,191 @@
+<template>
+  <div class="anti-fraud-rule-section">
+    <p class="anti-fraud-intro">
+      {{
+        t(
+          'AdsPolar将定时检查有效账户下最近两天（含当天）创建，并且状态是Active的广告组',
+        )
+      }}
+    </p>
+
+    <div class="anti-fraud-row">
+      <span class="field-label">{{ t('广告账户范围') }}</span>
+      <a-radio-group
+        :value="modelValue.accountScope"
+        button-style="solid"
+        @update:value="(v) => patch({ accountScope: v as 'all' | 'specified' })"
+      >
+        <a-radio-button value="all">{{ t('全部') }}</a-radio-button>
+        <a-radio-button value="specified">{{ t('指定') }}</a-radio-button>
+      </a-radio-group>
+    </div>
+
+    <div v-if="modelValue.accountScope === 'specified'" class="anti-fraud-row indent">
+      <a-select
+        :value="modelValue.specifiedAccountIds"
+        mode="multiple"
+        :placeholder="t('请选择广告账户')"
+        class="account-select"
+        allow-clear
+        :options="specifiedAccountOptions"
+        @update:value="(v) => patch({ specifiedAccountIds: v as string[] })"
+      />
+    </div>
+
+    <div class="anti-fraud-row match-row">
+      <span>{{ t('若广告组满足以下开启的') }}</span>
+      <a-select
+        :value="modelValue.conditionMatch"
+        class="match-select"
+        @update:value="(v) => patch({ conditionMatch: v as 'all' | 'any' })"
+      >
+        <a-select-option value="all">{{ t('全部条件') }}</a-select-option>
+        <a-select-option value="any">{{ t('任一条件') }}</a-select-option>
+      </a-select>
+      <span>{{ t('将会被自动关停') }}</span>
+    </div>
+
+    <div class="anti-fraud-condition">
+      <a-switch
+        :checked="modelValue.notCreatedInAdsPolar"
+        @update:checked="(v) => patch({ notCreatedInAdsPolar: v })"
+      />
+      <span class="condition-label">{{ t('广告组不在AdsPolar后台创建') }}</span>
+    </div>
+
+    <div class="anti-fraud-condition flex-wrap">
+      <a-switch
+        :checked="modelValue.nonWorkingHours"
+        @update:checked="(v) => patch({ nonWorkingHours: v })"
+      />
+      <span class="condition-label">{{ t('广告组创建时间在非工作时间段') }}</span>
+      <a-select
+        :value="modelValue.nonWorkingHourSlotIds"
+        mode="multiple"
+        :placeholder="t('请选择非工作时间段')"
+        class="slots-select"
+        :max-tag-count="2"
+        :options="nonWorkingSlotOptions"
+        allow-clear
+        @update:value="(v) => patch({ nonWorkingHourSlotIds: v as string[] })"
+      />
+      <span class="tz-hint">{{ t('(创建时间已按+8时区转换)') }}</span>
+    </div>
+  </div>
+</template>
+
+<script lang="ts" setup>
+import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
+
+export type AntiFraudRuleConfig = {
+  accountScope: 'all' | 'specified';
+  specifiedAccountIds: string[];
+  conditionMatch: 'all' | 'any';
+  notCreatedInAdsPolar: boolean;
+  nonWorkingHours: boolean;
+  nonWorkingHourSlotIds: string[];
+};
+
+const props = defineProps<{
+  modelValue: AntiFraudRuleConfig;
+}>();
+
+const emit = defineEmits<{
+  (e: 'update:modelValue', v: AntiFraudRuleConfig): void;
+}>();
+
+const { t } = useI18n();
+
+const patch = (p: Partial<AntiFraudRuleConfig>) => {
+  emit('update:modelValue', { ...props.modelValue, ...p });
+};
+
+const nonWorkingSlotOptions = computed(() =>
+  Array.from({ length: 8 }, (_, i) => ({
+    value: `slot-${i + 1}`,
+    label: `${t('非工作时段')}${i + 1}`,
+  })),
+);
+
+const specifiedAccountOptions = computed(() => [
+  { value: 'demo-1', label: 'Demo Account 1' },
+  { value: 'demo-2', label: 'Demo Account 2' },
+]);
+</script>
+
+<style lang="less" scoped>
+.anti-fraud-rule-section {
+  font-size: 14px;
+  color: #333;
+  line-height: 1.6;
+
+  .anti-fraud-intro {
+    margin: 0 0 16px;
+    padding: 12px 14px;
+    background: #f6f8fc;
+    border-radius: 6px;
+    color: #595959;
+    font-size: 13px;
+  }
+
+  .anti-fraud-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    margin-bottom: 14px;
+
+    &.indent {
+      padding-left: 0;
+      margin-top: -6px;
+    }
+
+    .field-label {
+      font-weight: 500;
+      margin-right: 4px;
+    }
+
+    &.match-row {
+      margin-bottom: 18px;
+    }
+  }
+
+  .account-select {
+    min-width: 320px;
+    flex: 1;
+    max-width: 560px;
+  }
+
+  .match-select {
+    width: 120px;
+  }
+
+  .anti-fraud-condition {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+
+    &.flex-wrap {
+      flex-wrap: wrap;
+    }
+
+    .condition-label {
+      flex: 0 1 auto;
+    }
+
+    .slots-select {
+      min-width: 220px;
+      max-width: 400px;
+      flex: 1;
+    }
+
+    .tz-hint {
+      font-size: 12px;
+      color: #8c8c8c;
+      white-space: nowrap;
+    }
+  }
+}
+</style>

@@ -1,0 +1,127 @@
+import request from '@/utils/request';
+
+export interface RequestLog {
+  id: string;
+  user_id: string;
+  user_name: string;
+  ip_address: string;
+  user_agent: string;
+  full_user_agent: string;
+  request_method: string;
+  request_path: string;
+  query_parameters: any;
+  request_body: any;
+  response_status: number;
+  response_time: number;
+  response_time_formatted: string;
+  requested_at: string;
+  requested_at_formatted: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RequestLogsParams {
+  user_name?: string;
+  ip_address?: string;
+  request_method?: string;
+  request_path?: string;
+  response_status?: number;
+  date_start?: string;
+  date_end?: string;
+  datetime_start?: string;
+  datetime_end?: string;
+  pageSize?: number;
+  pageNo?: number;
+  sortField?: string;
+  sortOrder?: string;
+}
+
+export interface RequestLogsResponse {
+  data: RequestLog[];
+  pageSize: number;
+  pageNo: number;
+  totalPage: number;
+  totalCount: number;
+}
+
+export interface StatisticsSummary {
+  total_requests: number;
+  unique_users: number;
+  unique_ips: number;
+  avg_response_time: number;
+  avg_response_time_formatted: string;
+}
+
+export interface TopPath {
+  path: string;
+  count: number;
+}
+
+export interface TopIp {
+  ip: string;
+  count: number;
+}
+
+export interface Statistics {
+  summary: StatisticsSummary;
+  method_stats: Record<string, number>;
+  status_stats: Record<string, number>;
+  hourly_stats: Record<string, number>;
+  top_paths: TopPath[];
+  top_ips: TopIp[];
+}
+
+export interface StatisticsParams {
+  date_start?: string;
+  date_end?: string;
+  datetime_start?: string;
+  datetime_end?: string;
+}
+
+export interface CleanupParams {
+  days?: number;
+}
+
+export interface CleanupResponse {
+  success: boolean;
+  message: string;
+  data: {
+    deleted_count: number;
+    cutoff_date: string;
+  };
+}
+
+/**
+ * 获取请求日志列表
+ */
+export function getRequestLogs(params: RequestLogsParams): Promise<RequestLogsResponse> {
+  return request.get('/request-logs', {
+    params,
+  });
+}
+
+/**
+ * 获取单个日志详情
+ */
+export function getRequestLog(id: string): Promise<{ data: RequestLog }> {
+  return request.get(`/request-logs/${id}`);
+}
+
+/**
+ * 获取统计信息
+ */
+export function getRequestLogsStatistics(params?: StatisticsParams): Promise<{ data: Statistics }> {
+  return request.get('/request-logs/statistics', {
+    params,
+  });
+}
+
+/**
+ * 清理旧日志
+ */
+export function cleanupRequestLogs(data: CleanupParams): Promise<CleanupResponse> {
+  return request.delete('/request-logs/cleanup', {
+    data,
+  });
+}
+

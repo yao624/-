@@ -1,0 +1,149 @@
+<template>
+  <div>
+    <a-modal
+      :open="open"
+      :title="modelRef.action === 'share' ? t('Share') : t('Unshare')"
+      @cancel="handleCancel"
+      @ok="handleOk"
+      :confirm-loading="loading"
+      :width="800"
+    >
+      <a-spin :spinning="loading">
+        <a-form :label-col="labelCol" :wrapper-col="wrapperCol">
+          <a-form-item :label="t('Action')">
+            <a-radio-group v-model:value="modelRef.action" button-style="solid">
+              <a-radio-button value="share">{{ t('Share') }}</a-radio-button>
+              <a-radio-button value="unshare">{{ t('Unshare') }}</a-radio-button>
+            </a-radio-group>
+          </a-form-item>
+          <a-form-item :label="t('Email')" :rules="[{ required: true }]">
+            <a-select
+              v-model:value="modelRef.emailList"
+              mode="tags"
+              style="width: 100%"
+              :placeholder="t('Please input user emails')"
+            ></a-select>
+          </a-form-item>
+        </a-form>
+      </a-spin>
+    </a-modal>
+  </div>
+</template>
+
+<script lang="ts">
+import type { PropType } from 'vue';
+import { defineComponent, reactive, ref, toRaw, watchEffect } from 'vue';
+import { message } from 'ant-design-vue';
+import { useI18n } from 'vue-i18n';
+import { Form } from 'ant-design-vue';
+import type { ShareModel } from '@/utils/fb-interfaces';
+
+const formLayout = {
+  labelCol: {
+    xs: { span: 24 },
+    sm: { span: 7 },
+  },
+  wrapperCol: {
+    xs: { span: 24 },
+    sm: { span: 13 },
+  },
+};
+
+export default defineComponent({
+  name: 'EditItem',
+  components: {},
+  props: {
+    open: {
+      type: Boolean,
+      required: true,
+    },
+    model: {
+      type: Object as PropType<ShareModel | null>,
+      default: () => null,
+    },
+    shareApi: {
+      type: Function,
+      required: true,
+    },
+    unshareApi: {
+      type: Function,
+      required: true,
+    },
+  },
+  emits: ['ok', 'cancel'],
+  setup(props, { emit }) {
+    const { t } = useI18n();
+    const loading = ref(false);
+    const inputValue = ref('');
+    const useForm = Form.useForm;
+
+    const modelRef = reactive<ShareModel>({
+      action: 'share',
+      emailList: [],
+      resourceList: [],
+    });
+
+    const rulesRef = reactive({
+      emailList: [
+        {
+          required: true,
+          message: 'Please input name',
+          type: 'array',
+        },
+      ],
+    });
+
+    watchEffect(() => {
+      if (props.model) {
+        const raw = toRaw(props.model);
+        modelRef.action = raw.action;
+        modelRef.emailList = raw.emailList;
+        modelRef.resourceList = raw.resourceList;
+      }
+    });
+
+    const { validate } = useForm(modelRef, rulesRef);
+
+    const onCreate = () => {};
+
+    const handleCancel = () => {
+      emit('cancel');
+    };
+
+    const handleOk = () => {
+      // 在这里处理确认逻辑
+      loading.value = true;
+      validate().then(() => {
+        const params = {
+          user_emails: modelRef.emailList,
+          resource_ids: modelRef.resourceList,
+        };
+        const api = modelRef.action === 'share' ? props.shareApi : props.unshareApi;
+        api(params)
+          .then(() => {
+            emit('ok');
+            message.success(t('pages.opSuccessfully'));
+          })
+          .finally(() => {
+            loading.value = false;
+          });
+      });
+    };
+
+    return {
+      inputValue,
+      loading,
+      onCreate,
+      handleCancel,
+      handleOk,
+      t,
+      modelRef,
+      ...formLayout,
+    };
+  },
+});
+</script>
+
+<style scoped>
+/* 可根据需要添加样式 */
+</style>

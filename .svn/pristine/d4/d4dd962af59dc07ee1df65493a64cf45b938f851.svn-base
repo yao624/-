@@ -1,0 +1,713 @@
+<template>
+  <div class="create-rule-page">
+    <!-- 步骤1: 选择模板 -->
+    <div v-if="currentStep === 1" class="step-content">
+      <div class="step-header">
+        <div class="step-title">{{ t('创建规则') }}</div>
+        <div class="step-subtitle">{{ t('请选择下方模板或直接创建规则:') }}</div>
+      </div>
+
+      <!-- 监控设置 -->
+      <div class="monitoring-settings">
+        <div class="setting-item">
+          <label>{{ t('监控渠道') }}:</label>
+          <a-select v-model:value="monitoringChannel" style="width: 150px">
+            <a-select-option value="meta">Meta</a-select-option>
+          </a-select>
+        </div>
+        <div class="setting-item">
+          <label>{{ t('监控对象') }}:</label>
+          <a-tabs v-model:activeKey="monitoringObject" type="card">
+            <a-tab-pane key="ad-account" :tab="t('广告账号')" />
+            <a-tab-pane key="campaign" :tab="t('广告系列')" />
+            <a-tab-pane key="ad-group" :tab="t('广告组')" />
+            <a-tab-pane key="ad" :tab="t('广告')" />
+            <a-tab-pane key="ad-material" :tab="t('广告+素材')" />
+            <a-tab-pane key="material" :tab="t('素材')" />
+          </a-tabs>
+        </div>
+      </div>
+
+      <!-- 规则模板卡片 -->
+      <div class="rule-templates">
+        <div class="template-card" @click="selectTemplate('direct')">
+          <div class="template-icon" style="background: #1890ff">
+            <plus-outlined />
+          </div>
+          <div class="template-title">{{ t('直接创建') }}</div>
+        </div>
+        <div
+          v-for="template in ruleTemplates"
+          :key="template.id"
+          class="template-card"
+          @click="selectTemplate(template.id)"
+        >
+          <div class="template-icon" :style="{ background: template.color }">
+            <component :is="template.icon" />
+          </div>
+          <div class="template-title">{{ template.title }}</div>
+          <div class="template-desc">{{ template.description }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 步骤2: 配置规则 -->
+    <div v-if="currentStep === 2" class="step-content">
+      <div class="step-header">
+        <div class="step-title">{{ t('创建规则') }}</div>
+      </div>
+
+      <!-- 筛选条件 -->
+      <div class="rule-section">
+        <div class="section-title">
+          <filter-outlined />
+          {{ t('筛选') }}
+        </div>
+        <div class="filter-row">
+          <a-select
+            v-model:value="ruleConfig.filters.adGroup"
+            :placeholder="t('广告组: 请选择')"
+            style="width: 200px"
+            allow-clear
+          />
+          <a-select
+            v-model:value="ruleConfig.filters.campaign"
+            :placeholder="t('广告系列: 请选择')"
+            style="width: 200px"
+            allow-clear
+          />
+          <a-select
+            v-model:value="ruleConfig.filters.status"
+            :placeholder="t('状态: 请选择')"
+            style="width: 150px"
+            allow-clear
+          >
+            <a-select-option value="enabled">{{ t('已开启') }}</a-select-option>
+            <a-select-option value="disabled">{{ t('已关闭') }}</a-select-option>
+          </a-select>
+        </div>
+
+        <!-- 指标过滤 -->
+        <div class="metric-filter">
+          <div class="metric-title">
+            {{ t('指标过滤') }}
+            <a-tooltip>
+              <template #title>
+                {{ t('因三方数据指标的延迟较长,若选择监控三方指标,建议选择2天及以前的数据时间') }}
+              </template>
+              <info-circle-outlined style="margin-left: 8px; color: #1890ff" />
+            </a-tooltip>
+          </div>
+          <a-alert
+            type="info"
+            :message="t('因三方数据指标的延迟较长,若选择监控三方指标,建议选择2天及以前的数据时间')"
+            show-icon
+            style="margin-bottom: 16px"
+          />
+          <div
+            v-for="(condition, index) in ruleConfig.metricConditions"
+            :key="index"
+            class="metric-condition"
+          >
+            <div class="condition-number">{{ index + 1 }}</div>
+            <a-select
+              v-model:value="condition.metric"
+              style="width: 150px"
+              :options="metricOptions"
+            />
+            <span style="margin: 0 8px">Meta</span>
+            <a-select
+              v-model:value="condition.date"
+              :placeholder="t('今天')"
+              style="width: 120px"
+            >
+              <a-select-option value="today">{{ t('今天') }}</a-select-option>
+              <a-select-option value="1day">{{ t('1天前') }}</a-select-option>
+              <a-select-option value="2day">{{ t('2天前') }}</a-select-option>
+            </a-select>
+            <a-select
+              v-model:value="condition.operator"
+              style="width: 80px"
+              :options="operatorOptions"
+            />
+            <a-select
+              v-model:value="condition.valueType"
+              style="width: 100px"
+              :options="valueTypeOptions"
+            />
+            <a-input-number
+              v-model:value="condition.value"
+              :placeholder="t('数值')"
+              style="width: 120px"
+            />
+            <a-select
+              v-model:value="condition.currency"
+              style="width: 80px"
+              :options="currencyOptions"
+            />
+            <a-button
+              type="link"
+              danger
+              @click="removeCondition(index)"
+              style="margin-left: 8px"
+            >
+              {{ t('删除') }}
+            </a-button>
+          </div>
+          <a-button type="link" @click="addCondition" style="padding: 0">
+            {{ t('添加条件') }}
+          </a-button>
+        </div>
+      </div>
+
+      <!-- 执行动作 -->
+      <div class="rule-section">
+        <div class="section-title">
+          <play-circle-outlined />
+          {{ t('执行动作') }}
+          <a-tooltip>
+            <template #title>{{ t('依次执行以下动作') }}</template>
+            <info-circle-outlined style="margin-left: 8px; color: #1890ff" />
+          </a-tooltip>
+        </div>
+        <a-checkbox v-model:checked="ruleConfig.executeInOrder">
+          {{ t('依次执行以下动作') }}
+        </a-checkbox>
+        <div
+          v-for="(action, index) in ruleConfig.actions"
+          :key="index"
+          class="action-item"
+        >
+          <div class="action-number">{{ index + 1 }}</div>
+          <action-config :action="action" @update="updateAction(index, $event)" />
+          <a-button
+            type="link"
+            danger
+            @click="removeAction(index)"
+            style="margin-left: 8px"
+          >
+            {{ t('删除') }}
+          </a-button>
+        </div>
+        <a-button type="link" @click="addAction" style="padding: 0">
+          {{ t('添加动作') }}
+        </a-button>
+      </div>
+
+      <!-- 执行频次 -->
+      <div class="rule-section">
+        <div class="section-title">
+          <clock-circle-outlined />
+          {{ t('执行频次') }}
+        </div>
+        <div class="frequency-setting">
+          <span>{{ t('若监控对象在多次检查中均满足条件,那么距离上次执行动作的时间间隔是') }}</span>
+          <a-select v-model:value="ruleConfig.executionInterval" style="width: 100px; margin-left: 8px">
+            <a-select-option value="24h">24h</a-select-option>
+            <a-select-option value="12h">12h</a-select-option>
+            <a-select-option value="6h">6h</a-select-option>
+          </a-select>
+        </div>
+        <div class="check-time-setting">
+          <div class="setting-row">
+            <label>{{ t('使用时区') }}:</label>
+            <a-select v-model:value="ruleConfig.timezone" style="width: 150px">
+              <a-select-option value="UTC+8">UTC+8</a-select-option>
+              <a-select-option value="UTC+0">UTC+0</a-select-option>
+            </a-select>
+            <span class="help-text">
+              {{ t('请选择广告账户对应的时区,以确保数据与媒体后台保持一致') }}
+            </span>
+          </div>
+          <div class="setting-row">
+            <label>{{ t('生效时段') }}:</label>
+            <a-radio-group v-model:value="ruleConfig.effectivePeriod">
+              <a-radio-button value="long-term">{{ t('长期') }}</a-radio-button>
+              <a-radio-button value="custom">{{ t('自定义') }}</a-radio-button>
+            </a-radio-group>
+          </div>
+          <div class="setting-row">
+            <label>{{ t('检查频次') }}:</label>
+            <a-radio-group v-model:value="ruleConfig.checkFrequency">
+              <a-radio-button value="15min">{{ t('每15分钟') }}</a-radio-button>
+              <a-radio-button value="30min">{{ t('每半小时') }}</a-radio-button>
+              <a-radio-button value="1h">{{ t('每小时') }}</a-radio-button>
+              <a-radio-button value="daily">{{ t('每天') }}</a-radio-button>
+              <a-radio-button value="weekly">{{ t('每周') }}</a-radio-button>
+              <a-radio-button value="custom">{{ t('自定义') }}</a-radio-button>
+            </a-radio-group>
+          </div>
+        </div>
+      </div>
+
+      <!-- 基础信息 -->
+      <div class="rule-section">
+        <div class="section-title">
+          <file-text-outlined />
+          {{ t('基础信息') }}
+        </div>
+        <a-form :model="ruleConfig.basicInfo" layout="vertical">
+          <a-form-item :label="t('规则名称') + '*'">
+            <a-input v-model:value="ruleConfig.basicInfo.ruleName" :placeholder="t('请输入规则名称')" />
+          </a-form-item>
+          <a-form-item :label="t('规则描述')">
+            <a-textarea
+              v-model:value="ruleConfig.basicInfo.description"
+              :placeholder="t('请输入规则描述')"
+              :rows="3"
+            />
+          </a-form-item>
+          <a-form-item :label="t('规则状态')">
+            <a-radio-group v-model:value="ruleConfig.basicInfo.status">
+              <a-radio-button value="enabled">{{ t('启用') }}</a-radio-button>
+              <a-radio-button value="disabled">{{ t('停用') }}</a-radio-button>
+            </a-radio-group>
+          </a-form-item>
+          <a-form-item :label="t('货币单位')">
+            <a-radio-group v-model:value="ruleConfig.basicInfo.currency">
+              <a-radio-button value="USD">{{ t('美元') }}</a-radio-button>
+              <a-radio-button value="CNY">{{ t('人民币') }}</a-radio-button>
+            </a-radio-group>
+          </a-form-item>
+        </a-form>
+      </div>
+    </div>
+
+    <!-- 底部按钮 -->
+    <div class="footer-actions">
+      <a-button v-if="currentStep === 2" @click="currentStep = 1">{{ t('上一步') }}</a-button>
+      <a-button type="primary" @click="handleConfirm">{{ t('确定') }}</a-button>
+      <a-button @click="handleSaveTemplate">{{ t('保存模板') }}</a-button>
+      <a-checkbox v-model:checked="agreedToDisclaimer" style="margin-left: 24px">
+        {{ t('我已阅读并同意AI助手执行动作的免责声明') }}
+        <a style="margin-left: 4px">{{ t('免责声明') }}</a>
+      </a-checkbox>
+    </div>
+  </div>
+</template>
+
+<script lang="ts" setup>
+import { ref, h } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { useRouter } from 'vue-router';
+import {
+  PlusOutlined,
+  BellOutlined,
+  StopOutlined,
+  SafetyOutlined,
+  ReloadOutlined,
+  RiseOutlined,
+  FallOutlined,
+  FileAddOutlined,
+  MinusOutlined,
+  TagOutlined,
+  FilterOutlined,
+  PlayCircleOutlined,
+  ClockCircleOutlined,
+  FileTextOutlined,
+  InfoCircleOutlined,
+} from '@ant-design/icons-vue';
+import { message } from 'ant-design-vue';
+import ActionConfig from './components/action-config.vue';
+import { getRuleTemplates } from './mock-data';
+
+const { t } = useI18n();
+const router = useRouter();
+
+const currentStep = ref(1);
+const monitoringChannel = ref('meta');
+const monitoringObject = ref('ad-group');
+const selectedTemplate = ref<string | null>(null);
+const agreedToDisclaimer = ref(false);
+
+const ruleTemplates = ref([
+  {
+    id: 'notification',
+    title: t('通知提醒'),
+    description: t('当广告投放效果不好时,发送邮件通知'),
+    icon: BellOutlined,
+    color: '#722ed1',
+  },
+  {
+    id: 'loss-prevention',
+    title: t('广告止损'),
+    description: t('自动关停投放效果不好的广告'),
+    icon: StopOutlined,
+    color: '#52c41a',
+  },
+  {
+    id: 'anti-fraud',
+    title: t('广告防盗刷'),
+    description: t('自动关闭盗刷广告'),
+    icon: SafetyOutlined,
+    color: '#52c41a',
+  },
+  {
+    id: 'restart',
+    title: t('重启广告'),
+    description: t('重新开启投放效果达标的广告'),
+    icon: ReloadOutlined,
+    color: '#fa8c16',
+  },
+  {
+    id: 'increase-bid',
+    title: t('提价扩量'),
+    description: t('当广告投放效果较好时,提高出价争取更多转化'),
+    icon: RiseOutlined,
+    color: '#1890ff',
+  },
+  {
+    id: 'decrease-bid',
+    title: t('降价控成本'),
+    description: t('当广告投放效果不好时,降低出价控制转化成本'),
+    icon: FallOutlined,
+    color: '#ff4d4f',
+  },
+  {
+    id: 'increase-budget',
+    title: t('增加预算'),
+    description: t('当花费达到预算值并且广告效果较好时,增加预算'),
+    icon: FileAddOutlined,
+    color: '#13c2c2',
+  },
+  {
+    id: 'decrease-budget',
+    title: t('降低预算'),
+    description: t('当花费较大但广告效果不好时,减低预算'),
+    icon: MinusOutlined,
+    color: '#fa8c16',
+  },
+  {
+    id: 'auto-tag',
+    title: t('自动打标签'),
+    description: t('根据目标对象的投放数据效果或属性特征,自动为其打上合适的标签'),
+    icon: TagOutlined,
+    color: '#2f54eb',
+  },
+]);
+
+const ruleConfig = ref({
+  filters: {
+    adGroup: undefined,
+    campaign: undefined,
+    status: undefined,
+  },
+  metricConditions: [
+    {
+      metric: 'spend',
+      date: null,
+      operator: '>',
+      valueType: 'value',
+      value: 50,
+      currency: 'USD',
+    },
+  ],
+  actions: [
+    {
+      type: 'send-email',
+      config: {
+        recipients: ['mediapluse09@gmail.com'],
+        subject: '',
+        body: '',
+      },
+    },
+  ],
+  executeInOrder: true,
+  executionInterval: '24h',
+  timezone: 'UTC+8',
+  effectivePeriod: 'long-term',
+  checkFrequency: '1h',
+  basicInfo: {
+    ruleName: '',
+    description: '',
+    status: 'enabled',
+    currency: 'USD',
+  },
+});
+
+const metricOptions = [
+  { label: t('花费'), value: 'spend' },
+  { label: t('购物'), value: 'purchases' },
+  { label: t('单次购物费用'), value: 'cost-per-purchase' },
+  { label: t('展示数'), value: 'impressions' },
+  { label: t('出价'), value: 'bid' },
+  { label: t('广告花费回报目标'), value: 'roas' },
+];
+
+const operatorOptions = [
+  { label: '>', value: '>' },
+  { label: '<', value: '<' },
+  { label: '>=', value: '>=' },
+  { label: '<=', value: '<=' },
+  { label: '=', value: '=' },
+];
+
+const valueTypeOptions = [
+  { label: t('数值'), value: 'value' },
+  { label: t('日预算'), value: 'daily-budget' },
+];
+
+const currencyOptions = [
+  { label: 'USD', value: 'USD' },
+  { label: 'CNY', value: 'CNY' },
+];
+
+const selectTemplate = (templateId: string) => {
+  selectedTemplate.value = templateId;
+  if (templateId === 'direct') {
+    currentStep.value = 2;
+  } else {
+    // 根据模板预填充配置
+    currentStep.value = 2;
+  }
+};
+
+const addCondition = () => {
+  ruleConfig.value.metricConditions.push({
+    metric: 'spend',
+    date: null,
+    operator: '>',
+    valueType: 'value',
+    value: undefined,
+    currency: 'USD',
+  });
+};
+
+const removeCondition = (index: number) => {
+  ruleConfig.value.metricConditions.splice(index, 1);
+};
+
+const addAction = () => {
+  ruleConfig.value.actions.push({
+    type: 'send-email',
+    config: {},
+  });
+};
+
+const removeAction = (index: number) => {
+  ruleConfig.value.actions.splice(index, 1);
+};
+
+const updateAction = (index: number, action: any) => {
+  ruleConfig.value.actions[index] = action;
+};
+
+const handleConfirm = () => {
+  if (!agreedToDisclaimer.value) {
+    message.warning(t('请先阅读并同意免责声明'));
+    return;
+  }
+  if (!ruleConfig.value.basicInfo.ruleName) {
+    message.warning(t('请输入规则名称'));
+    return;
+  }
+  message.success(t('规则创建成功'));
+  router.back();
+};
+
+const handleSaveTemplate = () => {
+  message.success(t('模板保存成功'));
+};
+</script>
+
+<style lang="less" scoped>
+.create-rule-page {
+  padding: 24px;
+  background: #f0f2f5;
+  min-height: calc(100vh - 120px);
+
+  .step-content {
+    background: #fff;
+    padding: 24px;
+    border-radius: 4px;
+    margin-bottom: 16px;
+
+    .step-header {
+      margin-bottom: 24px;
+
+      .step-title {
+        font-size: 20px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+
+      .step-subtitle {
+        color: #666;
+      }
+    }
+
+    .monitoring-settings {
+      margin-bottom: 24px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid #e8e8e8;
+
+      .setting-item {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 16px;
+
+        label {
+          min-width: 80px;
+          font-weight: 500;
+        }
+      }
+    }
+
+    .rule-templates {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 16px;
+
+      .template-card {
+        padding: 24px;
+        border: 1px solid #e8e8e8;
+        border-radius: 4px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s;
+
+        &:hover {
+          border-color: #1890ff;
+          box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
+        }
+
+        .template-icon {
+          width: 64px;
+          height: 64px;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin: 0 auto 12px;
+          font-size: 32px;
+          color: #fff;
+        }
+
+        .template-title {
+          font-size: 16px;
+          font-weight: 500;
+          margin-bottom: 8px;
+        }
+
+        .template-desc {
+          font-size: 12px;
+          color: #666;
+          line-height: 1.5;
+        }
+      }
+    }
+
+    .rule-section {
+      margin-bottom: 24px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid #e8e8e8;
+
+      &:last-child {
+        border-bottom: none;
+      }
+
+      .section-title {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .filter-row {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+
+      .metric-filter {
+        .metric-title {
+          font-size: 14px;
+          font-weight: 500;
+          margin-bottom: 16px;
+          display: flex;
+          align-items: center;
+        }
+
+        .metric-condition {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 12px;
+
+          .condition-number {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #1890ff;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            flex-shrink: 0;
+          }
+        }
+      }
+
+      .action-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        margin-bottom: 12px;
+
+        .action-number {
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          background: #1890ff;
+          color: #fff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 12px;
+          flex-shrink: 0;
+          margin-top: 4px;
+        }
+      }
+
+      .frequency-setting {
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+      }
+
+      .check-time-setting {
+        .setting-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 16px;
+
+          label {
+            min-width: 100px;
+          }
+
+          .help-text {
+            font-size: 12px;
+            color: #999;
+            margin-left: 8px;
+          }
+        }
+      }
+    }
+  }
+
+  .footer-actions {
+    background: #fff;
+    padding: 16px 24px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+}
+</style>
+

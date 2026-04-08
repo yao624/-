@@ -1,0 +1,20 @@
+export default {
+  title: 'Filter',
+  moreFilters: 'More Filters',
+  reset: 'Reset',
+  selectPlaceholder: 'Please select',
+  inputPlaceholder: 'Please enter',
+  numberStartPlaceholder: 'Min',
+  numberEndPlaceholder: 'Max',
+  modal: {
+    title: 'Filter Settings',
+    notification: 'Checked filter conditions will be displayed on the interface after confirmation',
+    selectPlaceholder: 'Please select',
+    inputPlaceholder: 'Please enter',
+    numberStartPlaceholder: 'Min',
+    numberEndPlaceholder: 'Max',
+    saveAsTemplate: 'Save as template',
+    cancel: 'Cancel',
+    confirm: 'Confirm',
+  },
+};

@@ -1,0 +1,127 @@
+<template>
+  <div class="filter-section">
+    <generic-filter-section
+      ref="filterRef"
+      :fields="filterFields"
+      :default-visible-keys="defaultVisibleKeys"
+      :storage-key="storageKey"
+      :show-modal="false"
+      i18n-prefix="components.filter"
+      @search="handleSearch"
+    />
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, ref, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
+import GenericFilterSection from '@/components/filter-section';
+import type { FilterFieldConfig, FilterValue, FilterSectionInstance } from '@/components/filter-section';
+import { getUserOptions } from '@/api/user/options';
+
+const { t, locale } = useI18n();
+
+const isZh = computed(() => locale.value.startsWith('zh'));
+
+const filterRef = ref<FilterSectionInstance>();
+
+const emit = defineEmits<{
+  (e: 'search', params: {
+    channel?: string;
+    name?: string;
+    description?: string;
+    creator?: string;
+  }): void;
+}>();
+
+// localStorage key for persisting visible filters
+const storageKey = 'ad-template-filters';
+
+// 创建者选项
+const creatorOptions = ref<Array<{ label: string; value: string }>>([]);
+
+// 获取创建者列表
+const loadCreators = async () => {
+  try {
+    const response = await getUserOptions();
+    if (response.status && response.data) {
+      creatorOptions.value = response.data;
+    }
+  } catch (error) {
+    console.error('Failed to load creator options:', error);
+    // 使用默认值
+    creatorOptions.value = [
+      { label: 'admin', value: '1' },
+      { label: '张三', value: '2' },
+      { label: '李四', value: '3' },
+      { label: '王五', value: '4' },
+    ];
+  }
+};
+
+// 筛选字段配置
+const filterFields = computed<FilterFieldConfig[]>(() => [
+  {
+    key: 'channel',
+    label: isZh.value ? '渠道' : 'Channel',
+    type: 'select',
+    options: [
+      { label: 'Meta', value: 'Facebook Ads' },
+      { label: 'Google Ads', value: 'Google Ads' },
+      { label: 'TikTok Ads', value: 'TikTok Ads' },
+      { label: isZh.value ? '快手广告' : 'Kwai Ads', value: 'Kwai Ads' },
+    ],
+  },
+  {
+    key: 'name',
+    label: isZh.value ? '模板名称' : 'Template Name',
+    type: 'input',
+  },
+  {
+    key: 'description',
+    label: isZh.value ? '模板描述' : 'Description',
+    type: 'input',
+  },
+  {
+    key: 'creator',
+    label: isZh.value ? '创建者' : 'Created By',
+    type: 'select',
+    options: creatorOptions.value,
+  },
+]);
+
+// 默认显示所有字段
+const defaultVisibleKeys = computed(() => {
+  return filterFields.value.map(f => f.key);
+});
+
+const handleSearch = (filters: FilterValue) => {
+  emit('search', {
+    channel: filters.channel as string || undefined,
+    name: filters.name as string || undefined,
+    description: filters.description as string || undefined,
+    creator: filters.creator as string || undefined,
+  });
+};
+
+// 重置方法
+const reset = () => {
+  filterRef.value?.reset();
+};
+
+// 组件挂载时加载创建者列表
+onMounted(() => {
+  loadCreators();
+});
+
+// 暴露重置方法
+defineExpose({
+  reset,
+});
+</script>
+
+<style scoped lang="less">
+.filter-section {
+  margin-bottom: 16px;
+}
+</style>

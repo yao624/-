@@ -1,0 +1,61 @@
+/* NOTE: 此文件定义或引入的变量可以在全局使用；请勿在此直接写样式 */
+
+@white: #fff;
+@line-height-base: 1.5715;
+@ant-prefix: ant;
+@background-color-light: hsv(0, 0, 98%);
+@background-color-base: var(--background-color-base);
+
+@font-size-base: var(--font-size-base);
+@font-size-lg: var(--font-size-lg);
+
+@screen-lg: var(--screen-lg);
+@screen-md: var(--screen-md);
+@screen-sm: var(--screen-sm);
+@screen-xs: var(--screen-xs);
+@screen-xl: var(--screen-xl);
+
+@component-background: var(--component-background);
+@popover-bg: var(--popover-bg);
+@tag-default-bg: var(--tag-default-bg);
+
+@primary-color: var(--primary-color);
+@primary-1: var(--primary-1);
+@primary-6: var(--primary-6);
+@red-6: var(--red-6);
+@green-6: var(--green-6);
+@highlight-color: var(--highlight-color);
+
+@input-placeholder-color: var(--input-placeholder-color);
+@text-color: var(--text-color);
+@text-color-secondary: var(--text-color-secondary);
+@text-color-inverse: var(--text-color-inverse);
+
+@disabled-color: var(--disabled-color);
+@layout-sider-background: var(--layout-sider-background);
+@btn-primary-color: var(--btn-primary-color);
+
+@shadow-color: var(--shadow-color);
+@shadow-1-down: 0 -6px 16px 0 rgba(0, 0, 0, 0.08), 0 -3px 6px -4px rgba(0, 0, 0, 0.12),
+  0 -9px 28px 8px rgba(0, 0, 0, 0.05);
+@shadow-1-up: 0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12),
+  0 9px 28px 8px rgba(0, 0, 0, 0.05);
+
+@border-color-base: var(--border-color-base);
+@border-color-split: var(--border-color-split);
+@border-width-base: var(--border-width-base);
+@border-style-base: var(--border-style-base);
+@border-radius-base: var(--border-radius-base);
+
+@menu-dark-bg: var(--menu-dark-bg);
+@menu-dark-bg-85: var(--menu-dark-bg-85);
+@menu-dark-bg-65: var(--menu-dark-bg-65);
+
+@ease-in-out: var(--ease-in-out);
+
+@heading-color: var(--heading-color);
+@heading-3-size: var(--heading-3-size);
+
+@avatar-size-base: var(--avatar-size-base);
+@avatar-size-lg: var(--avatar-size-lg);
+@avatar-size-sm: var(--avatar-size-sm);

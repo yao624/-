@@ -1,0 +1,91 @@
+import request from '@/utils/request';
+
+// 自动优化模拟数据
+
+export async function getSummaryData() {
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  return {
+    sendNotification: 0,
+    sendNotificationHours: 0,
+    toggleAds: 0,
+    toggleAdsHours: 0,
+    modifyBid: 0,
+    modifyBidHours: 0,
+    modifyBudget: 0,
+    modifyBudgetHours: 0,
+    allActions: 0,
+    allActionsHours: 0,
+  };
+}
+
+export async function getRulesList(params: any) {
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  const page = params?.page || 1;
+  const pageSize = params?.pageSize || 20;
+
+  const allData = [
+    {
+      id: '1',
+      status: '启用',
+      ruleName: '广告组-广告止损',
+      channel: 'Meta',
+      monitoringObject: '广告组',
+      description: '当广告投放效果不好时,自动关停',
+      creator: 'Z',
+      lastExecuteTime: '-',
+      editTime: '2026-01-06 10:00:00',
+      auditStatus: '已审核',
+    },
+    {
+      id: '2',
+      status: '启用',
+      ruleName: '广告组-提价扩量',
+      channel: 'Meta',
+      monitoringObject: '广告组',
+      description: '当广告投放效果较好时,提高出价争取更多转化',
+      creator: 'Z',
+      lastExecuteTime: '2026-01-06 09:30:00',
+      editTime: '2026-01-06 09:00:00',
+      auditStatus: '已审核',
+    },
+    {
+      id: '3',
+      status: '暂停',
+      ruleName: '广告组-广告防盗刷',
+      channel: 'Meta',
+      monitoringObject: '广告组',
+      description: '自动关闭盗刷广告',
+      creator: 'Z',
+      lastExecuteTime: '2026-01-05 15:20:00',
+      editTime: '2026-01-05 15:00:00',
+      auditStatus: '已审核',
+    },
+  ];
+
+  const start = (page - 1) * pageSize;
+  const end = start + pageSize;
+
+  return {
+    data: allData.slice(start, end),
+    total: allData.length,
+  };
+}
+
+export async function getCreators() {
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  return [
+    { id: '1', name: 'Z' },
+    { id: '2', name: 'A' },
+    { id: '3', name: 'B' },
+  ];
+}
+
+export async function getRuleTemplates(monitoringObject: string) {
+  const res = await request.get('/rules/templates', {
+    params: { monitoringObject },
+  });
+
+  const data = Array.isArray(res) ? res : (res?.data ?? []);
+  return Array.isArray(data) ? data : [];
+}
+

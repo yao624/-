@@ -1,0 +1,62 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+class MetaAutoRule extends Model
+{
+    use HasFactory;
+
+    protected $fillable = [
+        'user_id',
+        'name',
+        'description',
+        'channel',
+        'monitoring_object',
+        'template_id',
+        'status',
+        'currency',
+        'timezone',
+        'effective_period',
+        'check_frequency',
+        'execution_interval',
+        'execute_in_order',
+        'audit_status',
+        'audit_reason',
+        'is_del',
+        'filters',
+        'metric_conditions',
+        'anti_fraud_config',
+        'actions',
+    ];
+
+    protected $casts = [
+        'filters' => 'array',
+        'metric_conditions' => 'array',
+        'anti_fraud_config' => 'array',
+        'actions' => 'array',
+        'status' => 'integer',
+        'audit_status' => 'integer',
+        'execute_in_order' => 'boolean',
+        'is_del' => 'boolean',
+    ];
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function template(): BelongsTo
+    {
+        return $this->belongsTo(MetaAutoRuleTemplate::class, 'template_id');
+    }
+
+    public function executionLogs(): HasMany
+    {
+        return $this->hasMany(MetaAutoRuleExecutionLog::class, 'rule_id');
+    }
+}

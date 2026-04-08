@@ -1,0 +1,680 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\FbAccount;
+use App\Models\Permission;
+use App\Models\Role;
+use App\Models\Tenant;
+use App\Models\User;
+use App\Services\TenantService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
+
+class UserController extends BaseController
+{
+    public function createUser(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'name' => 'required|max:50',
+                'email' => 'required|email|unique:users,email',
+                'password' => 'required|min:8|max:20',
+                'role_ids' => 'nullable|exists:meta_roles,id',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'validation error',
+                    'errors' => $validator->errors(),
+                ], 401);
+            }
+
+            $user = User::create([
+                'name' => $request->get('name'),
+                'email' => $request->get('email'),
+                'password' => Hash::make($request->get('password')),
+
+            ]);
+
+            if ($request->filled('role_ids')) {
+                $user->roles()->attach($request->get('role_ids'));
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => 'User created successfully',
+                'data' => $user->load('roles'),
+            ], 200);
+        } catch (\Throwable $th) {
+            Log::debug($th->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function updateUser(Request $request, $id)
+    {
+        try {
+            $user = User::find($id);
+
+            if (!$user) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'User not found',
+                ], 404);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'name' => 'nullable|max:50',
+                'email' => 'nullable|email|unique:users,email,' . $id,
+                'password' => 'nullable|min:8|max:20',
+                'role_ids' => 'nullable|array',
+                'role_ids.*' => 'exists:meta_roles,id',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'validation error',
+                    'errors' => $validator->errors(),
+                ], 401);
+            }
+
+            if ($request->has('name')) {
+                $user->name = $request->get('name');
+            }
+            if ($request->has('is_super')) {
+                $user->is_super = $request->get('is_super');
+            }
+            if ($request->has('email')) {
+                $user->email = $request->get('email');
+            }
+
+            if ($request->filled('password')) {
+                $user->password = Hash::make($request->get('password'));
+            }
+
+            $user->save();
+
+            if ($request->has('role_ids')) {
+                $roleIds = $user->is_super ? [] : $request->get('role_ids');
+                $user->roles()->sync($roleIds);
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => 'User updated successfully',
+                'data' => $user->load('roles'),
+            ]);
+        } catch (\Throwable $th) {
+            Log::debug($th->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+
+    /**
+     * 备份：原登录逻辑（依赖 tenants + 动态租户库连接）。
+     * 建议仅用于排查/迁移期间。
+     */
+    public function loginWithTenant(Request $request)
+    {
+        try {
+            // 验证请求参数：支持 email 或 username
+            $validateUser = Validator::make($request->all(),
+                [
+                    'email' => 'required_without:username|email',
+                    'username' => 'required_without:email',
+                    'password' => 'required'
+                ]);
+
+            if ($validateUser->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'validation error',
+                    'errors' => $validateUser->errors()
+                ], 401);
+            }
+
+            // 获取登录标识（优先使用 email）
+            $loginIdentifier = $request->input('email') ?? $request->input('username');
+            $password = $request->input('password');
+
+            // 步骤1：从主数据库查询租户信息（根据 email）
+            // 注意：如果使用 username 登录，需要先找到对应的 email
+            $tenant = null;
+            if ($request->has('email')) {
+                $tenant = Tenant::findByEmail($request->input('email'));
+            } else {
+                // 如果使用 username 登录，需要先查询主库中是否有对应的 email
+                // 这里假设 username 就是 email，或者需要其他方式查找
+                // 暂时尝试将 username 作为 email 查找
+                $tenant = Tenant::findByEmail($request->input('username'));
+            }
+
+            if (!$tenant) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Tenant not found for this email.',
+                ], 401);
+            }
+
+            if ($tenant->status !== 'active') {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Tenant account is not active.',
+                ], 403);
+            }
+
+            // 步骤2：设置租户数据库连接
+            try {
+                TenantService::setTenantConnection($tenant->uuid);
+            } catch (\Exception $e) {
+                Log::error("Failed to connect to tenant database: " . $e->getMessage());
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Failed to connect to tenant database.',
+                ], 500);
+            }
+
+            // 步骤3：在租户数据库中验证用户
+            // 支持通过 email 或 name 登录
+            $user = null;
+            if ($request->has('email')) {
+                $user = User::where('email', $request->input('email'))->first();
+            } else {
+                $user = User::where('name', $request->input('username'))->first();
+            }
+
+            if (!$user || !Hash::check($password, $user->password)) {
+                // 恢复默认数据库连接
+                DB::setDefaultConnection(config('database.default'));
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Email/Username & Password does not match with our record.',
+                ], 401);
+            }
+
+            // 步骤4：生成 Token，并在 Token 中存储 tenant_uuid
+            $token = $user->createToken("API_TOKEN", [], now()->addDays(30));
+
+            // 将 tenant_uuid 存储到 Token
+            $token->accessToken->tenant_uuid = $tenant->uuid;
+            $token->accessToken->save();
+
+            // 恢复默认数据库连接（后续请求会通过中间件重新设置）
+            DB::setDefaultConnection(config('database.default'));
+
+            return response()->json([
+                'status' => true,
+                'message' => 'User Logged In Successfully',
+                'token' => $token->plainTextToken,
+                'tenant_uuid' => $tenant->uuid, // 临时返回，方便调试
+            ], 200);
+
+        } catch (\Throwable $th) {
+            Log::debug($th->getMessage());
+            Log::debug($th->getTraceAsString());
+
+            // 确保恢复默认数据库连接
+            try {
+                DB::setDefaultConnection(config('database.default'));
+            } catch (\Exception $e) {
+                // 忽略错误
+            }
+
+            return response()->json([
+                'status' => false,
+                'message' => 'server error: ' . $th->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * 新登录逻辑：不依赖 tenants，不切换租户库连接。
+     * 直接在当前默认数据库连接中校验用户并签发 Sanctum token。
+     */
+    public function login(Request $request)
+    {
+        try {
+            $validateUser = Validator::make($request->all(), [
+                'email' => 'required_without:username|email',
+                'username' => 'required_without:email',
+                'password' => 'required',
+            ]);
+
+            if ($validateUser->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'validation error',
+                    'errors' => $validateUser->errors()
+                ], 401);
+            }
+
+            $password = (string)$request->input('password');
+            $username = trim((string)$request->input('username', ''));
+
+            // 兼容前端只传 username 的场景：
+            // - email 字段存在：按 email 查
+            // - username 字段存在：也仅按 email 查（username 视为邮箱）
+            $user = null;
+            $user = User::where('email', $username)->first();
+
+            if (!$user || !Hash::check($password, $user->password)) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Email/Username & Password does not match with our record.',
+                ], 401);
+            }
+
+            $token = $user->createToken("API_TOKEN", [], now()->addDays(30));
+
+            // 与 tenant 中间件一致：若主库存在该邮箱对应的租户，写入 token（需表含 tenant_uuid 列，见 migration）
+            $tenant = null;
+            try {
+                $tenant = Tenant::findByEmail($user->email);
+                if ($tenant) {
+                    $token->accessToken->tenant_uuid = $tenant->uuid;
+                    $token->accessToken->save();
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Login: tenant_uuid not persisted: ' . $e->getMessage());
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => 'User Logged In Successfully',
+                'token' => $token->plainTextToken,
+                'tenant_uuid' => $tenant?->uuid,
+            ], 200);
+        } catch (\Throwable $th) {
+            Log::debug($th->getMessage());
+            Log::debug($th->getTraceAsString());
+
+            return response()->json([
+                'status' => false,
+                'message' => 'server error: ' . $th->getMessage()
+            ], 500);
+        }
+    }
+
+    public function logout()
+    {
+        try {
+            auth()->user()->currentAccessToken()->delete();
+        } catch (\Throwable $th) {
+        }
+        return response()->json();
+    }
+
+    /**
+     * 备份：原信息接口（保留给 tenant 中间件链路使用）。
+     */
+    public function infoWithTenant(Request $request)
+    {
+        try {
+            Log::info("info");
+            $id = Auth::id();
+            Log::debug("auth id: {$id}");
+            $userInfo = User::find(Auth::id());
+            $userInfo['role'] = $userInfo->role_info;
+            return response()->json([
+                'status' => true,
+                'data' => $userInfo
+            ]);
+        } catch (\Throwable $th) {
+            Log::debug($th->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => $th->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * 新信息接口：不依赖 tenant 中间件。
+     */
+    public function info(Request $request)
+    {
+        try {
+            Log::info("info_no_tenant");
+            $id = Auth::id();
+            Log::debug("auth id: {$id}");
+
+            $userInfo = User::with('roles.permissions')->find($id);
+
+            if (!$userInfo) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'User not found',
+                ], 404);
+            }
+
+            // 获取用户所有角色
+            $roles = $userInfo->roles;
+
+            // 合并所有角色的权限，按资源分组
+            $permissions = [];
+            foreach ($roles as $role) {
+                foreach ($role->permissions as $permission) {
+
+                    $resource = $permission->name;
+                    $action = $permission->slug;
+
+                    if (!isset($permissions[$resource])) {
+                        $permissions[$resource] = [
+                            'id' => $permission->id,
+                            'name' => $resource,
+                            'actions' => [],
+                        ];
+                    }
+                    if ($action !== null && !in_array($action, $permissions[$resource]['actions'])) {
+                        $permissions[$resource]['actions'][] = $action;
+                    }
+                }
+            }
+
+            // 构建角色信息
+            $roleInfos = $roles->map(function ($role) {
+                return [
+                    'id' => $role->id,
+                    'name' => $role->name,
+                    'describe' => $role->description ?? $role->name,
+                ];
+            })->values()->all();
+
+            $userInfo['roles'] = $roleInfos;
+            $userInfo['permissions'] = array_values($permissions);
+
+            return response()->json([
+                'status' => true,
+                'data' => $userInfo
+            ]);
+        } catch (\Throwable $th) {
+            Log::debug($th->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => $th->getMessage()
+            ], 500);
+        }
+    }
+
+    public function change_password(Request $request)
+    {
+        Log::debug("local: {$this->language}");
+        $customMessages = [
+            'min' => '密码最少 8 位',
+            'max' => '密码最长 20 位',
+            'same' => '两次密码不同'
+        ];
+
+        $validator = Validator::make($request->all(), [
+            'old_password' => 'required',
+            'new_password' => 'required|min:8|max:20',
+            'new_password2' => 'required|min:8|max:20|same:new_password'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => $validator->errors()
+            ], 400);
+        }
+
+        $user = Auth::user();
+        $old_password = $request->all()['old_password'];
+        $new_password = $request->all()['new_password'];
+        #Match The Old Password
+        if (!Hash::check($old_password, $user->password)) {
+            return response()->json([
+                'status' => false,
+                'message' => '原始密码不正确'
+            ], 400);
+        }
+
+        Log::info("new password:" . $new_password);
+
+        $user->forceFill([
+            'password' => Hash::make($new_password)
+        ]);
+        $user->currentAccessToken()->delete();
+        $user->save();
+
+        return response()->json();
+    }
+
+    public function health(Request $request)
+    {
+        Log::debug("lang: {$this->language}");
+        $datetime = Carbon::now()->toDateTimeString();
+        return response()->json([
+            'status' => trans('message.healthy', [], $this->language),
+            'datetime' => $datetime
+        ]);
+    }
+
+
+    public function list(Request $request)
+    {
+        try {
+            $pageSize = $request->get('pageSize', 10);
+            $pageNo = $request->get('pageNo', 1);
+
+            $query = User::with('roles');
+
+            if ($request->has('name') && $request->get('name')) {
+                $query->where('name', 'like', '%' . $request->get('name') . '%');
+            }
+
+            if ($request->has('email') && $request->get('email')) {
+                $query->where('email', 'like', '%' . $request->get('email') . '%');
+            }
+
+            if ($request->has('status') && $request->get('status') !== '') {
+                $query->where('status', $request->get('status'));
+            }
+
+            $query->orderBy('id', 'desc');
+
+            $users = $query->paginate($pageSize, ['*'], 'page', $pageNo);
+
+            return response()->json([
+                'status' => true,
+                'data' => $users->items(),
+                'pageSize' => $users->perPage(),
+                'pageNo' => $users->currentPage(),
+                'totalPage' => $users->lastPage(),
+                'totalCount' => $users->total(),
+            ]);
+        } catch (\Throwable $th) {
+            Log::debug($th->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function batchDelete(Request $request)
+    {
+        $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'string'
+        ]);
+        $ids = $request->get('ids');
+        $count = User::query()->whereIn('id', $ids)->delete();
+
+        return response()->json([
+            'message' => 'Deleted successful',
+            'success' => true,
+            'data' => "{$count}"
+        ]);
+    }
+
+
+    public function token(Request $request, $id)
+    {
+        //检查用户是否存在并验证密码
+        $user = User::where('id', $id)->first();
+
+        if (!$user) {
+            throw ValidationException::withMessages([
+                'user' => ["The user doesn't exist."],
+            ]);
+        }
+
+        //生成并返回新的 API token
+        return response()->json([
+            'data' => $user->createToken("API_TOKEN")->plainTextToken,
+            'success' => true,
+        ]);
+    }
+
+    public function ownedFbAccounts()
+    {
+        return $this->hasMany(FbAccount::class, 'owner_id');
+    }
+
+    public function accessibleFbAccounts()
+    {
+        return $this->belongsToMany(FbAccount::class, 'fb_account_user');
+    }
+
+    public function currentUserNav(Request $request)
+    {
+        try {
+            $user = Auth::user();
+
+            // 超级管理员返回所有菜单权限
+            if ($user->is_super == 1) {
+                $permissions = Permission::where('type', 'menu')
+                    ->where('status', 1)
+                    ->orderBy('sort', 'asc')
+                    ->get();
+            } else {
+                // 获取用户所有权限ID
+                $permissionIds = [];
+                foreach ($user->roles as $role) {
+                    foreach ($role->permissions as $p) {
+                        $permissionIds[$p->id] = true;
+                    }
+                }
+
+
+                // 查询类型为menu的可用权限
+                $permissions = Permission::whereIn('id', array_keys($permissionIds))
+                    ->where('type', 'menu')
+                    ->where('status', 1)
+                    ->orderBy('sort', 'asc')
+                    ->get();
+            }
+
+            // 构建树形结构
+            $nav = $this->buildNavTree($permissions, 0);
+
+            return response()->json([
+                'status' => true,
+                'data' => $nav,
+            ]);
+        } catch (\Throwable $th) {
+            Log::debug($th->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * 获取用户选项列表（用于下拉框选择）
+     *
+     * @queryParam keyword string 搜索关键词（可选）
+     */
+    public function options(Request $request)
+    {
+        try {
+            $query = User::select('id', 'name', 'email');
+
+            // 搜索关键词
+            if ($request->has('keyword') && $request->get('keyword')) {
+                $keyword = $request->get('keyword');
+                $query->where(function ($q) use ($keyword) {
+                    $q->where('name', 'like', '%' . $keyword . '%')
+                        ->orWhere('email', 'like', '%' . $keyword . '%');
+                });
+            }
+
+            $users = $query->orderBy('name')
+                ->get();
+
+            return response()->json([
+                'status' => true,
+                'data' => $users->map(function ($user) {
+                    return [
+                        'label' => $user->name . ($user->email ? " ({$user->email})" : ''),
+                        'value' => $user->id,
+                        'name' => $user->name,
+                        'email' => $user->email,
+                    ];
+                })->toArray()
+            ]);
+        } catch (\Throwable $th) {
+            Log::debug($th->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    private function buildNavTree($permissions, $parentId)
+    {
+        $tree = [];
+        foreach ($permissions as $p) {
+            if ($p->pid == $parentId) {
+                $item = [
+                    'id' => $p->id,
+                    'parentId' => $p->pid,
+                    'name' => $p->name,
+                    'path' => $p->path,
+                    'redirect' => $p->redirect ?? '',
+                    'component' => $p->component ?? '',
+                ];
+
+                // 所有菜单都需要 meta
+                $item['meta'] = [
+                    'title' => $p->alias ?? '',
+                    'icon' => $p->icon ?? '',
+                    'hideChildrenInMenu' => (bool)($p->hide_children_in_menu ?? false)
+                ];
+
+                // 子菜单才有 hideInMenu 和 hideChildrenInMenu
+                if ($p->pid > 0) {
+                    $item['meta']['hideInMenu'] = (bool)($p->hide_in_menu ?? false);
+                    // $item['meta']['hideChildrenInMenu'] = (bool)($p->hide_children_in_menu ?? false);
+                }
+
+                $children = $this->buildNavTree($permissions, $p->id);
+                if (!empty($children)) {
+                    $item['children'] = $children;
+                }
+
+                $tree[] = $item;
+            }
+        }
+        return $tree;
+    }
+}

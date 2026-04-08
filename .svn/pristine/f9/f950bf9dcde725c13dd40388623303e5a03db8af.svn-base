@@ -1,0 +1,144 @@
+[2026-03-25 01:26:19] production.INFO: info_no_tenant  
+[2026-03-25 01:26:19] production.DEBUG: auth id: 1  
+[2026-03-25 01:26:20] production.ERROR: 404 occurred  
+[2026-03-25 02:13:35] production.INFO: info_no_tenant  
+[2026-03-25 02:13:35] production.DEBUG: auth id: 1  
+[2026-03-25 02:13:35] production.ERROR: 404 occurred  
+[2026-03-25 02:22:38] production.INFO: info_no_tenant  
+[2026-03-25 02:22:38] production.DEBUG: auth id: 1  
+[2026-03-25 02:22:38] production.ERROR: 404 occurred  
+[2026-03-25 02:31:43] production.INFO: info_no_tenant  
+[2026-03-25 02:31:43] production.DEBUG: auth id: 1  
+[2026-03-25 02:31:43] production.ERROR: 404 occurred  
+[2026-03-25 03:08:47] production.INFO: info_no_tenant  
+[2026-03-25 03:08:47] production.DEBUG: auth id: 1  
+[2026-03-25 03:08:47] production.ERROR: 404 occurred  
+[2026-03-25 03:08:48] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-25 03:08:48] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-25 03:08:48] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-25 03:08:48] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-25 03:08:48] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-25 03:08:48] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-25 03:10:42] production.INFO: info_no_tenant  
+[2026-03-25 03:10:42] production.DEBUG: auth id: 1  
+[2026-03-25 03:10:42] production.ERROR: 404 occurred  
+[2026-03-25 03:10:42] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-25 03:10:42] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-25 03:10:42] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-25 03:10:43] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-25 03:10:43] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-25 03:10:43] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-25 05:41:53] production.INFO: info_no_tenant  
+[2026-03-25 05:41:53] production.DEBUG: auth id: 1  
+[2026-03-25 05:41:54] production.ERROR: 404 occurred  
+[2026-03-25 05:41:54] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-25 05:41:54] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-25 05:41:54] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-25 05:41:54] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-25 05:41:54] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-25 05:41:54] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-25 05:53:51] production.INFO: info_no_tenant  
+[2026-03-25 05:53:51] production.DEBUG: auth id: 1  
+[2026-03-25 05:53:51] production.ERROR: 404 occurred  
+[2026-03-25 05:55:42] production.INFO: info_no_tenant  
+[2026-03-25 05:55:42] production.DEBUG: auth id: 1  
+[2026-03-25 05:55:43] production.ERROR: 404 occurred  
+[2026-03-25 06:09:50] production.INFO: info_no_tenant  
+[2026-03-25 06:09:50] production.DEBUG: auth id: 1  
+[2026-03-25 06:09:51] production.ERROR: 404 occurred  
+[2026-03-25 06:11:43] production.INFO: info_no_tenant  
+[2026-03-25 06:11:43] production.DEBUG: auth id: 1  
+[2026-03-25 06:11:43] production.ERROR: 404 occurred  
+[2026-03-25 06:14:49] production.INFO: info_no_tenant  
+[2026-03-25 06:14:49] production.DEBUG: auth id: 1  
+[2026-03-25 06:14:49] production.ERROR: 404 occurred  
+[2026-03-25 06:20:26] production.INFO: info_no_tenant  
+[2026-03-25 06:20:26] production.DEBUG: auth id: 1  
+[2026-03-25 06:20:26] production.ERROR: 404 occurred  
+[2026-03-25 06:52:25] production.INFO: info_no_tenant  
+[2026-03-25 06:52:25] production.DEBUG: auth id: 1  
+[2026-03-25 06:52:25] production.ERROR: 404 occurred  
+[2026-03-25 07:00:49] production.INFO: info_no_tenant  
+[2026-03-25 07:00:49] production.DEBUG: auth id: 1  
+[2026-03-25 07:00:49] production.ERROR: 404 occurred  
+[2026-03-25 07:57:30] production.INFO: info_no_tenant  
+[2026-03-25 07:57:30] production.DEBUG: auth id: 1  
+[2026-03-25 07:57:30] production.ERROR: 404 occurred  
+[2026-03-25 09:03:57] production.INFO: info_no_tenant  
+[2026-03-25 09:03:57] production.DEBUG: auth id: 1  
+[2026-03-25 09:03:57] production.ERROR: 404 occurred  
+[2026-03-25 09:05:42] production.INFO: info_no_tenant  
+[2026-03-25 09:05:42] production.DEBUG: auth id: 1  
+[2026-03-25 09:05:43] production.ERROR: 404 occurred  
+[2026-03-25 09:18:37] production.INFO: info_no_tenant  
+[2026-03-25 09:18:37] production.DEBUG: auth id: 1  
+[2026-03-25 09:18:37] production.ERROR: 404 occurred  
+[2026-03-25 12:13:23] production.INFO: info_no_tenant  
+[2026-03-25 12:13:23] production.DEBUG: auth id: 1  
+[2026-03-25 12:13:24] production.ERROR: 404 occurred  
+[2026-03-25 12:18:30] production.ERROR: __clone method called on non-object {"exception":"[object] (Error(code: 0): __clone method called on non-object at D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\app\\Http\\Controllers\\XmpFoldersController.php:319)
+[stacktrace]
+#0 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Controller.php(54): App\\Http\\Controllers\\XmpFoldersController->move(Object(Illuminate\\Http\\Request), '4')
+#1 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\ControllerDispatcher.php(43): Illuminate\\Routing\\Controller->callAction('move', Array)
+#2 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Route.php(259): Illuminate\\Routing\\ControllerDispatcher->dispatch(Object(Illuminate\\Routing\\Route), Object(App\\Http\\Controllers\\XmpFoldersController), 'move')
+#3 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Route.php(205): Illuminate\\Routing\\Route->runController()
+#4 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(806): Illuminate\\Routing\\Route->run()
+#5 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(144): Illuminate\\Routing\\Router->Illuminate\\Routing\\{closure}(Object(Illuminate\\Http\\Request))
+#6 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\app\\Http\\Middleware\\RequestLogger.php(36): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#7 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): App\\Http\\Middleware\\RequestLogger->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#8 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Middleware\\SubstituteBindings.php(50): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#9 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): Illuminate\\Routing\\Middleware\\SubstituteBindings->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#10 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Middleware\\ThrottleRequests.php(159): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#11 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Middleware\\ThrottleRequests.php(125): Illuminate\\Routing\\Middleware\\ThrottleRequests->handleRequest(Object(Illuminate\\Http\\Request), Object(Closure), Array)
+#12 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Middleware\\ThrottleRequests.php(87): Illuminate\\Routing\\Middleware\\ThrottleRequests->handleRequestUsingNamedLimiter(Object(Illuminate\\Http\\Request), Object(Closure), 'api', Object(Closure))
+#13 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): Illuminate\\Routing\\Middleware\\ThrottleRequests->handle(Object(Illuminate\\Http\\Request), Object(Closure), 'api')
+#14 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\sanctum\\src\\Http\\Middleware\\EnsureFrontendRequestsAreStateful.php(25): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#15 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(144): Laravel\\Sanctum\\Http\\Middleware\\EnsureFrontendRequestsAreStateful->Laravel\\Sanctum\\Http\\Middleware\\{closure}(Object(Illuminate\\Http\\Request))
+#16 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(119): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#17 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\sanctum\\src\\Http\\Middleware\\EnsureFrontendRequestsAreStateful.php(24): Illuminate\\Pipeline\\Pipeline->then(Object(Closure))
+#18 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): Laravel\\Sanctum\\Http\\Middleware\\EnsureFrontendRequestsAreStateful->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#19 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(119): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#20 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(805): Illuminate\\Pipeline\\Pipeline->then(Object(Closure))
+#21 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(784): Illuminate\\Routing\\Router->runRouteWithinStack(Object(Illuminate\\Routing\\Route), Object(Illuminate\\Http\\Request))
+#22 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(748): Illuminate\\Routing\\Router->runRoute(Object(Illuminate\\Http\\Request), Object(Illuminate\\Routing\\Route))
+#23 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(737): Illuminate\\Routing\\Router->dispatchToRoute(Object(Illuminate\\Http\\Request))
+#24 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Kernel.php(200): Illuminate\\Routing\\Router->dispatch(Object(Illuminate\\Http\\Request))
+#25 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(144): Illuminate\\Foundation\\Http\\Kernel->Illuminate\\Foundation\\Http\\{closure}(Object(Illuminate\\Http\\Request))
+#26 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\app\\Http\\Middleware\\ForceJsonResponse.php(21): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#27 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): App\\Http\\Middleware\\ForceJsonResponse->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#28 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#29 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Middleware\\ConvertEmptyStringsToNull.php(31): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#30 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): Illuminate\\Foundation\\Http\\Middleware\\ConvertEmptyStringsToNull->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#31 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#32 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Middleware\\TrimStrings.php(40): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#33 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): Illuminate\\Foundation\\Http\\Middleware\\TrimStrings->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#34 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Middleware\\ValidatePostSize.php(27): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#35 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): Illuminate\\Foundation\\Http\\Middleware\\ValidatePostSize->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#36 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Middleware\\PreventRequestsDuringMaintenance.php(99): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#37 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): Illuminate\\Foundation\\Http\\Middleware\\PreventRequestsDuringMaintenance->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#38 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Http\\Middleware\\HandleCors.php(62): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#39 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): Illuminate\\Http\\Middleware\\HandleCors->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#40 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Http\\Middleware\\TrustProxies.php(39): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#41 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(183): Illuminate\\Http\\Middleware\\TrustProxies->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#42 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(119): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#43 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Kernel.php(175): Illuminate\\Pipeline\\Pipeline->then(Object(Closure))
+#44 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Kernel.php(144): Illuminate\\Foundation\\Http\\Kernel->sendRequestThroughRouter(Object(Illuminate\\Http\\Request))
+#45 D:\\work\\phpstudy_pro\\WWW\\fireflyads\\ads\\backend-1115\\public\\index.php(51): Illuminate\\Foundation\\Http\\Kernel->handle(Object(Illuminate\\Http\\Request))
+#46 {main}
+"} 
+[2026-03-25 12:20:41] production.INFO: info_no_tenant  
+[2026-03-25 12:20:41] production.DEBUG: auth id: 1  
+[2026-03-25 12:20:41] production.ERROR: 404 occurred  
+[2026-03-25 12:30:12] production.INFO: info_no_tenant  
+[2026-03-25 12:30:12] production.DEBUG: auth id: 1  
+[2026-03-25 12:30:12] production.ERROR: 404 occurred  
+[2026-03-25 12:37:18] production.ERROR: 404 occurred  
+[2026-03-25 12:37:28] production.INFO: info_no_tenant  
+[2026-03-25 12:37:28] production.DEBUG: auth id: 1  
+[2026-03-25 12:37:29] production.ERROR: 404 occurred  
+[2026-03-25 12:37:29] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-25 12:37:29] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-25 12:37:29] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-25 12:37:29] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-25 12:37:29] production.WARNING: Tenant UUID not found in token for user: 1  
+[2026-03-25 12:37:29] production.WARNING: Tenant UUID not found in token for user: 1  

@@ -1,0 +1,44 @@
+// 广告账户管理页面类型定义
+
+export type AuthorizationStatus = 'authorized' | 'expired' | 'pending';
+export type AccountStatus = 'active' | 'disabled' | 'pending';
+export type FilterTab = 'users' | 'adAccounts';
+export type PlatformType = 'meta' | 'google' | 'tiktok';
+
+export interface Platform {
+  key: PlatformType;
+  name: string;
+  nameEn: string;
+  icon: string;
+  color: string;
+}
+
+export interface AdAccount {
+  id: string;                      // 广告账户ID
+  name: string;                    // 广告账户名称
+  bm?: string;                     // Business Manager (FB) / MCC (Google)
+  balance?: string;                // 余额
+  personalAccountCount: number;    // 个人号数量
+  personalAccounts: string[];      // 个人号列表
+  entity?: string;                 // 主体 (TikTok)
+  authorizationStatus: AuthorizationStatus;
+  accountStatus: AccountStatus;
+  owner: string;                   // 所属人员
+  assistants: string[];            // 协助人员
+  authorizationTime: string;       // 授权时间
+  accountNote?: string;            // 账号备注名
+  platform?: PlatformType;         // 平台类型
+}
+
+export interface AdAccountListParams {
+  page?: number;
+  pageSize?: number;
+  tab?: FilterTab;
+  keyword?: string;
+  platform?: PlatformType;
+}
+
+export interface AdAccountListResponse {
+  data: AdAccount[];
+  total: number;
+}

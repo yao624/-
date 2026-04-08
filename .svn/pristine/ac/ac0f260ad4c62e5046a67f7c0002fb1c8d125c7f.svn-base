@@ -1,0 +1,30 @@
+export type PlatformType = 'meta' | 'google' | 'tiktok' | 'kwai';
+
+export type MaterialShape = 'square' | 'landscape' | 'portrait' | 'unknown';
+
+export type MaterialFormat = 'mp4' | 'jpg' | 'png' | 'gif' | 'webp';
+
+export type MaterialSource = 'upload' | 'sync' | 'import';
+
+export interface Material {
+  id: string;                    // 素材Id
+  name: string;                  // 名称
+  platform: PlatformType;        // 渠道
+  usedAccounts: string[];        // 使用账户
+  ownerAccount: string;          // 所属账户
+  size: string;                  // 尺寸
+  duration: string;              // 时长
+  shape: MaterialShape;          // 形状
+  format: MaterialFormat;        // 格式
+  source: MaterialSource;        // 来源
+  remark: string;                // 素材备注
+  createdAt: string;             // 创建时间
+  rejectionInfo: string | null;  // 拒审信息
+  thumbnail?: string;            // 缩略图
+}
+
+export interface MaterialFilter {
+  platform?: PlatformType;
+  materialType?: string;
+  createTimeRange?: [string, string] | null;
+}

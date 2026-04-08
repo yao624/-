@@ -1,0 +1,26 @@
+import request from '@/utils/request';
+
+export async function queryTagsApi(params?: { [key: string]: any }) {
+  return request.get('/tags', {
+    params,
+  });
+}
+export async function addTagsOneApi(params: Record<string, any>) {
+  return request('/tags', {
+    method: 'POST',
+    data: params,
+  });
+}
+export async function deleteTagsOneApi(id?: string) {
+  return request('/tags/' + id, {
+    method: 'DELETE',
+    data: {},
+  });
+}
+
+export async function manageTags(modelType: string, params) {
+  return request('/tags/' + modelType, {
+    method: 'post',
+    data: params,
+  });
+}

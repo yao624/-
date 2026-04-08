@@ -1,0 +1,84 @@
+// 模拟数据
+
+// 获取文件夹列表
+export async function getFolders() {
+  await new Promise((resolve) => setTimeout(resolve, 200));
+
+  return [
+    {
+      id: 1,
+      name: '系统文件夹',
+      count: 3,
+      canDelete: false,
+      isExpanded: false,
+      childrenLoaded: true,
+      children: [],
+    },
+    {
+      id: 2,
+      name: '业务文件夹',
+      count: 2,
+      canDelete: true,
+      isExpanded: false,
+      childrenLoaded: true,
+      children: [],
+    },
+    {
+      id: 3,
+      name: '自定义文件夹',
+      count: 1,
+      canDelete: true,
+      isExpanded: false,
+      childrenLoaded: true,
+      children: [],
+    },
+  ];
+}
+
+// 获取标签列表
+export async function getTags() {
+  await new Promise((resolve) => setTimeout(resolve, 200));
+
+  return [
+    {
+      id: 1,
+      name: '短视频',
+      remark: '用于短视频素材',
+      parent_id: 1,
+      parent_name: '系统标签',
+      options: [
+        { id: 1, name: '竖版短视频', description: '9:16 竖屏视频素材', image: 'https://via.placeholder.com/100x100/1890ff/fff?text=video1', remark1: '时长15-60秒', remark2: '优先高清' },
+        { id: 2, name: '横版短视频', description: '16:9 横屏视频素材', image: 'https://via.placeholder.com/100x100/52c41a/fff?text=video2', remark1: '时长10-30秒', remark2: '横版构图' },
+        { id: 3, name: '方形短视频', description: '1:1 正方形视频素材', image: 'https://via.placeholder.com/100x100/fa8c16/fff?text=video3', remark1: '适用于信息流', remark2: '需配字幕' },
+      ],
+    },
+    { id: 2, name: '图片广告', remark: '图片类广告素材', parent_id: 1, parent_name: '系统标签', options: [] },
+    { id: 3, name: '轮播图', remark: '轮播图素材', parent_id: 1, parent_name: '系统标签', options: [] },
+    { id: 4, name: '信息流', remark: '信息流广告', parent_id: 2, parent_name: '业务标签', options: [] },
+    { id: 5, name: '品牌广告', remark: '品牌类广告', parent_id: 2, parent_name: '业务标签', options: [] },
+    { id: 6, name: '促销标签', remark: '促销活动标签', parent_id: 3, parent_name: '自定义标签', options: [] },
+  ];
+}
+
+// 获取子标签选项列表
+export async function getSubTagOptions(level: number) {
+  await new Promise((resolve) => setTimeout(resolve, 200));
+
+  // 不同层级返回不同数据
+  if (level === 1) {
+    return [
+      { id: 1, name: '竖版短视频', description: '9:16 竖屏视频素材', image: 'https://via.placeholder.com/100x100/1890ff/fff?text=video1', remark1: '时长15-60秒', remark2: '优先高清' },
+      { id: 2, name: '横版短视频', description: '16:9 横屏视频素材', image: 'https://via.placeholder.com/100x100/52c41a/fff?text=video2', remark1: '时长10-30秒', remark2: '横版构图' },
+      { id: 3, name: '方形短视频', description: '1:1 正方形视频素材', image: 'https://via.placeholder.com/100x100/fa8c16/fff?text=video3', remark1: '适用于信息流', remark2: '需配字幕' },
+    ];
+  } else if (level === 2) {
+    return [
+      { id: 4, name: '高清竖版', description: '1080P 竖屏视频', image: 'https://via.placeholder.com/100x100/1890ff/fff?text=hd1', remark1: '1080P', remark2: '竖屏' },
+      { id: 5, name: '标清竖版', description: '720P 竖屏视频', image: 'https://via.placeholder.com/100x100/52c41a/fff?text=sd1', remark1: '720P', remark2: '竖屏' },
+    ];
+  } else {
+    return [
+      { id: 6, name: '超清版本', description: '4K 视频素材', image: 'https://via.placeholder.com/100x100/fa8c16/fff?text=4k', remark1: '4K', remark2: '顶级' },
+    ];
+  }
+}

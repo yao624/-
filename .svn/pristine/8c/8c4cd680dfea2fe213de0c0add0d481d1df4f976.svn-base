@@ -1,0 +1,136 @@
+import router from '@/router';
+import localStorage from '@/utils/local-storage';
+import { allowList, loginRoutePath, defaultRoutePath } from '../define-meta';
+// eslint-disable-next-line
+import { useUserStore } from '@/store/user';
+import { STORAGE_TOKEN_KEY } from '@/store/app';
+import initProgressBar from './router-progress-bar';
+import { filterMenu } from '@/utils/menu-util';
+import { routes } from '@/router';
+import type { RouteRecordRaw } from 'vue-router';
+
+router.beforeEach(async to => {
+  // 开发模式：可以通过环境变量或直接设置来禁用登录验证
+  // 仅当 .env 中 VITE_DISABLE_AUTH=true 时跳过登录（开发调试用）；默认必须走真实登录与 token
+  const DISABLE_AUTH = import.meta.env.VITE_DISABLE_AUTH === 'true';
+  
+  if (DISABLE_AUTH) {
+    // 开发模式：自动登录，跳过所有验证
+    const userStore = useUserStore();
+    
+    // 如果访问登录页，自动跳转到首页
+    if (to.path === loginRoutePath || to.name === 'login') {
+      return {
+        path: defaultRoutePath,
+        replace: true,
+      };
+    }
+    
+    // 设置一个默认token（如果还没有）
+    const userToken = localStorage.get(STORAGE_TOKEN_KEY);
+    if (!userToken) {
+      userStore.SET_TOKEN('dev-token-' + Date.now());
+    }
+    
+    // 如果路由还未初始化，同步初始化后再放行（否则 /workplace 等会匹配不到，出现空白页）
+    if (!userStore.allowRouters || userStore.allowRouters.length === 0) {
+      try {
+        userStore.SET_INFO({
+          userid: 'admin',
+          name: '管理员',
+          role: {
+            id: '1',
+            name: 'admin',
+            describe: '管理员',
+            permissions: [
+              { id: '1', name: 'ads.query' },
+              { id: '2', name: 'ads.add' },
+              { id: '3', name: 'ads.update' },
+              { id: '4', name: 'ads.delete' },
+              { id: '5', name: 'ads.preview' },
+              // 资源/主页管理等菜单需要的权限（否则菜单会被过滤掉）
+              { id: '6', name: 'pages' },
+              { id: '7', name: 'links' },
+              { id: '8', name: 'copywritings' },
+              { id: '9', name: 'materials' },
+            ],
+          },
+        });
+        const allRoutes = filterMenu(routes);
+        userStore.SET_ROUTERS(allRoutes as RouteRecordRaw[]);
+        const existingRoute = router.getRoutes().find(r => r.name === routes[0]?.name);
+        if (!existingRoute && routes[0]) {
+          const {
+            children: _,
+            ...mainRoute
+          } = routes[0];
+          router.addRoute({
+            ...mainRoute,
+            children: allRoutes,
+          } as RouteRecordRaw);
+          // 路由刚添加，需要 replace 到当前目标才能正确渲染
+          return { path: to.fullPath, replace: true };
+        }
+      } catch (error) {
+        console.error('路由初始化失败:', error);
+      }
+    }
+
+    return true;
+  }
+  
+  const userToken = localStorage.get(STORAGE_TOKEN_KEY);
+  const userStore = useUserStore();
+  // token check
+  if (!userToken) {
+    // 白名单路由列表检查
+    if (allowList.includes(to.name as string)) {
+      return true;
+    }
+    if (to.fullPath !== loginRoutePath) {
+      // 未登录，进入到登录页
+      return {
+        path: loginRoutePath,
+        replace: true,
+        // 登录后跳转到之前页面，如不需要，直接删除 query 即可
+        query: { redirect: encodeURIComponent(to.fullPath) },
+      };
+    }
+    return to;
+  }
+
+  // 已完成一次用户信息初始化后，直接放行，避免重复拉取 /user/info
+  const hasLoadedUserInfo = !!(userStore.info && Object.keys(userStore.info).length > 0);
+  if (hasLoadedUserInfo || (userStore.allowRouters && userStore.allowRouters.length > 0)) {
+    return true;
+  } else {
+    // 从服务端获取用户的 [基础信息] 和 [权限信息]
+    // 并构建动态路由和菜单
+    // 问题1：为什么这么做：
+    //   - 一般开发需要权限的系统时，都会有 登录 步骤
+    //   - SPA 单页应用每次刷新时，内存中的数据都会被清空，如果每次刷新，执行一次 登录 步骤则非常不合理。
+    //   - 所以设计为，一次登录，获得用户的授权 access token，并持久化到 localstorage，之后用户每次打开
+    //     页面或者刷新页面时，都利用这个 token 去向后端索要用户的真实信息
+    // 问题2：为什么不把用户信息也存到 localstorage 来少一次请求？
+    //   - 用户信息存在 localstorage 后，使用者打开控制台，直接修改其中的权限信息，如：
+    //     我的用户角色是 'user' ，这时改成 'admin'。刷新页面时就能看到 'admin' 才能看到的信息。所以该方案不可行！
+    // 问题3：为什么不每次都调用登录？
+    //   - 如果每次刷新都进行登录认证，那么用户的账户以及密码则不可保障安全
+    //   - 要登录必然要账户密码或相同功能的认证信息代替
+    // 问题4：access token 不是也不能保障安全吗？
+    //   - 用户在此进行登录，代表认同该设备。保存用户的 token 可以进行快速身份认证，
+    //     并且当用户认为 token 发生泄露或不安全时，可以根据相关服务端 token 设计规则，让 token 失效。
+    const info = await userStore.GET_INFO();
+    // 使用当前用户的 权限信息 生成 对应权限的路由表
+    // const allowRouters = await userStore.GENERATE_ROUTES(info);
+    // const allowRouters = (await userStore.GENERATE_ROUTES(info)) as RouteRecordRaw[];
+    const allowRouters = (await userStore.GENERATE_ROUTES_DYNAMIC()) as RouteRecordRaw[];
+    // 仅当真正有可注入路由时才 replace，避免 [] 导致重复导航循环
+    if (allowRouters && allowRouters.length > 0) {
+      return { ...to, replace: true };
+    }
+    return true;
+  }
+});
+
+initProgressBar(router);

@@ -1,0 +1,11 @@
+export default {
+  submit: 'Submit',
+  'submit.ok': 'Submitted',
+  'submit.error': 'Submit Failed',
+  'confirm.ok': 'Yes',
+  'confirm.cancel': 'No',
+
+  'atavar.meun.changepwd': 'Change Password',
+  'atavar.meun.logout': 'Logout',
+  'global.setting.title': 'Settings',
+};

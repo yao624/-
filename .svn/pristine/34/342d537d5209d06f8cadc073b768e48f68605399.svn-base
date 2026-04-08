@@ -1,0 +1,268 @@
+<template>
+  <div class="action-config">
+    <a-select
+      v-model:value="localAction.type"
+      style="width: 150px"
+      @change="handleTypeChange"
+    >
+      <a-select-option value="send-email">{{ t('发送邮件') }}</a-select-option>
+      <a-select-option value="status">{{ t('状态') }}</a-select-option>
+      <a-select-option value="bid">{{ t('出价') }}</a-select-option>
+      <a-select-option value="budget">{{ t('日预算') }}</a-select-option>
+      <a-select-option value="edit-tag">{{ t('编辑标签') }}</a-select-option>
+    </a-select>
+
+    <!-- 发送邮件配置 -->
+    <template v-if="localAction.type === 'send-email'">
+      <div class="action-content">
+        <div class="email-recipients">
+          <a-tag
+            v-for="(email, index) in localAction.config.recipients"
+            :key="index"
+            closable
+            @close="removeRecipient(index)"
+          >
+            {{ email }}
+          </a-tag>
+          <a-input
+            v-if="showEmailInput"
+            v-model:value="newEmail"
+            placeholder="输入邮箱"
+            style="width: 200px"
+            @press-enter="addRecipient"
+            @blur="addRecipient"
+          />
+          <a-button v-else type="link" @click="showEmailInput = true">
+            {{ t('添加') }}
+          </a-button>
+        </div>
+        <a-input
+          v-model:value="localAction.config.subject"
+          :placeholder="t('邮件主题')"
+          style="width: 300px; margin-top: 8px"
+        />
+        <a-textarea
+          v-model:value="localAction.config.body"
+          :placeholder="t('邮件正文')"
+          :rows="3"
+          style="width: 500px; margin-top: 8px"
+        />
+      </div>
+    </template>
+
+    <!-- 状态配置 -->
+    <template v-if="localAction.type === 'status'">
+      <div class="action-content">
+        <span>{{ t('设置为') }}</span>
+        <a-select v-model:value="localAction.config.status" style="width: 120px; margin-left: 8px">
+          <a-select-option value="pause">{{ t('暂停') }}</a-select-option>
+          <a-select-option value="enable">{{ t('开启') }}</a-select-option>
+        </a-select>
+      </div>
+    </template>
+
+    <!-- 出价配置 -->
+    <template v-if="localAction.type === 'bid'">
+      <div class="action-content">
+        <a-select v-model:value="localAction.config.bidAction" style="width: 120px">
+          <a-select-option value="increase">{{ t('增加数值') }}</a-select-option>
+          <a-select-option value="decrease">{{ t('减少数值') }}</a-select-option>
+        </a-select>
+        <a-input-number
+          v-model:value="localAction.config.bidValue"
+          :placeholder="t('数值')"
+          style="width: 120px; margin-left: 8px"
+        />
+        <span v-if="localAction.config.bidAction === 'increase'" style="margin: 0 8px">
+          {{ t(', 且新最高不超过') }}
+        </span>
+        <span v-else style="margin: 0 8px">
+          {{ t(', 且新最低不小于') }}
+        </span>
+        <a-input-number
+          v-model:value="localAction.config.bidLimit"
+          style="width: 120px"
+        />
+        <span style="margin-left: 8px">USD</span>
+      </div>
+    </template>
+
+    <!-- 预算配置 -->
+    <template v-if="localAction.type === 'budget'">
+      <div class="action-content">
+        <a-select v-model:value="localAction.config.budgetAction" style="width: 120px">
+          <a-select-option value="increase">{{ t('增加数值') }}</a-select-option>
+          <a-select-option value="decrease">{{ t('减少数值') }}</a-select-option>
+        </a-select>
+        <a-input-number
+          v-model:value="localAction.config.budgetValue"
+          :placeholder="t('数值')"
+          style="width: 120px; margin-left: 8px"
+        />
+        <span v-if="localAction.config.budgetAction === 'increase'" style="margin: 0 8px">
+          {{ t(', 且新最高不超过') }}
+        </span>
+        <span v-else style="margin: 0 8px">
+          {{ t(', 且新最低不小于') }}
+        </span>
+        <a-input-number
+          v-model:value="localAction.config.budgetLimit"
+          style="width: 120px"
+        />
+        <span style="margin-left: 8px">USD</span>
+        <div class="budget-strategy" style="margin-top: 12px">
+          <div class="strategy-title">{{ t('第二天的预算策略') }}:</div>
+          <a-radio-group v-model:value="localAction.config.budgetStrategy">
+            <a-radio value="continue">
+              {{ t('继续沿用调整后的预算') }}
+            </a-radio>
+            <a-radio value="restore">
+              {{ t('还原为AI助手最后一次调整成功前的预算(可在任务中心批量编辑类型中查看定时调整任务)') }}
+            </a-radio>
+          </a-radio-group>
+        </div>
+      </div>
+    </template>
+
+    <!-- 编辑标签配置 -->
+    <template v-if="localAction.type === 'edit-tag'">
+      <div class="action-content">
+        <div style="margin-bottom: 8px">
+          <span>{{ t('选择编辑的标签') }}</span>
+          <a-select
+            v-model:value="localAction.config.tag"
+            :placeholder="t('请选择')"
+            style="width: 200px; margin-left: 8px"
+            allow-clear
+          />
+        </div>
+        <div>
+          <span>{{ t('设置方式') }}</span>
+          <a-select
+            v-model:value="localAction.config.tagAction"
+            style="width: 120px; margin-left: 8px"
+          >
+            <a-select-option value="add">{{ t('添加标签') }}</a-select-option>
+            <a-select-option value="remove">{{ t('移除标签') }}</a-select-option>
+            <a-select-option value="replace">{{ t('替换标签') }}</a-select-option>
+          </a-select>
+          <span v-if="localAction.config.tagAction === 'replace'" style="margin: 0 8px">
+            {{ t('将标签设置为') }}
+          </span>
+          <a-select
+            v-if="localAction.config.tagAction === 'replace'"
+            v-model:value="localAction.config.newTag"
+            :placeholder="t('请选择')"
+            style="width: 150px"
+            allow-clear
+          />
+        </div>
+      </div>
+    </template>
+  </div>
+</template>
+
+<script lang="ts" setup>
+import { ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
+
+interface Props {
+  action: any;
+}
+
+const props = defineProps<Props>();
+const emit = defineEmits(['update']);
+
+const { t } = useI18n();
+
+const localAction = ref({
+  type: props.action?.type || 'send-email',
+  config: {
+    recipients: props.action?.config?.recipients || ['mediapluse09@gmail.com'],
+    subject: props.action?.config?.subject || '',
+    body: props.action?.config?.body || '',
+    status: props.action?.config?.status || 'pause',
+    bidAction: props.action?.config?.bidAction || 'increase',
+    bidValue: props.action?.config?.bidValue,
+    bidLimit: props.action?.config?.bidLimit,
+    budgetAction: props.action?.config?.budgetAction || 'increase',
+    budgetValue: props.action?.config?.budgetValue,
+    budgetLimit: props.action?.config?.budgetLimit,
+    budgetStrategy: props.action?.config?.budgetStrategy || 'continue',
+    tag: props.action?.config?.tag,
+    tagAction: props.action?.config?.tagAction || 'add',
+    newTag: props.action?.config?.newTag,
+  },
+});
+
+const showEmailInput = ref(false);
+const newEmail = ref('');
+
+const addRecipient = () => {
+  if (newEmail.value && !localAction.value.config.recipients.includes(newEmail.value)) {
+    localAction.value.config.recipients.push(newEmail.value);
+    newEmail.value = '';
+    showEmailInput.value = false;
+    emit('update', localAction.value);
+  }
+};
+
+const removeRecipient = (index: number) => {
+  localAction.value.config.recipients.splice(index, 1);
+  emit('update', localAction.value);
+};
+
+const handleTypeChange = () => {
+  // 重置配置
+  localAction.value.config = {};
+  if (localAction.value.type === 'send-email') {
+    localAction.value.config.recipients = ['mediapluse09@gmail.com'];
+    localAction.value.config.subject = '';
+    localAction.value.config.body = '';
+  } else if (localAction.value.type === 'status') {
+    localAction.value.config.status = 'pause';
+  } else if (localAction.value.type === 'bid') {
+    localAction.value.config.bidAction = 'increase';
+  } else if (localAction.value.type === 'budget') {
+    localAction.value.config.budgetAction = 'increase';
+    localAction.value.config.budgetStrategy = 'continue';
+  } else if (localAction.value.type === 'edit-tag') {
+    localAction.value.config.tagAction = 'add';
+  }
+  emit('update', localAction.value);
+};
+
+watch(
+  () => localAction.value,
+  () => {
+    emit('update', localAction.value);
+  },
+  { deep: true },
+);
+</script>
+
+<style lang="less" scoped>
+.action-config {
+  flex: 1;
+
+  .action-content {
+    margin-top: 8px;
+    padding-left: 32px;
+
+    .email-recipients {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .budget-strategy {
+      .strategy-title {
+        font-weight: 500;
+        margin-bottom: 8px;
+      }
+    }
+  }
+}
+</style>
+

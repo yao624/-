@@ -1,0 +1,306 @@
+<template>
+  <page-container :showPageHeader="false">
+    <div class="ad-template-page">
+      <div class="content-card">
+        <!-- 顶部操作栏 -->
+        <div class="action-bar">
+          <div class="action-buttons">
+            <template-actions
+              :has-selection="hasSelected"
+              @batch-share="handleBatchShare"
+              @batch-delete="handleBatchDelete"
+            />
+          </div>
+          <div class="selection-info">
+            <span v-if="hasSelected" class="selected-text">
+              {{ t('pages.adTemplate.messages.selected', { count: selectedRowKeys.length }) }}
+            </span>
+          </div>
+        </div>
+
+        <!-- 筛选区域 -->
+        <div class="filter-area">
+          <filter-section
+            ref="filterSectionRef"
+            @search="handleSearch"
+            @reset="handleReset"
+          />
+        </div>
+
+        <!-- 表格区域 -->
+        <div class="table-area">
+          <template-table
+            :data-source="templateData"
+            :loading="loading"
+            :pagination="pagination"
+            :selected-row-keys="selectedRowKeys"
+            @update:selected-row-keys="handleSelectionChange"
+            @page-change="handlePageChange"
+            @share="handleShare"
+            @delete="handleDelete"
+            @edit="handleEdit"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- 分享弹窗 -->
+    <a-modal
+      v-model:open="shareModalVisible"
+      :title="t('pages.adTemplate.actions.share')"
+      width="500px"
+      @ok="handleShareModalOk"
+      @cancel="shareModalVisible = false"
+    >
+      <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
+        <a-form-item :label="t('pages.adTemplate.form.shareWith')">
+          <a-select
+            v-model:value="shareUsers"
+            mode="multiple"
+            :placeholder="t('pages.adTemplate.form.selectUsers')"
+            style="width: 100%"
+          >
+            <a-select-option value="user1">张三</a-select-option>
+            <a-select-option value="user2">李四</a-select-option>
+            <a-select-option value="user3">王五</a-select-option>
+          </a-select>
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
+    <!-- 编辑弹窗 -->
+    <a-modal
+      v-model:open="editModalVisible"
+      :title="t('pages.adTemplate.actions.edit')"
+      width="500px"
+      @ok="handleEditModalOk"
+      @cancel="editModalVisible = false"
+    >
+      <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
+        <a-form-item :label="t('pages.adTemplate.form.name')">
+          <a-input
+            v-model:value="editForm.name"
+            :placeholder="t('pages.adTemplate.form.namePlaceholder')"
+          />
+        </a-form-item>
+        <a-form-item :label="t('pages.adTemplate.form.description')">
+          <a-textarea
+            v-model:value="editForm.description"
+            :placeholder="t('pages.adTemplate.form.descriptionPlaceholder')"
+            :rows="4"
+          />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+  </page-container>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { message, Modal } from 'ant-design-vue';
+import TemplateActions from './components/TemplateActions.vue';
+import FilterSection from './components/FilterSection.vue';
+import TemplateTable from './components/TemplateTable.vue';
+import { getTemplateList, deleteTemplate } from './mock-data';
+import type { AdTemplate, PlatformType } from './types';
+
+const { t, locale } = useI18n();
+
+const isZh = computed(() => locale.value.startsWith('zh'));
+
+// Data
+const templateData = ref<AdTemplate[]>([]);
+const loading = ref(false);
+const selectedRowKeys = ref<string[]>([]);
+const currentPage = ref(1);
+const pageSize = ref(20);
+const total = ref(0);
+
+const filterSectionRef = ref<any>(null);
+
+// Computed
+const pagination = computed(() => ({
+  current: currentPage.value,
+  pageSize: pageSize.value,
+  total: total.value,
+  showSizeChanger: true,
+  showQuickJumper: true,
+  showTotal: (total: number) => t('pages.adTemplate.messages.total', { count: total }),
+}));
+
+const hasSelected = computed(() => selectedRowKeys.value.length > 0);
+
+const shareModalVisible = ref(false);
+const shareUsers = ref<string[]>([]);
+
+const editModalVisible = ref(false);
+const editForm = ref({
+  id: '',
+  name: '',
+  description: '',
+});
+
+// 筛选条件
+const currentKeyword = ref('');
+const currentPlatform = ref<PlatformType | undefined>();
+
+// Methods
+const loadData = async () => {
+  loading.value = true;
+  try {
+    const response = await getTemplateList({
+      page: currentPage.value,
+      pageSize: pageSize.value,
+      keyword: currentKeyword.value,
+      platform: currentPlatform.value,
+    });
+    templateData.value = response.data;
+    total.value = response.total;
+  } finally {
+    loading.value = false;
+  }
+};
+
+const handleSearch = (keyword: string, platform?: PlatformType) => {
+  currentKeyword.value = keyword;
+  currentPlatform.value = platform;
+  currentPage.value = 1;
+  loadData();
+};
+
+const handleReset = () => {
+  currentPage.value = 1;
+  selectedRowKeys.value = [];
+  loadData();
+};
+
+const handleSelectionChange = (keys: string[]) => {
+  selectedRowKeys.value = keys;
+};
+
+const clearSelection = () => {
+  selectedRowKeys.value = [];
+};
+
+const handleShare = (record: AdTemplate) => {
+  shareUsers.value = [];
+  shareModalVisible.value = true;
+};
+
+const handleEdit = (record: AdTemplate) => {
+  editForm.value.id = record.id;
+  editForm.value.name = record.name;
+  editForm.value.description = record.description || '';
+  editModalVisible.value = true;
+};
+
+const handleEditModalOk = () => {
+  if (!editForm.value.name.trim()) {
+    message.warning(t('pages.adTemplate.messages.nameRequired'));
+    return;
+  }
+  const index = templateData.value.findIndex(item => item.id === editForm.value.id);
+  if (index !== -1) {
+    templateData.value[index] = {
+      ...templateData.value[index],
+      name: editForm.value.name,
+      description: editForm.value.description,
+    };
+    message.success(t('pages.adTemplate.messages.editSuccess'));
+  }
+  editModalVisible.value = false;
+};
+
+const handleShareModalOk = () => {
+  message.success(t('pages.adTemplate.messages.shareSuccess', { count: shareUsers.value.length }));
+  shareModalVisible.value = false;
+};
+
+const handleDelete = async (record: AdTemplate) => {
+  try {
+    await deleteTemplate(record.id);
+    message.success(t('pages.adTemplate.messages.deleteSuccess'));
+    loadData();
+  } catch {
+    message.error(t('pages.adTemplate.messages.deleteError'));
+  }
+};
+
+const handleBatchDelete = () => {
+  Modal.confirm({
+    title: t('pages.adTemplate.messages.batchDeleteConfirm'),
+    content: t('pages.adTemplate.messages.batchDeleteConfirmContent', { count: selectedRowKeys.value.length }),
+    onOk: async () => {
+      try {
+        // TODO: 实现批量删除
+        message.success(t('pages.adTemplate.messages.batchDeleteSuccess'));
+        selectedRowKeys.value = [];
+        loadData();
+      } catch {
+        message.error(t('pages.adTemplate.messages.batchDeleteError'));
+      }
+    },
+  });
+};
+
+const handleBatchShare = () => {
+  shareModalVisible.value = true;
+};
+
+const handlePageChange = (page: number, size: number) => {
+  currentPage.value = page;
+  pageSize.value = size;
+  loadData();
+};
+
+// Lifecycle
+onMounted(() => {
+  loadData();
+});
+</script>
+
+<style scoped lang="less">
+.ad-template-page {
+  min-height: 500px;
+
+  .content-card {
+    background: #fff;
+    border-radius: 8px;
+    padding: 16px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+
+    .action-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      .selection-info {
+        flex: 1;
+
+        .selected-text {
+          color: #1890ff;
+          font-size: 14px;
+        }
+      }
+
+      .action-buttons {
+        flex-shrink: 0;
+      }
+    }
+
+    .filter-area {
+      flex-shrink: 0;
+    }
+
+    .table-area {
+      flex: 1;
+      overflow: hidden;
+      min-height: 0;
+    }
+  }
+}
+</style>

@@ -1,0 +1,125 @@
+<template>
+  <div class="platform-sidebar">
+    <div class="sidebar-title">
+      {{ t('pages.adAccount.platform.title') }}
+    </div>
+    <div class="platform-list">
+      <div
+        v-for="platform in platforms"
+        :key="platform.key"
+        :class="['platform-item', { active: modelValue === platform.key }]"
+        @click="handleSelect(platform.key)"
+      >
+        <component :is="platform.icon" class="platform-icon" :style="{ color: platform.color }" />
+        <span class="platform-name">{{ locale === 'zhCN' ? platform.name : platform.nameEn }}</span>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed } from 'vue'; 
+import { useI18n } from 'vue-i18n';
+import {
+  FacebookOutlined,
+  GoogleOutlined,
+  // TikTokOutlined,
+} from '@ant-design/icons-vue';
+import type { PlatformType } from '../types';
+
+const props = defineProps<{
+  modelValue: PlatformType;
+}>();
+
+const emit = defineEmits<{
+  (e: 'update:modelValue', value: PlatformType): void;
+}>();
+
+const { locale, t } = useI18n();
+
+const platforms = computed(() => [
+  {
+    key: 'meta' as PlatformType,
+    name: 'Meta',
+    nameEn: 'Meta',
+    icon: FacebookOutlined,
+    color: '#1877F2',
+  },
+        // {
+        //   key: 'google' as PlatformType,
+        //   name: 'Google',
+        //   nameEn: 'Google',
+        //   icon: GoogleOutlined,
+        //   color: '#4285F4',
+        // },
+        // {
+        //   key: 'tiktok' as PlatformType,
+        //   name: 'TikTok',
+        //   nameEn: 'TikTok',
+        //   // icon: TikTokOutlined,
+        //   color: '#000000',
+        // },
+]);
+
+const handleSelect = (key: PlatformType) => {
+  emit('update:modelValue', key);
+};
+</script>
+
+<style scoped lang="less">
+.platform-sidebar {
+  width: 200px;
+  background: #fff;
+  border-right: 1px solid #f0f0f0;
+  padding: 16px 0;
+  height: 100%;
+}
+
+.sidebar-title {
+  padding: 0 16px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #262626;
+  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 8px;
+}
+
+.platform-list {
+  .platform-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    gap: 8px;
+
+    &:hover {
+      background: #f5f5f5;
+    }
+
+    &.active {
+      background: #e6f4ff;
+      border-right: 3px solid #1890ff;
+
+      .platform-name {
+        color: #1890ff;
+        font-weight: 500;
+      }
+    }
+
+    .platform-icon {
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .platform-name {
+      flex: 1;
+      font-size: 14px;
+      color: #595959;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  }
+}
+</style>

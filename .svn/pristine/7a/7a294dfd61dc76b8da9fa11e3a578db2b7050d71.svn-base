@@ -1,0 +1,39 @@
+import request from '@/utils/request';
+
+export async function queryCopywritingsApi(params?: { [key: string]: any }) {
+  try {
+    return await request.get('/copywritings', { params });
+  } catch (_e) {
+    // 后端接口异常时降级，避免页面因 Request Error 无法使用
+    return { data: [], totalCount: 0 };
+  }
+}
+
+export async function addCopywritingsOneApi(params: Record<string, any>) {
+  const url = params.id ? `copywritings/${params.id}` : '/copywritings';
+  return request(url, {
+    method: params.id ? 'PUT' : 'POST',
+    data: params,
+  });
+}
+
+export async function deleteCopywritingsApi(id?: string) {
+  return request('/copywritings/' + id, {
+    method: 'DELETE',
+    data: {},
+  });
+}
+
+export async function shareCopywritingsApi(params: Record<string, any>) {
+  return request('/copywritings/share', {
+    method: 'POST',
+    data: params,
+  });
+}
+
+export async function unShareCopywritingsApi(params: Record<string, any>) {
+  return request('/copywritings/unshare', {
+    method: 'POST',
+    data: params,
+  });
+}

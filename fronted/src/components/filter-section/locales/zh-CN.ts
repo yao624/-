@@ -1,0 +1,20 @@
+export default {
+  title: '筛选',
+  moreFilters: '更多筛选',
+  reset: '重置',
+  selectPlaceholder: '请选择',
+  inputPlaceholder: '请输入',
+  numberStartPlaceholder: '最小值',
+  numberEndPlaceholder: '最大值',
+  modal: {
+    title: '筛选设置',
+    notification: '勾选筛选条件确定后将会在界面显示',
+    selectPlaceholder: '请选择',
+    inputPlaceholder: '请输入',
+    numberStartPlaceholder: '最小值',
+    numberEndPlaceholder: '最大值',
+    saveAsTemplate: '保存为模板',
+    cancel: '取消',
+    confirm: '确定',
+  },
+};

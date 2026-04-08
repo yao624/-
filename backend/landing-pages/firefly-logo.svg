@@ -1,0 +1,30 @@
+<svg width="460" height="460" viewBox="0 0 460 460" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1E4DD7"/>
+      <stop offset="100%" stop-color="#2D6EEB"/>
+    </linearGradient>
+    <linearGradient id="sparkGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FFEAB0"/>
+      <stop offset="100%" stop-color="#F4C25C"/>
+    </linearGradient>
+    <linearGradient id="arrowGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#F4C25C"/>
+      <stop offset="100%" stop-color="#CF8B1F"/>
+    </linearGradient>
+  </defs>
+  <rect width="460" height="460" rx="48" fill="#F4F7FB"/>
+  <path d="M0 72 L72 0 H0Z" fill="#010814"/>
+  <g transform="translate(70,40)">
+    <path d="M145 15C63 15 0 78 0 160s63 145 145 145c39 0 75-13 103-35" fill="none" stroke="url(#ringGradient)" stroke-width="28" stroke-linecap="round"/>
+    <path d="M144 166L26 105" stroke="url(#ringGradient)" stroke-width="28" stroke-linecap="round"/>
+    <circle cx="205" cy="134" r="56" fill="url(#sparkGradient)"/>
+    <g stroke="#2D6EEB" stroke-linecap="round">
+      <path d="M205 68V34" stroke-width="12"/>
+      <path d="M154 148L118 126" stroke-width="12"/>
+      <path d="M238 214L252 246" stroke-width="10"/>
+    </g>
+    <path d="M268 52 L230 140 L300 124 L348 220" fill="none" stroke="url(#arrowGradient)" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="100" y="380" font-family="'Segoe UI','Inter','Arial',sans-serif" font-size="130" font-weight="700" fill="#14206A">Firefly</text>
+</svg>

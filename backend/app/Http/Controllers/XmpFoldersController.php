@@ -1,0 +1,573 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
+
+class XmpFoldersController extends Controller
+{
+    private const DEFAULT_LIBRARY_NAME = '默认素材库';
+
+    private function authUserId(): ?int
+    {
+        // guard 默认是 web，这里走 sanctum 才会拿到登录态 user
+        $id = Auth::guard('sanctum')->id();
+        if ($id !== null) return (int) $id;
+        $fallback = Auth::id();
+        return $fallback !== null ? (int) $fallback : null;
+    }
+
+    private function isDefaultLibraryFolder($folder): bool
+    {
+        if (!$folder) return false;
+        $name = trim((string) ($folder->folder_name ?? ''));
+        $isRootLibrary = ((int) ($folder->level ?? 0)) === 1;
+        return $isRootLibrary && mb_strtolower($name) === mb_strtolower(self::DEFAULT_LIBRARY_NAME);
+    }
+
+    /**
+     * 获取根文件夹列表（用于侧边栏/文件夹树第一层）
+     */
+    public function index(Request $request)
+    {
+        $libraryType = (int) $request->query('library_type', 0);
+        $ownerId = $request->query('owner_id', $this->authUserId());
+
+        $folders = DB::table('meta_folders as f')
+            ->whereNull('f.deleted_at')
+            ->where('f.library_type', $libraryType)
+            ->where('f.owner_id', $ownerId)
+            ->where('f.parent_id', 0)
+            ->orderBy('f.sort_order')
+            ->select([
+                DB::raw('CAST(f.id AS CHAR) as id'),
+                'f.folder_name as name',
+                'f.folder_path',
+                'f.parent_id',
+                DB::raw('CAST(f.library_type AS CHAR) as library_type'),
+                DB::raw('CAST(f.owner_id AS CHAR) as owner_id'),
+            ])
+            ->get()
+            ->map(function ($row) use ($ownerId) {
+                $row->isExpanded = false;
+                $row->childrenLoaded = false;
+                $row->children = [];
+                $row->isLeaf = false;
+                
+                // 递归子文件夹数
+                $row->subfolder_count = DB::table('meta_folders')
+                    ->whereNull('deleted_at')
+                    ->where('folder_path', 'like', $row->folder_path . '/%')
+                    ->when($ownerId !== null, function($q) use ($ownerId) {
+                        return $q->where('owner_id', $ownerId);
+                    })
+                    ->count();
+
+                // 递归素材数
+                $descendantIds = DB::table('meta_folders')
+                    ->whereNull('deleted_at')
+                    ->where(function($q) use ($row) {
+                        $q->where('folder_path', $row->folder_path)
+                          ->orWhere('folder_path', 'like', $row->folder_path . '/%');
+                    })
+                    ->when($ownerId !== null, function($q) use ($ownerId) {
+                        return $q->where('owner_id', $ownerId);
+                    })
+                    ->pluck('id');
+
+                $row->material_count = $descendantIds->isEmpty() ? 0 : 
+                    DB::table('meta_materials')
+                    ->whereNull('deleted_at')
+                    ->whereIn('folder_id', $descendantIds)
+                    ->count();
+
+                $row->count = $row->material_count; 
+                return $row;
+            });
+
+        return response()->json([
+            'data' => $folders,
+            'totalCount' => $folders->count(),
+        ]);
+    }
+
+    /**
+     * 获取指定文件夹的子文件夹列表（用于懒加载树节点）
+     */
+    public function children(Request $request, $id)
+    {
+        $ownerId = $request->query('owner_id', $this->authUserId());
+        $libraryType = (int) $request->query('library_type');
+        if ($libraryType === 0) {
+            $libraryType = (int) DB::table('meta_folders')
+                ->whereNull('deleted_at')
+                ->where('id', $id)
+                ->value('library_type');
+        }
+
+        $folders = DB::table('meta_folders as f')
+            ->whereNull('f.deleted_at')
+            ->where('f.library_type', $libraryType)
+            ->where('f.owner_id', $ownerId)
+            ->where('f.parent_id', $id)
+            ->orderBy('f.sort_order')
+            ->select([
+                DB::raw('CAST(f.id AS CHAR) as id'),
+                'f.folder_name as name',
+                'f.folder_path',
+                'f.parent_id',
+                DB::raw('CAST(f.library_type AS CHAR) as library_type'),
+                DB::raw('CAST(f.owner_id AS CHAR) as owner_id'),
+            ])
+            ->get()
+            ->map(function ($row) use ($ownerId) {
+                $row->isExpanded = false;
+                $row->childrenLoaded = false;
+                $row->children = [];
+                $row->isLeaf = false;
+
+                // 递归子文件夹数
+                $row->subfolder_count = DB::table('meta_folders')
+                    ->whereNull('deleted_at')
+                    ->where('folder_path', 'like', $row->folder_path . '/%')
+                    ->when($ownerId !== null, function($q) use ($ownerId) {
+                        return $q->where('owner_id', $ownerId);
+                    })
+                    ->count();
+
+                // 递归素材数
+                $descendantIds = DB::table('meta_folders')
+                    ->whereNull('deleted_at')
+                    ->where(function($q) use ($row) {
+                        $q->where('folder_path', $row->folder_path)
+                          ->orWhere('folder_path', 'like', $row->folder_path . '/%');
+                    })
+                    ->when($ownerId !== null, function($q) use ($ownerId) {
+                        return $q->where('owner_id', $ownerId);
+                    })
+                    ->pluck('id');
+
+                $row->material_count = $descendantIds->isEmpty() ? 0 : 
+                    DB::table('meta_materials')
+                    ->whereNull('deleted_at')
+                    ->whereIn('folder_id', $descendantIds)
+                    ->count();
+
+                $row->count = $row->material_count; 
+                return $row;
+            });
+
+        return response()->json([
+            'data' => $folders,
+            'totalCount' => $folders->count(),
+        ]);
+    }
+
+    /**
+     * 创建文件夹（支持两种模式）：
+     *  - parent_id != 0：从父级文件夹继承 library_type/owner_id 并计算 folder_path
+     *  - parent_id == 0：创建根目录文件夹，需要传 library_type + owner_id
+     */
+    public function store(Request $request)
+    {
+        $folderName = trim((string) $request->input('folder_name', ''));
+        $notes = (string) $request->input('notes', '');
+        $parentIdRaw = $request->input('parent_id', 0);
+        if ($parentIdRaw === null || $parentIdRaw === '') {
+            $parentId = 0;
+        } elseif (is_numeric($parentIdRaw)) {
+            $parentId = (int) $parentIdRaw;
+        } else {
+            return response()->json([
+                'message' => 'parent_id must be a valid numeric id',
+            ], 422);
+        }
+
+        if ($folderName === '') {
+            return response()->json(['message' => 'folder_name is required'], 422);
+        }
+
+        // 系统保留名：前端“添加素材库”时若使用“默认素材库”，给出友好提示。
+        // 说明：默认素材库为系统初始化节点，用户不应手动创建。
+        if (mb_strtolower($folderName) === mb_strtolower(self::DEFAULT_LIBRARY_NAME)) {
+            return response()->json([
+                'message' => '“默认素材库”是系统保留名称，请使用其他素材库名称',
+            ], 422);
+        }
+
+        $now = now();
+        $ownerIdForNew = null;
+        $libraryTypeForNew = null;
+        $folderPath = null;
+        $level = null;
+
+        // Root folder creation
+        if ($parentId === 0) {
+            $libraryTypeForNew = (int) $request->input('library_type', 0);
+            $ownerIdForNew = $request->input('owner_id');
+            if ($ownerIdForNew === null || $ownerIdForNew === '') {
+                $ownerIdForNew = $this->authUserId();
+            }
+            if ($ownerIdForNew === null || $ownerIdForNew === '') {
+                return response()->json([
+                    'message' => 'owner_id is required (unauthenticated?)',
+                ], 422);
+            }
+            $folderPath = $folderName;
+            $level = 1;
+        } else {
+            $parent = DB::table('meta_folders')
+                ->where('id', $parentId)
+                ->whereNull('deleted_at')
+                ->first();
+
+            if (!$parent) {
+                return response()->json(['message' => 'parent folder not found'], 404);
+            }
+
+            $ownerIdForNew = $parent->owner_id;
+            $libraryTypeForNew = (int) $parent->library_type;
+            if ($ownerIdForNew === null || $ownerIdForNew === '') {
+                return response()->json([
+                    'message' => 'parent folder owner_id is invalid',
+                ], 422);
+            }
+            $folderPath = rtrim((string) $parent->folder_path, '/').'/'.$folderName;
+            // level 为空时，根据 folder_path 计算层级；确保能做最大 20 级校验
+            $level = $parent->level !== null
+                ? ((int) $parent->level + 1)
+                : (substr_count((string) $parent->folder_path, '/') + 2);
+        }
+
+        if ($level !== null && (int) $level > 20) {
+            return response()->json([
+                'message' => 'folder level must be <= 20',
+            ], 422);
+        }
+
+        // 并发保护：避免“先查重再插入”竞态导致重复根目录/默认素材库
+        // 说明：MySQL 对 NULL 的 UNIQUE 不可靠（可插入多条 NULL），因此这里用事务 + lockForUpdate 做幂等。
+        try {
+            $id = DB::transaction(function () use ($folderName, $parentId, $folderPath, $libraryTypeForNew, $ownerIdForNew, $level, $now) {
+            $existing = DB::table('meta_folders')
+                ->where('parent_id', $parentId)
+                ->where('owner_id', $ownerIdForNew)
+                ->where('library_type', $libraryTypeForNew)
+                ->whereNull('deleted_at')
+                ->whereRaw('LOWER(folder_name) = ?', [mb_strtolower($folderName)])
+                ->lockForUpdate()
+                ->first();
+
+            if ($existing) {
+                // 默认素材库：改为幂等返回（避免前端重试/并发导致重复）
+                $isDefaultLibraryRoot = ($parentId === 0)
+                    && ($libraryTypeForNew === 0)
+                    && (mb_strtolower($folderName) === mb_strtolower(self::DEFAULT_LIBRARY_NAME));
+
+                if ($isDefaultLibraryRoot) {
+                    return (int) $existing->id;
+                }
+
+                // 其他目录仍保持原行为：同级不允许重名
+                throw new \RuntimeException('duplicate_folder_name', 422);
+            }
+
+            // 计算排序：siblings 的 sort_order 最大值 + 1
+            $maxSortOrder = DB::table('meta_folders')
+                ->where('parent_id', $parentId)
+                ->where('owner_id', $ownerIdForNew)
+                ->where('library_type', $libraryTypeForNew)
+                ->whereNull('deleted_at')
+                ->lockForUpdate()
+                ->max('sort_order');
+
+            $sortOrder = (int) $maxSortOrder + 1;
+
+            return (int) DB::table('meta_folders')->insertGetId([
+                'folder_name' => $folderName,
+                'parent_id' => $parentId,
+                'folder_path' => $folderPath,
+                'library_type' => $libraryTypeForNew,
+                'owner_id' => $ownerIdForNew,
+                'level' => $level,
+                'sort_order' => $sortOrder,
+                'create_time' => $now,
+                'deleted_at' => null,
+                // notes currently not stored (meta_folders has no notes column)
+            ]);
+            }, 3);
+        } catch (\Throwable $e) {
+            $code = (int) $e->getCode();
+            if ($code === 422 && $e->getMessage() === 'duplicate_folder_name') {
+                return response()->json(['message' => '同级目录已存在同名文件夹'], 422);
+            }
+            throw $e;
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'id' => (string) $id,
+            ],
+        ]);
+    }
+
+    /**
+     * 创建企业素材库（同时创建根文件夹节点）
+     */
+    public function createEnterpriseLibrary(Request $request)
+    {
+        $libraryName = trim((string) $request->input('library_name', ''));
+        if ($libraryName === '') {
+            return response()->json(['message' => 'library_name is required'], 422);
+        }
+
+        $visibility = (string) $request->input('visibility', 'company');
+        $specifiedUsers = $request->input('specifiedUsers', $request->input('specified_users', []));
+        if (!is_array($specifiedUsers)) {
+            $specifiedUsers = [];
+        }
+
+        $reviewEnabled = $request->input('review_enabled', $request->input('reviewEnabled', 'disabled'));
+        $reviewEnabledInt = 0;
+        if (is_bool($reviewEnabled)) {
+            $reviewEnabledInt = $reviewEnabled ? 1 : 0;
+        } else {
+            $reviewEnabledInt = ($reviewEnabled === 'enabled' || $reviewEnabled === '1' || $reviewEnabled === 1) ? 1 : 0;
+        }
+
+        $managerId = $request->input('manager_id', $this->authUserId());
+        $enterpriseId = $request->input('enterprise_id', $managerId);
+
+        $sharedScope = null;
+        if ($visibility === 'self') {
+            $sharedScope = [
+                'type' => 'self',
+                'user_ids' => [(string) $managerId],
+            ];
+        } elseif ($visibility === 'specified') {
+            $sharedScope = [
+                'type' => 'specified',
+                'user_ids' => array_values(array_map(static function ($v) {
+                    return (string) $v;
+                }, $specifiedUsers)),
+            ];
+        }
+
+        $now = now();
+
+        $data = DB::transaction(function () use ($libraryName, $visibility, $sharedScope, $reviewEnabledInt, $managerId, $enterpriseId, $now) {
+            $enterpriseLibraryId = DB::table('meta_enterprise_libraries')->insertGetId([
+                'library_name' => $libraryName,
+                'enterprise_id' => $enterpriseId,
+                'manager_id' => $managerId,
+                'shared_scope' => $sharedScope,
+                'review_enabled' => $reviewEnabledInt,
+                'create_time' => $now,
+            ]);
+
+            // Create root folder for enterprise library
+            $maxSortOrder = DB::table('meta_folders')
+                ->where('parent_id', 0)
+                ->where('owner_id', $enterpriseId)
+                ->where('library_type', 1)
+                ->whereNull('deleted_at')
+                ->max('sort_order');
+
+            $sortOrder = (int) $maxSortOrder + 1;
+
+            $folderId = DB::table('meta_folders')->insertGetId([
+                'folder_name' => $libraryName,
+                'parent_id' => 0,
+                'folder_path' => $libraryName,
+                'library_type' => 1,
+                'owner_id' => $enterpriseId,
+                'level' => 1,
+                'sort_order' => $sortOrder,
+                'create_time' => $now,
+                'deleted_at' => null,
+            ]);
+
+            return [
+                'enterprise_library_id' => (string) $enterpriseLibraryId,
+                'folder_id' => (string) $folderId,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => $data,
+        ]);
+    }
+
+    /**
+     * 移动文件夹（支持跨库/调整父级）：
+     * - 更新自身 parent_id, library_type, owner_id, folder_path, level, sort_order
+     * - 递归更新所有子文件夹下的 folder_path, library_type, owner_id 和 level
+     */
+    public function move(Request $request, $id)
+    {
+        $targetParentIdRaw = $request->input('target_parent_id');
+        if ($targetParentIdRaw === null) {
+            return response()->json(['message' => 'target_parent_id is required'], 422);
+        }
+
+        $folder = DB::table('meta_folders')->where('id', $id)->whereNull('deleted_at')->first();
+        if (!$folder) {
+            return response()->json(['message' => 'folder not found'], 404);
+        }
+        if (((int) ($folder->level ?? 0)) === 1) {
+            return response()->json(['message' => '素材库节点不允许拖拽'], 422);
+        }
+
+        $now = now();
+        $targetParentId = $targetParentIdRaw === 'root-enterprise' || $targetParentIdRaw === 'root-my' || $targetParentIdRaw === 'root-department' ? 0 : (int)$targetParentIdRaw;
+        
+        $newParentId = $targetParentId;
+        $newLibraryType = (int)$folder->library_type;
+        $newOwnerId = $folder->owner_id; // Will override dynamically
+        $newLevel = 1;
+        $newPathPrefix = '';
+
+        if ($targetParentId === 0) {
+            if ($targetParentIdRaw === 'root-enterprise') {
+                $newLibraryType = 1;
+                // find enterprise owner id from user info context, but MVP implies passing from frontend or inferring from auth.
+                // Normally frontend sends target_owner_id for enterprise root drops. 
+                $targetOwnerId = $request->input('target_owner_id');
+                if (!$targetOwnerId) {
+                    return response()->json(['message' => 'target_owner_id is required for enterprise root moves'], 422);
+                }
+                $newOwnerId = $targetOwnerId;
+            } else if ($targetParentIdRaw === 'root-department') {
+                $newLibraryType = 0;
+                $targetOwnerId = $request->input('target_owner_id');
+                if (!$targetOwnerId) {
+                    return response()->json(['message' => 'target_owner_id is required for department root moves'], 422);
+                }
+                $newOwnerId = $targetOwnerId;
+            } else {
+                $newLibraryType = 0;
+                $newOwnerId = $this->authUserId();
+            }
+            $newPathPrefix = $folder->folder_name;
+            $newLevel = 1;
+        } else {
+            if ($targetParentId == $id) {
+                return response()->json(['message' => 'cannot move folder to itself'], 422);
+            }
+
+            $targetParent = DB::table('meta_folders')->where('id', $targetParentId)->whereNull('deleted_at')->first();
+            if (!$targetParent) {
+                return response()->json(['message' => 'target parent not found'], 404);
+            }
+
+            if (strpos((string)$targetParent->folder_path, (string)$folder->folder_path . '/') === 0 || $targetParent->folder_path === $folder->folder_path) {
+                return response()->json(['message' => 'cannot move folder to its own descendant'], 422);
+            }
+
+            $newLibraryType = $targetParent->library_type;
+            $newOwnerId = $targetParent->owner_id;
+            $newLevel = $targetParent->level !== null ? $targetParent->level + 1 : substr_count($targetParent->folder_path, '/') + 2;
+            $newPathPrefix = rtrim((string)$targetParent->folder_path, '/') . '/' . $folder->folder_name;
+        }
+
+        if ($newLevel > 20) {
+            return response()->json(['message' => 'folder level must be <= 20'], 422);
+        }
+
+        $maxSortOrder = DB::table('meta_folders')
+            ->where('parent_id', $newParentId)
+            ->where('owner_id', $newOwnerId)
+            ->where('library_type', $newLibraryType)
+            ->whereNull('deleted_at')
+            ->max('sort_order');
+            
+        $sortOrder = (int)$maxSortOrder + 1;
+        $levelDiff = $newLevel - (int)$folder->level;
+
+        DB::beginTransaction();
+        try {
+            $oldPathPrefix = (string)$folder->folder_path;
+            
+            // Note: like $oldPathPrefix . '/%' matches descendants
+            $descendants = DB::table('meta_folders')
+                ->where('folder_path', 'like', $oldPathPrefix . '/%')
+                ->whereNull('deleted_at')
+                ->get();
+                
+            foreach ($descendants as $desc) {
+                $descNewPath = $newPathPrefix . substr((string)$desc->folder_path, strlen($oldPathPrefix));
+                $descNewLevel = (int)$desc->level + $levelDiff;
+                
+                DB::table('meta_folders')->where('id', $desc->id)->update([
+                    'folder_path' => $descNewPath,
+                    'library_type' => $newLibraryType,
+                    'owner_id' => $newOwnerId,
+                    'level' => $descNewLevel,
+                ]);
+            }
+
+            DB::table('meta_folders')->where('id', $id)->update([
+                'parent_id' => $newParentId,
+                'folder_path' => $newPathPrefix,
+                'library_type' => $newLibraryType,
+                'owner_id' => $newOwnerId,
+                'level' => $newLevel,
+                'sort_order' => $sortOrder,
+            ]);
+
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'move failed', 'error' => $e->getMessage()], 500);
+        }
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * 删除文件夹（软删）
+
+     * - 级联删除子目录的 deleted_at：确保“祖先目录软删后，素材必须隐藏”。
+     */
+    public function destroy(Request $request, $id)
+    {
+        $folder = DB::table('meta_folders')
+            ->where('id', $id)
+            ->whereNull('deleted_at')
+            ->first();
+
+        if (!$folder) {
+            return response()->json(['message' => 'folder not found'], 404);
+        }
+        if ($this->isDefaultLibraryFolder($folder)) {
+            return response()->json(['message' => '默认素材库不允许删除'], 422);
+        }
+
+        $folderPath = (string) $folder->folder_path;
+        if ($folderPath === '') {
+            return response()->json(['message' => 'folder_path is invalid'], 422);
+        }
+
+        $now = now();
+
+        $affected = DB::table('meta_folders')
+            ->where(function ($q) use ($folderPath) {
+                $q->where('folder_path', $folderPath)
+                    ->orWhere('folder_path', 'like', $folderPath . '/%');
+            })
+            ->update(['deleted_at' => $now]);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'folder_id' => (string) $id,
+                'deleted_count' => (int) $affected,
+            ],
+        ]);
+    }
+}
+
