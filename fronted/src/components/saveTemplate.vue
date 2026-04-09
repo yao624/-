@@ -1,0 +1,256 @@
+<!--
+ * @Author: Claude
+ * @Date: 2024-04-07
+ * @Description: 保存模版（包含动态变量信息）
+ * 支持编辑模式（从模版管理编辑过来，直接保存）和复制模式（需要填写新名称）
+-->
+<template>
+  <div class="save-template-box">
+    <Button type="primary" @click="showSaveModal">
+      <Icon type="ios-cloud-upload" />
+      {{ isEditMode ? '更新模版' : '保存模版' }}
+    </Button>
+
+    <Modal
+      v-model="saveModalVisible"
+      :title="isEditMode ? '更新模版' : '保存模版'"
+      @on-ok="handleSave"
+      :loading="saving"
+    >
+      <Form :label-width="80" :model="templateForm">
+        <FormItem v-if="!isEditMode" label="模版名称">
+          <Input v-model="templateForm.name" placeholder="请输入模版名称" />
+        </FormItem>
+        <FormItem v-else label="模版名称">
+          <span>{{ templateForm.name }}</span>
+        </FormItem>
+        <FormItem label="模版描述">
+          <Input
+            v-model="templateForm.description"
+            type="textarea"
+            :rows="3"
+            placeholder="请输入模版描述（可选）"
+          />
+        </FormItem>
+        <FormItem label="画布尺寸">
+          <span>{{ canvasWidth }} × {{ canvasHeight }}</span>
+        </FormItem>
+        <FormItem label="动态变量">
+          <div v-if="dynamicVariables.length > 0" class="variables-preview">
+            <Tag
+              v-for="variable in dynamicVariables"
+              :key="variable.variableName"
+              :color="variable.variableType === 'text' ? 'blue' : 'green'"
+            >
+              {{ variable.variableName }} ({{ variable.variableType === 'text' ? '文本' : '图片' }})
+            </Tag>
+          </div>
+          <div v-else>
+            <span class="no-variables">暂无动态变量</span>
+            <Button size="small" @click="refreshDynamicVariables" style="margin-left: 10px">
+              刷新
+            </Button>
+          </div>
+        </FormItem>
+      </Form>
+    </Modal>
+  </div>
+</template>
+
+<script name="SaveTemplate" setup lang="ts">
+import { ref, inject, watch, computed } from 'vue';
+import { Modal } from 'ant-design-vue';
+import type { IEditor, DynamicVariable } from '@kuaitu/core';
+
+const canvasEditor = inject<IEditor>('canvasEditor');
+
+// Props - 接收当前编辑的模版信息
+const props = defineProps<{
+  /** 当前编辑的模版ID（如果有表示编辑模式） */
+  editingTemplateId?: string;
+  /** 原始模版数据（用于编辑模式） */
+  originalTemplate?: {
+    id: string;
+    name: string;
+    description: string;
+  };
+  /** 强制指定模式：'edit' 编辑模式 | 'copy' 复制模式 */
+  saveMode?: 'edit' | 'copy';
+}>();
+
+// 状态
+const saveModalVisible = ref(false);
+const saving = ref(false);
+
+// 表单数据
+const templateForm = ref({
+  name: '',
+  description: '',
+});
+
+// 判断是否为编辑模式
+// 有 editingTemplateId 或 saveMode 为 'edit' 时为编辑模式
+const isEditMode = computed(() => {
+  if (props.saveMode === 'copy') {
+    console.log('saveTemplate: 复制模式');
+    return false;
+  }
+  const result = !!(props.editingTemplateId || props.saveMode === 'edit');
+  console.log('saveTemplate isEditMode:', result, 'props:', {
+    editingTemplateId: props.editingTemplateId,
+    saveMode: props.saveMode,
+    originalTemplate: props.originalTemplate,
+  });
+  return result;
+});
+
+// 获取画布尺寸
+const canvasWidth = computed(() => {
+  return canvasEditor?.fabricCanvas?.width || 0;
+});
+
+const canvasHeight = computed(() => {
+  return canvasEditor?.fabricCanvas?.height || 0;
+});
+
+// 获取动态变量列表
+const dynamicVariables = ref<DynamicVariable[]>([]);
+
+// 刷新动态变量列表
+const refreshDynamicVariables = () => {
+  if (!canvasEditor) return;
+  const variables = canvasEditor.getDynamicVariables();
+  console.log('保存模版 - 动态变量列表:', variables);
+  dynamicVariables.value = variables;
+};
+
+// 监听模态框显示，刷新变量列表
+watch(saveModalVisible, (visible) => {
+  if (visible) {
+    refreshDynamicVariables();
+  }
+});
+
+// 显示保存对话框
+const showSaveModal = () => {
+  if (!canvasEditor) return;
+
+  console.log('打开保存模版对话框, 当前模式:', isEditMode.value ? '编辑模式' : '复制模式');
+
+  // 编辑模式：直接保存，不弹窗
+  if (isEditMode.value) {
+    handleSave();
+    return;
+  }
+
+  // 复制模式：显示对话框，用户需要填写名称
+  templateForm.value.name = `模版_副本_${new Date().toISOString().slice(0, 10)}`;
+  templateForm.value.description = '';
+
+  saveModalVisible.value = true;
+
+  // 立即刷新动态变量列表
+  setTimeout(() => {
+    refreshDynamicVariables();
+  }, 100);
+};
+
+// 处理保存
+const handleSave = async () => {
+  if (!canvasEditor) return Promise.reject();
+
+  // 复制模式下必须填写名称
+  if (!isEditMode.value && !templateForm.value.name) {
+    Message.warning('请输入模版名称');
+    return Promise.reject();
+  }
+
+  try {
+    saving.value = true;
+
+    // 获取画布 JSON 数据 - 使用 getJson() 以包含 dynamicConfig 等自定义属性
+    const canvasJson = canvasEditor.getJson();
+
+    console.log('保存的 JSON 数据:', canvasJson);
+
+    // 临时：从 localStorage 获取模版列表
+    const templates = JSON.parse(localStorage.getItem('userTemplates') || '[]');
+
+    if (isEditMode.value && props.editingTemplateId) {
+      // 编辑模式：更新现有模版（直接保存，不弹窗）
+      const index = templates.findIndex((t: any) => t.id === props.editingTemplateId);
+      if (index !== -1) {
+        // 先刷新动态变量列表（因为直接保存，没有经过 showSaveModal）
+        refreshDynamicVariables();
+
+        templates[index] = {
+          ...templates[index],
+          width: canvasWidth.value,
+          height: canvasHeight.value,
+          json: canvasJson,
+          dynamicVariables: dynamicVariables.value,
+          description: props.originalTemplate?.description || templates[index].description,
+          updatedAt: new Date().toISOString(),
+        };
+        localStorage.setItem('userTemplates', JSON.stringify(templates));
+        console.log('模版已更新，包含动态变量:', dynamicVariables.value);
+        Message.success('模版更新成功');
+      } else {
+        Message.error('未找到要更新的模版');
+        return Promise.reject();
+      }
+    } else {
+      // 复制模式：创建新模版
+      const templateData = {
+        name: templateForm.value.name,
+        description: templateForm.value.description,
+        width: canvasWidth.value,
+        height: canvasHeight.value,
+        json: canvasJson,
+        dynamicVariables: dynamicVariables.value,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const newTemplate = {
+        ...templateData,
+        id: `tpl_${Date.now()}`,
+        thumbnail: '', // 可以生成缩略图
+      };
+      templates.push(newTemplate);
+      localStorage.setItem('userTemplates', JSON.stringify(templates));
+
+      console.log('模版已保存，包含动态变量:', dynamicVariables.value);
+      Message.success('模版保存成功');
+    }
+
+    saveModalVisible.value = false;
+
+    return Promise.resolve();
+  } catch (error) {
+    console.error('保存模版失败:', error);
+    Message.error('保存模版失败');
+    return Promise.reject();
+  } finally {
+    saving.value = false;
+  }
+};
+</script>
+
+<style scoped lang="less">
+.save-template-box {
+  display: inline-block;
+  margin-left: 10px;
+}
+
+.variables-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.no-variables {
+  color: #999;
+  font-size: 14px;
+}
+</style>

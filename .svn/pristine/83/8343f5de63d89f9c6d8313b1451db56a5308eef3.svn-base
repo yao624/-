@@ -1,0 +1,391 @@
+<template>
+  <page-container :title="t('pages.links.title')" class="managed-module-font">
+    <a-card mb-4>
+      <a-row>
+        <a-col :flex="1">
+          <a-space>
+            <a-button type="primary" @click="openCreate">新增链接</a-button>
+            <a-button @click="importModalOpen = true">批量导入</a-button>
+          </a-space>
+        </a-col>
+        <a-col>
+          <a-tooltip :title="t('Refresh')">
+            <a-button shape="circle" :icon="h(ReloadOutlined)" @click="reloadTable"></a-button>
+          </a-tooltip>
+        </a-col>
+        <a-col>
+          <dynamic-form :form-items="formSearchItems" @change:form-data="onSearch"></dynamic-form>
+        </a-col>
+      </a-row>
+    </a-card>
+
+    <a-table
+      :loading="state.loading"
+      :scroll="{ y: tableHeight, x: 1600 }"
+      :columns="columns"
+      :data-source="state.dataSource"
+      :pagination="{
+        current: state.current,
+        pageSize: state.pageSize,
+        total: state.total,
+        defaultPageSize: 10,
+        showSizeChanger: true,
+        pageSizeOptions: ['10', '20', '50', '100'],
+        showTotal: total => `Total ${total} items`,
+      }"
+      :row-key="record => record.id"
+      @change="handleTableChange"
+    >
+      <template #bodyCell="{ column, text, record }">
+        <template v-if="column['dataIndex'] === 'link'">
+          <div class="link-cell">
+            <copy-outlined v-if="text" style="color: #1677ff" @click="copyCell(text)" />
+            <a :href="text" target="_blank" class="link-text">{{ text }}</a>
+          </div>
+        </template>
+        <template v-if="column['dataIndex'] === 'tags'">
+          <div>
+            <a-tag v-for="item in record.tags" :key="item.id">{{ item.name }}</a-tag>
+          </div>
+        </template>
+        <template v-if="column['dataIndex'] === 'language_variants'">
+          <span>{{ record.multi_language_count || 0 }}</span>
+        </template>
+        <template v-if="column['dataIndex'] === 'last_used_at'">
+          <span>{{ text ? dayjs(text).format('YYYY-MM-DD HH:mm:ss') : '-' }}</span>
+        </template>
+        <template v-if="column['dataIndex'] === 'created_at'">
+          <span>{{ dayjs(text).format('YYYY-MM-DD HH:mm:ss') }}</span>
+        </template>
+        <template v-if="column['dataIndex'] === 'operation'">
+          <a-button v-if="record.is_owner" type="link" :icon="h(EditOutlined)" @click="openEdit(record)"></a-button>
+          <a-button v-if="record.is_owner" type="link" :icon="h(ShareAltOutlined)" @click="handleShare(record)"></a-button>
+          <a-button v-if="record.is_owner" type="link" :icon="h(TagOutlined)" @click="showTagModal(record)"></a-button>
+          <a-button v-if="record.is_owner" type="link" :icon="h(DeleteOutlined)" @click="deleteOne(record)"></a-button>
+          <span v-else class="operation-placeholder">仅所有者可操作</span>
+        </template>
+      </template>
+    </a-table>
+
+    <link-form-modal
+      :open="formModal.open"
+      :title="formModal.title"
+      :model="formModal.model"
+      @cancel="formModal.open = false"
+      @ok="handleFormSaved"
+    />
+
+    <import-links-modal
+      :open="importModalOpen"
+      @cancel="importModalOpen = false"
+      @ok="handleImportSaved"
+    />
+
+    <link-tag-modal
+      :open="tagModal.open"
+      :model="tagModal.model"
+      @cancel="tagModal.open = false"
+      @ok="handleTagSaved"
+    />
+
+    <share-resource
+      :model="shareModalRef.model"
+      :open="shareModalRef.open"
+      :share-api="shareApi"
+      :unshare-api="unshareApi"
+      @cancel="shareModalRef.open = false"
+      @ok="
+        () => {
+          shareModalRef.open = false;
+          reloadTable();
+        }
+      "
+    />
+  </page-container>
+</template>
+
+<script lang="ts">
+import { computed, defineComponent, h, reactive, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
+import dayjs from 'dayjs';
+import { message, Modal } from 'ant-design-vue';
+import {
+  CopyOutlined,
+  ReloadOutlined,
+  EditOutlined,
+  ShareAltOutlined,
+  DeleteOutlined,
+  TagOutlined,
+} from '@ant-design/icons-vue';
+import DynamicForm from '@/components/dynamic-form/dynamic-form.vue';
+import { useTableHeight } from '@/utils/hooks/useTableHeight';
+import { useFetchData } from '@/utils/hooks/useFetchData';
+import type { Pagination, TableColumn } from '@/typing';
+import type { LinkModel, ShareModel } from '@/utils/fb-interfaces';
+import { deleteLinksOneApi, queryLinksApi, shareLinksApi, unShareLinksApi } from '@/api/links';
+import useClipboard from 'vue-clipboard3';
+import ShareResource from '../utils/share-resource.vue';
+import LinkFormModal from './link-form-modal.vue';
+import ImportLinksModal from './import-links-modal.vue';
+import LinkTagModal from './link-tag-modal.vue';
+
+export default defineComponent({
+  components: {
+    DynamicForm,
+    ShareResource,
+    LinkFormModal,
+    ImportLinksModal,
+    LinkTagModal,
+    CopyOutlined,
+  },
+  setup() {
+    const { t } = useI18n();
+    const sortedInfo = ref();
+    const importModalOpen = ref(false);
+    const formModal = reactive<{
+      open: boolean;
+      title: string;
+      model: LinkModel | null;
+    }>({
+      open: false,
+      title: '新增链接',
+      model: null,
+    });
+
+    const shareApi = shareLinksApi;
+    const unshareApi = unShareLinksApi;
+    const shareModalRef = reactive({
+      open: false,
+      model: {} as ShareModel,
+    });
+
+    const tagModal = reactive<{
+      open: boolean;
+      model: LinkModel | null;
+    }>({
+      open: false,
+      model: null,
+    });
+
+    const { tableHeight } = useTableHeight();
+    const formSearchItems = ref([
+      { label: t('pages.links.link'), field: 'link' },
+      { label: t('pages.links.note'), field: 'notes' },
+      { label: '默认语言', field: 'locale' },
+    ]);
+
+    const queryParam = reactive({
+      link: null as string | null,
+      notes: null as string | null,
+      locale: null as string | null,
+      sortOrder: undefined as string | undefined,
+      sortField: undefined as string | undefined,
+    });
+
+    const fetchDataContext = reactive({
+      current: 1,
+      pageSize: 10,
+      requestParams: { ...queryParam },
+    });
+
+    const onRequestError = (e: any) => {
+      console.error('links request error:', e);
+      message.error(t('Request Error'));
+    };
+
+    const { context: state, reload: reloadTable } = useFetchData(queryLinksApi, fetchDataContext, {
+      onRequestError,
+    });
+
+    const columns = computed<TableColumn[]>(() => {
+      const sorted = sortedInfo.value || {};
+      return [
+        {
+          title: t('pages.links.link'),
+          dataIndex: 'link',
+          width: 360,
+          ellipsis: true,
+        },
+        {
+          title: t('pages.links.note'),
+          dataIndex: 'notes',
+          width: 240,
+          ellipsis: true,
+        },
+        {
+          title: t('pages.tag'),
+          dataIndex: 'tags',
+          width: 220,
+        },
+        {
+          title: '默认语言',
+          dataIndex: 'default_locale',
+          width: 120,
+        },
+        {
+          title: '多语言数',
+          dataIndex: 'language_variants',
+          width: 100,
+        },
+        {
+          title: '关联广告数',
+          dataIndex: 'ad_usage_count',
+          width: 110,
+          sorter: false,
+        },
+        {
+          title: '最近使用',
+          dataIndex: 'last_used_at',
+          width: 170,
+        },
+        {
+          title: t('pages.createdAt'),
+          dataIndex: 'created_at',
+          sorter: true,
+          sortOrder: sorted.field === 'created_at' && sorted.order,
+          width: 170,
+        },
+        {
+          title: t('pages.operation'),
+          dataIndex: 'operation',
+          fixed: 'right',
+          width: 180,
+        },
+      ];
+    });
+
+    const onSearch = (data: Record<string, any>) => {
+      Object.entries(data).forEach(([key, value]) => ((queryParam as any)[key] = value));
+      fetchDataContext.current = 1;
+      fetchDataContext.requestParams = { ...queryParam };
+    };
+
+    const handleTableChange = ({ current, pageSize }: Pagination, _filters: any, sorter: any) => {
+      fetchDataContext.current = current;
+      fetchDataContext.pageSize = pageSize;
+      sortedInfo.value = sorter;
+      fetchDataContext.requestParams = {
+        ...queryParam,
+        sortField: sorter?.field,
+        sortOrder: sorter?.order ? (sorter.order === 'ascend' ? 'asc' : 'desc') : undefined,
+      };
+    };
+
+    const openCreate = () => {
+      formModal.title = '新增链接';
+      formModal.model = null;
+      formModal.open = true;
+    };
+
+    const openEdit = (record: LinkModel) => {
+      formModal.title = '编辑链接';
+      formModal.model = record;
+      formModal.open = true;
+    };
+
+    const handleFormSaved = () => {
+      formModal.open = false;
+      reloadTable();
+    };
+
+    const handleImportSaved = () => {
+      importModalOpen.value = false;
+      reloadTable();
+    };
+
+    const handleTagSaved = () => {
+      tagModal.open = false;
+      reloadTable();
+    };
+
+    const deleteOne = (record: LinkModel) => {
+      Modal.confirm({
+        title: t('Delete'),
+        content: `${t('Delete')}: ${record.link}`,
+        async onOk() {
+          await deleteLinksOneApi(record.id);
+          message.success(t('Delete Success'));
+          reloadTable();
+        },
+      });
+    };
+
+    const handleShare = (record: LinkModel) => {
+      shareModalRef.model = {
+        action: 'share',
+        resourceList: [record.id!],
+      };
+      shareModalRef.open = true;
+    };
+
+    const showTagModal = (record: LinkModel) => {
+      tagModal.model = record;
+      tagModal.open = true;
+    };
+
+    const { toClipboard } = useClipboard();
+    const copyCell = async (text: string) => {
+      try {
+        await toClipboard(text);
+        message.success(t('Copied'));
+      } catch (e) {
+        console.error(e);
+      }
+    };
+
+    return {
+      t,
+      h,
+      dayjs,
+      tableHeight,
+      formSearchItems,
+      columns,
+      state,
+      reloadTable,
+      handleTableChange,
+      onSearch,
+      openCreate,
+      openEdit,
+      deleteOne,
+      handleShare,
+      showTagModal,
+      shareModalRef,
+      shareApi,
+      unshareApi,
+      tagModal,
+      formModal,
+      importModalOpen,
+      handleFormSaved,
+      handleImportSaved,
+      handleTagSaved,
+      copyCell,
+      ReloadOutlined,
+      EditOutlined,
+      ShareAltOutlined,
+      DeleteOutlined,
+      TagOutlined,
+    };
+  },
+});
+</script>
+
+<style scoped>
+.link-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.link-text {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+}
+
+.operation-placeholder {
+  color: #94a3b8;
+  font-size: 12px;
+}
+</style>

@@ -1,0 +1,791 @@
+<template>
+  <div class="tag-select">
+    <a-popover v-model:open="open" trigger="click" placement="bottomLeft" overlayClassName="tag-select-popover">
+      <template #content>
+        <div class="panel" @click.stop>
+          <div class="panel-top">
+            <a-input
+              v-model:value="keyword"
+              :placeholder="t('搜索标签')"
+              allow-clear
+              class="search-input"
+              @mousedown.stop
+            >
+              <template #prefix>
+                <search-outlined />
+              </template>
+            </a-input>
+          </div>
+          <div class="panel-body">
+            <!-- 左侧：文件夹 + 标签 -->
+            <div class="col col-left">
+              <div
+                v-for="folder in filteredFolders"
+                :key="folder.id"
+                class="folder-item"
+              >
+                <div
+                  class="folder-row"
+                  :class="{ active: activeFolderId === folder.id }"
+                  @click="selectFolder(folder)"
+                >
+                  <folder-outlined class="folder-icon" />
+                  <span class="folder-name">{{ folder.name }}</span>
+                </div>
+                <div
+                  v-for="tag in getTagsByFolder(folder.id)"
+                  :key="tag.id"
+                  class="tag-item"
+                  :class="{ active: activeTagId === tag.id }"
+                  @click="selectTag(tag)"
+                >
+                  <tag-outlined class="tag-icon" />
+                  <span class="tag-name">{{ tag.name }}</span>
+                  <span v-if="creatable" class="tag-add-btn" @click.stop="handleShowCreateInput(null, tag.id)">
+                    <plus-outlined />
+                  </span>
+                </div>
+              </div>
+              <div
+                v-for="tag in tagsWithoutFolder"
+                :key="tag.id"
+                class="tag-item no-folder"
+                :class="{ active: activeTagId === tag.id }"
+                @click="selectTag(tag)"
+              >
+                <tag-outlined class="tag-icon" />
+                <span class="tag-name">{{ tag.name }}</span>
+                <span v-if="creatable" class="tag-add-btn" @click.stop="handleShowCreateInput(null, tag.id)">
+                  <plus-outlined />
+                </span>
+              </div>
+            </div>
+
+            <!-- 中间：标签选项 -->
+            <div class="col col-middle">
+              <div v-if="!activeTagId" class="empty-wrap">
+                <a-empty :description="t('请选择标签')" />
+              </div>
+              <div v-else-if="filteredOptions.length === 0" class="empty-wrap">
+                <a-empty :description="t('暂无选项')" />
+              </div>
+              <a-checkbox-group v-else :value="modelValue" class="options-group" @change="handleChange">
+                <template v-for="opt in filteredOptions" :key="opt.id">
+                  <div class="opt-row-wrap">
+                    <div class="opt-row opt-level-1" @click="handleOptionClick(opt)">
+                      <a-checkbox :value="opt.id" @click.prevent />
+                      <span class="opt-label" @click.stop="handleOptionClick(opt)">{{ opt.name }}</span>
+                      <span v-if="creatable" class="opt-add-btn" title="新建子选项" @click.stop="handleShowCreateInput(opt.id)">
+                        <plus-outlined />
+                      </span>
+                    </div>
+                    <div v-if="creatingParentId === opt.id" class="inline-create-input">
+                      <a-input
+                        v-model:value="createInputVal"
+                        :placeholder="t('输入选项名称')"
+                        size="small"
+                        @pressEnter="handleCreateOption"
+                      />
+                      <a-button type="primary" size="small" :loading="createLoading" @click="handleCreateOption">{{ t('确定') }}</a-button>
+                      <a-button size="small" @click="handleCancelCreate">{{ t('取消') }}</a-button>
+                    </div>
+                  </div>
+                  <template v-if="opt.children?.length">
+                    <div
+                      v-for="child in opt.children"
+                      :key="child.id"
+                      class="opt-level-2-wrap"
+                    >
+                      <div class="opt-row-wrap">
+                        <div class="opt-row opt-level-2" @click.stop="handleOptionClick(child)">
+                          <a-checkbox :value="child.id" @click.prevent />
+                          <span class="opt-label" @click.stop="handleOptionClick(child)">{{ child.name }}</span>
+                          <span v-if="creatable" class="opt-add-btn" title="新建子选项" @click.stop="handleShowCreateInput(child.id)">
+                            <plus-outlined />
+                          </span>
+                        </div>
+                        <div v-if="creatingParentId === child.id" class="inline-create-input">
+                          <a-input
+                            v-model:value="createInputVal"
+                            :placeholder="t('输入选项名称')"
+                            size="small"
+                            @pressEnter="handleCreateOption"
+                          />
+                          <a-button type="primary" size="small" :loading="createLoading" @click="handleCreateOption">{{ t('确定') }}</a-button>
+                          <a-button size="small" @click="handleCancelCreate">{{ t('取消') }}</a-button>
+                        </div>
+                      </div>
+                      <template v-if="child.children?.length">
+                        <div
+                          v-for="grand in child.children"
+                          :key="grand.id"
+                          class="opt-level-3-wrap"
+                        >
+                          <div class="opt-row-wrap">
+                            <div class="opt-row opt-level-3" @click.stop="handleOptionClick(grand)">
+                              <a-checkbox :value="grand.id" @click.prevent />
+                              <span class="opt-label" @click.stop="handleOptionClick(grand)">{{ grand.name }}</span>
+                              <span v-if="creatable" class="opt-add-btn" title="新建子选项" @click.stop="handleShowCreateInput(grand.id)">
+                                <plus-outlined />
+                              </span>
+                            </div>
+                            <div v-if="creatingParentId === grand.id" class="inline-create-input">
+                              <a-input
+                                v-model:value="createInputVal"
+                                :placeholder="t('输入选项名称')"
+                                size="small"
+                                @pressEnter="handleCreateOption"
+                              />
+                              <a-button type="primary" size="small" :loading="createLoading" @click="handleCreateOption">{{ t('确定') }}</a-button>
+                              <a-button size="small" @click="handleCancelCreate">{{ t('取消') }}</a-button>
+                            </div>
+                          </div>
+                          <template v-if="grand.children?.length">
+                            <div
+                              v-for="great in grand.children"
+                              :key="great.id"
+                              class="opt-level-4-wrap"
+                            >
+                              <div class="opt-row-wrap">
+                                <div class="opt-row opt-level-4" @click.stop="handleOptionClick(great)">
+                                  <a-checkbox :value="great.id" @click.prevent />
+                                  <span class="opt-label" @click.stop="handleOptionClick(great)">{{ great.name }}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </template>
+                        </div>
+                      </template>
+                    </div>
+                  </template>
+                </template>
+              </a-checkbox-group>
+
+              <div v-if="creatingAtTagLevel && creatingTagId" class="tag-level-create">
+                <a-input
+                  v-model:value="createInputVal"
+                  :placeholder="t('输入选项名称')"
+                  size="small"
+                  @pressEnter="handleCreateOption"
+                />
+                <a-button type="primary" size="small" :loading="createLoading" @click="handleCreateOption">{{ t('确定') }}</a-button>
+                <a-button size="small" @click="handleCancelCreate">{{ t('取消') }}</a-button>
+              </div>
+            </div>
+
+            <!-- 右侧：已选 -->
+            <div class="col col-right">
+              <div class="selected-header">
+                <span class="selected-title">{{ t('已选') }} {{ modelValue.length }} {{ t('个') }}</span>
+                <span v-if="modelValue.length > 0" class="clear-all-btn" @click="handleClearAll">{{ t('清除') }}</span>
+              </div>
+              <div v-if="modelValue.length === 0" class="selected-empty">{{ t('未选择任何标签') }}</div>
+              <div v-else class="selected-list">
+                <div v-for="val in selectedLabels" :key="val.id" class="selected-item">
+                  <span class="selected-item-text" :title="val.name">{{ val.name }}</span>
+                  <close-outlined class="remove-btn" @click="removeOne(val.id)" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <div class="trigger-box" @click="open = true">
+        <span v-if="modelValue.length === 0" class="trigger-placeholder">{{ placeholder }}</span>
+        <span v-else class="trigger-text">{{ t('已选') }} {{ modelValue.length }} {{ t('个标签') }}</span>
+        <down-outlined class="trigger-arrow" />
+      </div>
+    </a-popover>
+  </div>
+</template>
+
+<script lang="ts" setup>
+import { ref, computed, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
+import {
+  CloseOutlined,
+  DownOutlined,
+  SearchOutlined,
+  FolderOutlined,
+  TagOutlined,
+  PlusOutlined,
+} from '@ant-design/icons-vue';
+import { message } from 'ant-design-vue';
+
+export interface TagOption {
+  id: number;
+  name: string;
+  tag_id: number | null;
+  children?: TagOption[];
+}
+
+interface Props {
+  modelValue?: number[];
+  tagFolders?: { id: number; name: string }[];
+  tags?: { id: number; folder_id: number; name: string }[];
+  tagOptions?: TagOption[];
+  placeholder?: string;
+  creatable?: boolean;
+  createOptionApi?: (tagId: number, name: string, parentId: number, isTagLevel: boolean) => Promise<any>;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  modelValue: () => [],
+  tagFolders: () => [],
+  tags: () => [],
+  tagOptions: () => [],
+  placeholder: '请选择标签',
+  creatable: true,
+});
+
+const emit = defineEmits<{
+  (e: 'update:modelValue', value: number[]): void;
+  (e: 'create-option', payload: { tagId: number; name: string; parentId?: number }): void;
+}>();
+
+const { t } = useI18n();
+const open = ref(false);
+const keyword = ref('');
+const activeFolderId = ref<number | null>(null);
+const activeTagId = ref<number | null>(null);
+
+const allTagOptions = computed(() => props.tagOptions || []);
+
+const filteredFolders = computed(() => {
+  const k = keyword.value.toLowerCase().trim();
+  if (!k) return props.tagFolders || [];
+  return (props.tagFolders || []).filter(f => f.name.toLowerCase().includes(k));
+});
+
+const getTagsByFolder = (folderId: number) => {
+  return (props.tags || []).filter(t => t.folder_id === folderId);
+};
+
+const tagsWithoutFolder = computed(() => {
+  const folderIds = new Set((props.tagFolders || []).map(f => f.id));
+  return (props.tags || []).filter(t => !folderIds.has(t.folder_id));
+});
+
+const filteredOptions = computed(() => {
+  if (!activeTagId.value) return [];
+  const k = keyword.value.toLowerCase().trim();
+  const tagOpts = allTagOptions.value.filter(o => o.tag_id === activeTagId.value);
+  if (!k) return tagOpts;
+  const flatFilter = (opts: TagOption[], q: string): TagOption[] => {
+    const result: TagOption[] = [];
+    opts.forEach(o => {
+      if (o.name.toLowerCase().includes(q)) {
+        result.push(o);
+      }
+      if (o.children?.length) {
+        const filteredChildren = flatFilter(o.children, q);
+        if (filteredChildren.length) {
+          result.push({ ...o, children: filteredChildren });
+        }
+      }
+    });
+    return result;
+  };
+  return flatFilter(tagOpts, k);
+});
+
+const selectedLabels = computed(() => {
+  const map = new Map<number, string>();
+  const collect = (opts: TagOption[]) => {
+    opts.forEach(o => {
+      map.set(o.id, o.name);
+      if (o.children?.length) collect(o.children);
+    });
+  };
+  collect(allTagOptions.value);
+  return (props.modelValue || []).map(id => ({ id, name: map.get(id) || String(id) }));
+});
+
+const selectFolder = (folder: any) => {
+  activeFolderId.value = folder.id;
+  const folderTags = getTagsByFolder(folder.id);
+  if (folderTags.length) {
+    selectTag(folderTags[0]);
+  } else {
+    activeTagId.value = null;
+  }
+};
+
+const selectTag = (tag: any) => {
+  activeTagId.value = tag.id;
+  if (tag.folder_id) {
+    activeFolderId.value = tag.folder_id;
+  }
+};
+
+const handleChange = (vals: number[]) => {
+  emit('update:modelValue', vals);
+};
+
+const handleOptionClick = (opt: TagOption) => {
+  const current = [...(props.modelValue || [])];
+  const idx = current.indexOf(opt.id);
+  if (idx > -1) {
+    current.splice(idx, 1);
+  } else {
+    current.push(opt.id);
+  }
+  emit('update:modelValue', current);
+};
+
+const removeOne = (id: number) => {
+  const current = (props.modelValue || []).filter(v => v !== id);
+  emit('update:modelValue', current);
+};
+
+const handleClearAll = () => {
+  emit('update:modelValue', []);
+};
+
+const creatingParentId = ref<number | null>(null);
+const creatingTagId = ref<number | null>(null);
+const creatingAtTagLevel = ref(false);
+const createInputVal = ref('');
+const createLoading = ref(false);
+
+const handleShowCreateInput = (parentId: number | null = null, tagId?: number) => {
+  creatingParentId.value = parentId;
+  creatingTagId.value = tagId ?? null;
+  creatingAtTagLevel.value = tagId !== undefined && parentId === null;
+  createInputVal.value = '';
+};
+
+const handleCreateOption = async () => {
+  const name = createInputVal.value.trim();
+  if (!name) return;
+  const targetTagId = creatingTagId.value ?? activeTagId.value;
+  if (!props.createOptionApi) {
+    const parentId = creatingAtTagLevel.value ? 0 : (creatingParentId.value ?? 0);
+    emit('create-option', { tagId: targetTagId, name, parentId });
+    creatingParentId.value = null;
+    creatingTagId.value = null;
+    creatingAtTagLevel.value = false;
+    return;
+  }
+  createLoading.value = true;
+  try {
+    await props.createOptionApi(targetTagId, name, creatingParentId.value ?? 0, creatingAtTagLevel.value);
+    message.success(t('创建成功'));
+    creatingParentId.value = null;
+    creatingTagId.value = null;
+    creatingAtTagLevel.value = false;
+    createInputVal.value = '';
+  } catch {
+    message.error(t('创建失败'));
+  } finally {
+    createLoading.value = false;
+  }
+};
+
+const handleCancelCreate = () => {
+  creatingParentId.value = null;
+  creatingTagId.value = null;
+  creatingAtTagLevel.value = false;
+  createInputVal.value = '';
+};
+
+watch(open, (val) => {
+  if (!val) {
+    keyword.value = '';
+    creatingParentId.value = null;
+    creatingTagId.value = null;
+    creatingAtTagLevel.value = false;
+    createInputVal.value = '';
+  }
+});
+</script>
+
+<style lang="less" scoped>
+.tag-select {
+  width: 100%;
+}
+
+.trigger-box {
+  width: 100%;
+  min-height: 32px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  background: #fff;
+  padding: 0 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  &:hover {
+    border-color: #4096ff;
+  }
+}
+
+.trigger-placeholder {
+  color: #bfbfbf;
+  font-size: 14px;
+}
+
+.trigger-text {
+  font-size: 14px;
+  color: #333;
+}
+
+.trigger-arrow {
+  font-size: 12px;
+  color: #999;
+}
+
+.panel {
+  width: 640px;
+  background: #fff;
+  border: 1px solid #e6e6e6;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  padding: 10px;
+}
+
+.panel-top {
+  margin-bottom: 10px;
+}
+
+.search-input {
+  width: 100%;
+}
+
+.panel-body {
+  display: grid;
+  grid-template-columns: 180px 1fr 180px;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  overflow: hidden;
+  min-height: 260px;
+}
+
+.col {
+  min-height: 260px;
+  overflow-y: auto;
+}
+
+.col-left {
+  border-right: 1px solid #f0f0f0;
+  background: #fafafa;
+  padding: 8px 0;
+}
+
+.col-middle {
+  border-right: 1px solid #f0f0f0;
+  background: #fff;
+  padding: 8px 0;
+}
+
+.col-right {
+  background: #fff;
+}
+
+.col-title {
+  padding: 4px 12px;
+  font-size: 12px;
+  color: #999;
+  font-weight: 500;
+}
+
+.folder-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.folder-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #333;
+  &:hover {
+    background: #f0f7ff;
+  }
+  &.active {
+    color: #1890ff;
+    background: #f0f7ff;
+  }
+}
+
+.folder-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.folder-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tag-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px 6px 24px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #666;
+  &:hover {
+    background: #f0f7fb;
+  }
+  &.active {
+    color: #1890ff;
+    background: #f0f7ff;
+  }
+  &.no-folder {
+    padding-left: 12px;
+  }
+}
+
+.tag-add-btn {
+  margin-left: auto;
+  font-size: 14px;
+  color: #bfbfbf;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  flex-shrink: 0;
+  padding: 2px;
+  &:hover {
+    color: #1890ff;
+  }
+}
+
+.tag-item:hover .tag-add-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.tag-level-create {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid #f0f0f0;
+  .ant-input {
+    flex: 1;
+    font-size: 14px;
+  }
+}
+
+.tag-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.tag-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.options-group {
+  width: 100%;
+  display: block;
+  padding: 4px 0;
+}
+
+.opt-row-wrap {
+  position: relative;
+}
+
+.opt-add-btn {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 14px;
+  color: #bfbfbf;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  &:hover {
+    color: #1890ff;
+  }
+}
+
+.opt-row:hover .opt-add-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.inline-create-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px 8px 36px;
+  background: #fafafa;
+  .ant-input {
+    flex: 1;
+    font-size: 14px;
+  }
+}
+
+.opt-row {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  cursor: pointer;
+  &:hover {
+    background: #f5f7fb;
+  }
+}
+
+.opt-level-1 {
+  padding-left: 12px;
+  font-weight: 500;
+  .opt-label {
+    color: #333;
+    font-weight: 500;
+  }
+}
+
+.opt-level-2-wrap {
+  position: relative;
+  &::before {
+    content: '';
+    position: absolute;
+    left: 20px;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: #e8e8e8;
+  }
+}
+
+.opt-level-2 {
+  padding-left: 32px;
+  .opt-label {
+    color: #666;
+  }
+}
+
+.opt-level-3-wrap {
+  position: relative;
+  padding-left: 16px;
+  &::before {
+    content: '';
+    position: absolute;
+    left: 36px;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: #e8e8e8;
+  }
+}
+
+.opt-level-3 {
+  padding-left: 32px;
+  .opt-label {
+    color: #888;
+  }
+}
+
+.opt-level-4-wrap {
+  position: relative;
+  padding-left: 16px;
+  &::before {
+    content: '';
+    position: absolute;
+    left: 52px;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: #e8e8e8;
+  }
+}
+
+.opt-level-4 {
+  padding-left: 52px;
+  .opt-label {
+    color: #aaa;
+  }
+}
+
+.opt-label {
+  margin-left: 8px;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  flex: 1;
+  &:hover {
+    color: #1890ff;
+  }
+}
+
+.empty-wrap {
+  padding: 24px 0;
+  text-align: center;
+}
+
+.selected-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 36px;
+  padding: 0 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.selected-title {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+}
+
+.clear-all-btn {
+  font-size: 12px;
+  color: #1890ff;
+  cursor: pointer;
+  &:hover {
+    color: #40a9ff;
+  }
+}
+
+.selected-empty {
+  padding: 16px 12px;
+  font-size: 12px;
+  color: #999;
+}
+
+.selected-list {
+  padding: 4px 0;
+}
+
+.selected-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 12px;
+}
+
+.selected-item-text {
+  font-size: 13px;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.remove-btn {
+  font-size: 12px;
+  color: #999;
+  cursor: pointer;
+  flex-shrink: 0;
+  &:hover {
+    color: #ff4d4f;
+  }
+}
+</style>

@@ -123,6 +123,7 @@
             <a-button @click="reloadItems">应用预览</a-button>
             <a-range-picker v-model:value="dateRange" />
             <a-checkbox v-model:checked="includeChildren">包含子文件夹文案</a-checkbox>
+            <a-button @click="copywritingPickerOpen = true">打开文案选择器</a-button>
             <a-button type="primary" :disabled="!effectiveFolderId" @click="openItemModalCreate">新增文案</a-button>
             <a-button
               :disabled="!activeLibraryId || treeLoading || !rootFolderId"
@@ -191,8 +192,15 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="itemOpen" :title="itemModalTitle" width="720px" ok-text="保存" @ok="submitItem">
-      <a-form layout="vertical">
+    <a-modal
+      v-model:open="itemOpen"
+      :title="itemModalTitle"
+      width="860px"
+      ok-text="保存"
+      wrap-class-name="copywriting-item-modal-wrap"
+      @ok="submitItem"
+    >
+      <a-form layout="vertical" class="copywriting-item-form">
         <a-alert
           type="info"
           show-icon
@@ -225,23 +233,31 @@
           />
           <a-button type="dashed" @click="addTranslationLocale">添加语言</a-button>
         </a-space>
-        <div v-for="loc in translationLocaleKeys" :key="loc" class="translation-block">
-          <div class="translation-block-hd">
-            <span class="loc-label">{{ loc }}</span>
-            <a-button type="link" danger size="small" @click="removeTranslationLocale(loc)">移除</a-button>
+        <div class="translation-scroll-area">
+          <div v-for="loc in translationLocaleKeys" :key="loc" class="translation-block">
+            <div class="translation-block-hd">
+              <span class="loc-label">{{ loc }}</span>
+              <a-button type="link" danger size="small" @click="removeTranslationLocale(loc)">移除</a-button>
+            </div>
+            <a-form-item label="正文">
+              <a-textarea v-model:value="itemTranslationsForm[loc].primary_text" :rows="2" />
+            </a-form-item>
+            <a-form-item label="标题">
+              <a-input v-model:value="itemTranslationsForm[loc].headline" />
+            </a-form-item>
+            <a-form-item label="描述">
+              <a-textarea v-model:value="itemTranslationsForm[loc].description" :rows="2" />
+            </a-form-item>
           </div>
-          <a-form-item label="正文">
-            <a-textarea v-model:value="itemTranslationsForm[loc].primary_text" :rows="2" />
-          </a-form-item>
-          <a-form-item label="标题">
-            <a-input v-model:value="itemTranslationsForm[loc].headline" />
-          </a-form-item>
-          <a-form-item label="描述">
-            <a-textarea v-model:value="itemTranslationsForm[loc].description" :rows="2" />
-          </a-form-item>
         </div>
       </a-form>
     </a-modal>
+    <copywriting-picker
+      v-model:open="copywritingPickerOpen"
+      :multiple="false"
+      :country-codes="previewCountryCodes"
+      @confirm:items-selected="handlePickerSelected"
+    />
   </page-container>
 </template>
 
@@ -273,6 +289,7 @@ import {
   type MetaCopyItemTranslations,
   type MetaCopyLibraryRow,
 } from '@/api/meta-copy-library';
+import CopywritingPicker from '@/components/copywriting-picker/index.vue';
 
 const sidebarContainerRef = ref<HTMLElement | null>(null);
 
@@ -999,6 +1016,7 @@ const previewCountryCodes = ref('');
 const includeChildren = ref(false);
 const dateRange = ref<[Dayjs, Dayjs] | null>(null);
 const selectedRowKeys = ref<string[]>([]);
+const copywritingPickerOpen = ref(false);
 
 const pagination = reactive({
   current: 1,
@@ -1116,6 +1134,16 @@ function onTableChange(pag: { current?: number; pageSize?: number }) {
 
 function onSelectRows(keys: string[]) {
   selectedRowKeys.value = keys;
+}
+
+function handlePickerSelected(_keys: Array<string | number>, rows: MetaCopyItemRow[]) {
+  const picked = rows?.[0];
+  if (!picked) {
+    message.info('未选择文案');
+    return;
+  }
+
+  message.success(`已选择文案：${picked.headline || picked.primary_text || picked.id}`);
 }
 
 watch(includeChildren, () => {
@@ -1501,6 +1529,60 @@ onUnmounted(() => {
 .translation-block-hd .loc-label {
   font-weight: 600;
   font-size: 13px;
+}
+
+.translation-scroll-area {
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.translation-scroll-area::-webkit-scrollbar {
+  width: 8px;
+}
+
+.translation-scroll-area::-webkit-scrollbar-thumb {
+  background: rgba(139, 152, 170, 0.45);
+  border-radius: 999px;
+}
+
+.translation-scroll-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+:global(.copywriting-item-modal-wrap .ant-modal) {
+  width: min(860px, calc(100vw - 24px)) !important;
+  top: 8px;
+  padding-bottom: 8px;
+}
+
+:global(.copywriting-item-modal-wrap .ant-modal-content) {
+  max-height: calc(100vh - 16px);
+  display: flex;
+  flex-direction: column;
+}
+
+:global(.copywriting-item-modal-wrap .ant-modal-header) {
+  padding: 14px 20px 10px;
+}
+
+:global(.copywriting-item-modal-wrap .ant-modal-body) {
+  flex: 1;
+  min-height: 0;
+  padding: 14px 20px 10px;
+  overflow-y: auto;
+}
+
+:global(.copywriting-item-modal-wrap .ant-modal-footer) {
+  padding: 10px 20px 14px;
+}
+
+:global(.copywriting-item-modal-wrap .copywriting-item-form .ant-form-item) {
+  margin-bottom: 12px;
+}
+
+:global(.copywriting-item-modal-wrap .copywriting-item-form .ant-divider) {
+  margin: 14px 0 12px;
 }
 .mb-3 {
   margin-bottom: 12px;

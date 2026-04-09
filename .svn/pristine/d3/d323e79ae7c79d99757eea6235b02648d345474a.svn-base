@@ -1,0 +1,337 @@
+<!--
+ * @Author: Claude
+ * @Date: 2024-04-07
+ * @Description: 素材分类管理组件
+-->
+<template>
+  <div class="asset-category-manager">
+    <div class="header">
+      <h3>素材分类</h3>
+      <Button type="primary" size="small" @click="showCreateModal">
+        <Icon type="md-add" />
+        新建分类
+      </Button>
+    </div>
+
+    <div v-if="categories.length > 0" class="category-list">
+      <div v-for="category in categories" :key="category.id" class="category-item">
+        <div class="category-info">
+          <Tag :color="getCategoryColor(category.id)">
+            {{ getCategoryIcon(category.id) }}
+          </Tag>
+          <span class="category-name">{{ category.name }}</span>
+          <span class="category-count">({{ getAssetCount(category.id) }})</span>
+        </div>
+
+        <div class="category-actions">
+          <Button size="small" type="text" @click="editCategory(category)">
+            <Icon type="md-create" />
+          </Button>
+          <Button size="small" type="text" style="color: #ed4014" @click="deleteCategory(category)">
+            <Icon type="md-trash" />
+          </Button>
+        </div>
+      </div>
+    </div>
+
+    <div v-else class="empty-state">
+      <Empty description="暂无分类">
+        <template #footer>
+          <Button type="primary" @click="showCreateModal">创建第一个分类</Button>
+        </template>
+      </Empty>
+    </div>
+
+    <!-- 创建/编辑分类对话框 -->
+    <Modal
+      v-model="categoryModalVisible"
+      :title="isEditMode ? '编辑分类' : '新建分类'"
+      @on-ok="handleSaveCategory"
+    >
+      <Form :label-width="80" :model="categoryForm">
+        <FormItem label="分类名称" required>
+          <Input v-model="categoryForm.name" placeholder="请输入分类名称" />
+        </FormItem>
+        <FormItem label="分类描述">
+          <Input
+            v-model="categoryForm.description"
+            type="textarea"
+            :rows="3"
+            placeholder="请输入分类描述（可选）"
+          />
+        </FormItem>
+        <FormItem label="图标">
+          <Select v-model="categoryForm.icon" placeholder="选择图标">
+            <Option value="📦">📦 商品</Option>
+            <Option value="🏷️">🏷️ 标签</Option>
+            <Option value="🖼️">🖼️ 图片</Option>
+            <Option value="🎨">🎨 设计</Option>
+            <Option value="✨">✨ 特效</Option>
+            <Option value="📝">📝 文档</Option>
+          </Select>
+        </FormItem>
+      </Form>
+    </Modal>
+  </div>
+</template>
+
+<script name="AssetCategoryManager" setup lang="ts">
+import { ref, onMounted } from 'vue';
+import {
+  Modal,
+  Message,
+  Empty,
+  Tag,
+  Form,
+  FormItem,
+  Input,
+  Select,
+  Option,
+} from 'view-ui-plus';
+
+// 分类数据类型
+interface Category {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  assetCount: number;
+  createdAt: string;
+}
+
+// 状态
+const categories = ref<Category[]>([]);
+const categoryModalVisible = ref(false);
+const isEditMode = ref(false);
+const editingCategoryId = ref<string | null>(null);
+
+const categoryForm = ref({
+  name: '',
+  description: '',
+  icon: '📦',
+});
+
+// 预设分类颜色
+const categoryColors: Record<string, string> = {
+  cat_products: 'blue',
+  cat_logos: 'green',
+  cat_backgrounds: 'purple',
+  cat_decorations: 'orange',
+  cat_textures: 'pink',
+};
+
+// 预设分类图标
+const categoryIcons: Record<string, string> = {
+  cat_products: '📦',
+  cat_logos: '🏷️',
+  cat_backgrounds: '🖼️',
+  cat_decorations: '✨',
+  cat_textures: '🎨',
+};
+
+// 模拟素材数量统计
+const mockAssetCounts: Record<string, number> = {
+  cat_products: 150,
+  cat_logos: 45,
+  cat_backgrounds: 80,
+  cat_decorations: 120,
+  cat_textures: 60,
+};
+
+// 加载分类列表
+const loadCategories = () => {
+  const saved = localStorage.getItem('assetCategories');
+  if (saved) {
+    categories.value = JSON.parse(saved);
+  } else {
+    // 默认分类
+    categories.value = [
+      {
+        id: 'cat_products',
+        name: '商品图片',
+        description: '用于替换主商品图',
+        icon: '📦',
+        assetCount: mockAssetCounts.cat_products,
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: 'cat_logos',
+        name: '品牌Logo',
+        description: '品牌标志图片',
+        icon: '🏷️',
+        assetCount: mockAssetCounts.cat_logos,
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: 'cat_backgrounds',
+        name: '背景图片',
+        description: '背景和纹理素材',
+        icon: '🖼️',
+        assetCount: mockAssetCounts.cat_backgrounds,
+        createdAt: new Date().toISOString(),
+      },
+    ];
+    saveCategories();
+  }
+};
+
+// 保存分类列表
+const saveCategories = () => {
+  localStorage.setItem('assetCategories', JSON.stringify(categories.value));
+};
+
+// 获取分类颜色
+const getCategoryColor = (categoryId: string) => {
+  return categoryColors[categoryId] || 'default';
+};
+
+// 获取分类图标
+const getCategoryIcon = (categoryId: string) => {
+  return categoryIcons[categoryId] || '📁';
+};
+
+// 获取素材数量
+const getAssetCount = (categoryId: string) => {
+  return mockAssetCounts[categoryId] || 0;
+};
+
+// 显示创建对话框
+const showCreateModal = () => {
+  isEditMode.value = false;
+  categoryForm.value = {
+    name: '',
+    description: '',
+    icon: '📦',
+  };
+  categoryModalVisible.value = true;
+};
+
+// 编辑分类
+const editCategory = (category: Category) => {
+  isEditMode.value = true;
+  editingCategoryId.value = category.id;
+  categoryForm.value = {
+    name: category.name,
+    description: category.description,
+    icon: category.icon,
+  };
+  categoryModalVisible.value = true;
+};
+
+// 处理保存分类
+const handleSaveCategory = () => {
+  if (!categoryForm.value.name) {
+    Message.warning('请输入分类名称');
+    return Promise.reject();
+  }
+
+  if (isEditMode.value && editingCategoryId.value) {
+    // 编辑模式
+    const category = categories.value.find((c) => c.id === editingCategoryId.value);
+    if (category) {
+      category.name = categoryForm.value.name;
+      category.description = categoryForm.value.description;
+      category.icon = categoryForm.value.icon;
+      saveCategories();
+      Message.success('分类已更新');
+    }
+  } else {
+    // 新建模式
+    const newCategory: Category = {
+      id: `cat_${Date.now()}`,
+      name: categoryForm.value.name,
+      description: categoryForm.value.description,
+      icon: categoryForm.value.icon,
+      assetCount: 0,
+      createdAt: new Date().toISOString(),
+    };
+    categories.value.push(newCategory);
+    saveCategories();
+    Message.success('分类已创建');
+  }
+
+  categoryModalVisible.value = false;
+  return Promise.resolve();
+};
+
+// 删除分类
+const deleteCategory = (category: Category) => {
+  Modal.confirm({
+    title: '确认删除',
+    content: `确定要删除分类"${category.name}"吗？`,
+    onOk: () => {
+      categories.value = categories.value.filter((c) => c.id !== category.id);
+      saveCategories();
+      Message.success('分类已删除');
+    },
+  });
+};
+
+onMounted(() => {
+  loadCategories();
+});
+
+// 暴露方法
+defineExpose({
+  categories,
+  loadCategories,
+});
+</script>
+
+<style lang="less" scoped>
+.asset-category-manager {
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding: 0 16px;
+
+    h3 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+  }
+
+  .category-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .category-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: #f5f5f5;
+    border-radius: 8px;
+
+    .category-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      .category-name {
+        font-weight: 500;
+      }
+
+      .category-count {
+        font-size: 12px;
+        color: #999;
+      }
+    }
+
+    .category-actions {
+      display: flex;
+      gap: 4px;
+    }
+  }
+
+  .empty-state {
+    padding: 40px 20px;
+    text-align: center;
+  }
+}
+</style>

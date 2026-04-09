@@ -1,0 +1,357 @@
+<template>
+  <div class="home">
+    <Layout>
+      <!-- 头部区域 -->
+      <Top v-if="state.show" :ruler="state.ruler" :editing-template="editingTemplate" @update:ruler="rulerSwitch"></Top>
+      <AContent class="canvas-content">
+        <!-- 左侧区域 -->
+        <Left v-if="state.show"></Left>
+        <!-- 画布区域 -->
+        <div id="workspace">
+          <div class="canvas-box">
+            <div class="inside-shadow"></div>
+            <canvas id="canvas" :class="state.ruler ? 'design-stage-grid' : ''"></canvas>
+            <dragMode v-if="state.show"></dragMode>
+            <zoom></zoom>
+          </div>
+        </div>
+        <Right v-if="state.show"></Right>
+      </AContent>
+    </Layout>
+  </div>
+</template>
+
+<script name="Home" setup lang="ts">
+import { ref, reactive, onMounted, onUnmounted, watch, provide } from 'vue';
+import { useRoute } from 'vue-router';
+import { Layout } from 'ant-design-vue';
+
+// 从 Layout 中解构子组件
+const { Content: AContent } = Layout;
+import Top from './components/top/index.vue';
+import Left from './components/left/index.vue';
+import Right from './components/right/index.vue';
+
+import zoom from '@/components/fabric-editor/zoom.vue';
+import dragMode from '@/components/fabric-editor/dragMode.vue';
+// 功能组件
+import { fabric } from 'fabric';
+import { message } from 'ant-design-vue';
+
+const route = useRoute();
+
+// 当前正在编辑的模版信息（从模版管理编辑过来时会有值）
+const editingTemplate = ref<{
+  id: string;
+  name: string;
+  description: string;
+} | null>(null);
+
+import Editor, {
+  IEditor,
+  DringPlugin,
+  AlignGuidLinePlugin,
+  ControlsPlugin,
+  // ControlsRotatePlugin,
+  CenterAlignPlugin,
+  LayerPlugin,
+  CopyPlugin,
+  MoveHotKeyPlugin,
+  DeleteHotKeyPlugin,
+  GroupPlugin,
+  DrawLinePlugin,
+  GroupTextEditorPlugin,
+  GroupAlignPlugin,
+  WorkspacePlugin,
+  HistoryPlugin,
+  FlipPlugin,
+  RulerPlugin,
+  MaterialPlugin,
+  WaterMarkPlugin,
+  FontPlugin,
+  PolygonModifyPlugin,
+  DrawPolygonPlugin,
+  FreeDrawPlugin,
+  PathTextPlugin,
+  PsdPlugin,
+  SimpleClipImagePlugin,
+  BarCodePlugin,
+  QrCodePlugin,
+  ImageStroke,
+  ResizePlugin,
+  LockPlugin,
+  AddBaseTypePlugin,
+  MaskPlugin,
+  DynamicVariablePlugin,
+} from '@kuaitu/core';
+
+const APIHOST = import.meta.env.VITE_APP_APIHOST;
+
+// 创建编辑器
+const canvasEditor = new Editor() as IEditor;
+
+const state = reactive({
+  show: false,
+  select: null,
+  ruler: true,
+});
+
+onMounted(() => {
+  // 初始化fabric
+  const canvas = new fabric.Canvas('canvas', {
+    fireRightClick: true, // 启用右键，button的数字为3
+    stopContextMenu: true, // 禁止默认右键菜单
+    controlsAboveOverlay: true, // 超出clipPath后仍然展示控制条
+    // imageSmoothingEnabled: false, // 解决文字导出后不清晰问题
+    preserveObjectStacking: true, // 当选择画布中的对象时，让对象不在顶层。
+  });
+
+  // 初始化编辑器
+  canvasEditor.init(canvas);
+  canvasEditor
+    .use(DringPlugin)
+    .use(PolygonModifyPlugin)
+    .use(AlignGuidLinePlugin)
+    .use(ControlsPlugin)
+    // .use(ControlsRotatePlugin)
+    .use(CenterAlignPlugin)
+    .use(LayerPlugin)
+    .use(CopyPlugin)
+    .use(MoveHotKeyPlugin)
+    .use(DeleteHotKeyPlugin)
+    .use(GroupPlugin)
+    .use(DrawLinePlugin)
+    .use(GroupTextEditorPlugin)
+    .use(GroupAlignPlugin)
+    .use(WorkspacePlugin)
+    .use(HistoryPlugin)
+    .use(FlipPlugin)
+    .use(RulerPlugin)
+    .use(DrawPolygonPlugin)
+    .use(FreeDrawPlugin)
+    .use(PathTextPlugin)
+    .use(SimpleClipImagePlugin)
+    .use(BarCodePlugin)
+    .use(QrCodePlugin)
+    .use(FontPlugin, {
+      repoSrc: APIHOST,
+    })
+    .use(MaterialPlugin, {
+      repoSrc: APIHOST,
+    })
+    .use(WaterMarkPlugin)
+    .use(PsdPlugin)
+    .use(ImageStroke)
+    .use(ResizePlugin)
+    .use(LockPlugin)
+    .use(AddBaseTypePlugin)
+    .use(MaskPlugin)
+    .use(DynamicVariablePlugin);
+
+  state.show = true;
+  // 默认打开标尺 - 延迟启用，确保 canvas 完全初始化
+  if (state.ruler) {
+    // 使用 setTimeout 确保 canvas 完全准备好
+    setTimeout(() => {
+      try {
+        // 检查 canvas 是否有有效的尺寸
+        if (canvas.width > 0 && canvas.height > 0) {
+          canvasEditor.rulerEnable();
+        } else {
+          console.warn('Canvas 尺寸无效，延迟启用标尺');
+          // 如果尺寸无效，再次延迟尝试
+          setTimeout(() => {
+            if (canvas.width > 0 && canvas.height > 0) {
+              canvasEditor.rulerEnable();
+            } else {
+              console.error('Canvas 尺寸仍然无效，无法启用标尺');
+            }
+          }, 500);
+        }
+      } catch (error) {
+        console.error('启用标尺失败:', error);
+      }
+    }, 100);
+  }
+
+  // 检查是否需要加载本地模版（延迟执行，确保画布完全初始化）
+  const templateId = route.query.templateId as string;
+  const mode = route.query.mode as string; // 'edit' 或 'copy'
+  if (templateId) {
+    setTimeout(() => {
+      loadLocalTemplate(templateId, mode);
+    }, 500);
+  }
+});
+
+// 监听路由变化，处理从模版管理页面跳转过来的情况
+watch(() => route.query, (query) => {
+  const templateId = query.templateId as string;
+  const mode = query.mode as string;
+  if (templateId) {
+    setTimeout(() => {
+      loadLocalTemplate(templateId, mode);
+    }, 500);
+  }
+});
+
+// 加载本地模版
+const loadLocalTemplate = async (templateId: string, mode?: string) => {
+  console.log('开始加载本地模版:', templateId, '模式:', mode || 'edit');
+  try {
+    const savedTemplates = localStorage.getItem('userTemplates');
+    if (!savedTemplates) {
+      console.warn('未找到本地模版数据');
+      message.warning('未找到本地模版');
+      return;
+    }
+
+    const templates = JSON.parse(savedTemplates);
+    console.log('找到的模版数量:', templates.length);
+
+    const template = templates.find((t) => t.id === templateId);
+
+    if (!template) {
+      console.warn('模版不存在:', templateId);
+      message.warning('模版不存在');
+      return;
+    }
+
+    console.log('找到模版:', template.name, '尺寸:', template.width, 'x', template.height);
+
+    // 根据模式设置 editingTemplate
+    // mode='copy' 时为复制模式，不设置 editingTemplate（或设为 null）
+    // mode='edit' 或未指定时为编辑模式，设置 editingTemplate
+    if (mode === 'copy') {
+      console.log('home/index: 设置为复制模式，editingTemplate = null');
+      editingTemplate.value = null;
+      message.success(`已复制模版：${template.name}，可修改后另存为新模版`);
+    } else {
+      console.log('home/index: 设置为编辑模式，editingTemplate =', {
+        id: template.id,
+        name: template.name,
+        description: template.description || '',
+      });
+      editingTemplate.value = {
+        id: template.id,
+        name: template.name,
+        description: template.description || '',
+      };
+      message.success(`已加载模版：${template.name}`);
+    }
+
+    // 兼容新旧两种格式
+    const jsonData = template.json || template.canvasJson;
+
+    if (jsonData) {
+      console.log('开始加载JSON数据到画布');
+      await canvasEditor.loadJSON(jsonData);
+      console.log('模版加载完成');
+    } else {
+      console.warn('模版没有JSON数据');
+      message.warning('模版数据不完整');
+    }
+  } catch (error) {
+    console.error('加载模版失败:', error);
+    message.error('加载模版失败');
+  }
+};
+
+onUnmounted(() => canvasEditor.destory());
+const rulerSwitch = (val) => {
+  if (val) {
+    canvasEditor.rulerEnable();
+  } else {
+    canvasEditor.rulerDisable();
+  }
+  // 使标尺开关组件失焦，避免响应键盘的空格事件
+  if (document.activeElement instanceof HTMLElement) {
+    document.activeElement.blur();
+  }
+};
+
+provide('fabric', fabric);
+provide('canvasEditor', canvasEditor);
+// provide('mixinState', mixinState);
+</script>
+
+<style lang="less" scoped>
+// 画布内容区域样式
+.canvas-content {
+  display: flex;
+  height: calc(100vh - 64px);
+  position: relative;
+}
+
+:deep(.ivu-layout-header) {
+  --height: 45px;
+  padding: 0 0px;
+  border-bottom: 1px solid #eef2f8;
+  background: #fff;
+  height: var(--height);
+  line-height: var(--height);
+  display: flex;
+  justify-content: space-between;
+}
+
+.home,
+.ivu-layout {
+  height: 100vh;
+}
+
+.icon {
+  display: block;
+}
+
+.canvas-box {
+  position: relative;
+}
+
+// 画布内阴影
+.inside-shadow {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  box-shadow: inset 0 0 9px 2px #0000001f;
+  z-index: 2;
+  pointer-events: none;
+}
+
+#canvas {
+  width: 300px;
+  height: 300px;
+  margin: 0 auto;
+}
+
+#workspace {
+  flex: 1;
+  width: 100%;
+  position: relative;
+  background: #f1f1f1;
+  overflow: hidden;
+}
+
+// 标尺
+.switch {
+  margin-right: 10px;
+}
+
+// 网格背景
+.design-stage-grid {
+  --offsetX: 0px;
+  --offsetY: 0px;
+  --size: 16px;
+  --color: #dedcdc;
+  background-image: linear-gradient(
+      45deg,
+      var(--color) 25%,
+      transparent 0,
+      transparent 75%,
+      var(--color) 0
+    ),
+    linear-gradient(45deg, var(--color) 25%, transparent 0, transparent 75%, var(--color) 0);
+  background-position: var(--offsetX) var(--offsetY),
+    calc(var(--size) + var(--offsetX)) calc(var(--size) + var(--offsetY));
+  background-size: calc(var(--size) * 2) calc(var(--size) * 2);
+}
+</style>

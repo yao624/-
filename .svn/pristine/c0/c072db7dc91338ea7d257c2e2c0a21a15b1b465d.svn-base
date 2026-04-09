@@ -1,0 +1,2226 @@
+<template>
+  <div class="create-rule-page">
+    <div class="page-head">
+      <a-breadcrumb>
+        <a-breadcrumb-item>
+          <a @click.prevent="goRuleManage">{{ t('规则管理') }}</a>
+        </a-breadcrumb-item>
+        <a-breadcrumb-item>
+          <a @click.prevent="goCreateRule">{{ pageTitle }}</a>
+        </a-breadcrumb-item>
+      </a-breadcrumb>
+    </div>
+
+    <div class="wizard-layout">
+      <div class="wizard-steps-nav">
+        <div class="wizard-step-item" :class="{ active: currentStep === 1 }">
+          <span class="wizard-step-index">1</span>
+          <span class="wizard-step-text">{{ t('选择规则类型') }}</span>
+        </div>
+        <div class="wizard-step-item" :class="{ active: currentStep === 2 }">
+          <span class="wizard-step-index">2</span>
+          <span class="wizard-step-text">{{ t('设置规则') }}</span>
+        </div>
+      </div>
+
+      <div class="wizard-main">
+        <!-- 步骤1: 选择模板 -->
+        <div v-show="currentStep === 1" class="step-content">
+          <div class="step-header">
+            <div class="step-title-wrap">
+              <!--              <a-popconfirm-->
+              <!--                :open="headerBackConfirmVisible"-->
+              <!--                :title="t('当前填写内容将丢失，确认返回吗？')"-->
+              <!--                :ok-text="t('确认')"-->
+              <!--                :cancel-text="t('取消')"-->
+              <!--                @confirm="confirmHeaderBack"-->
+              <!--                @cancel="headerBackConfirmVisible = false"-->
+              <!--              >-->
+              <a-tooltip :title="t('返回上一级')">
+                <a-button shape="circle" class="back-icon-button" @click="onHeaderBackClick">
+                  <arrow-left-outlined />
+                </a-button>
+              </a-tooltip>
+              <!--              </a-popconfirm>-->
+              <div class="step-title-block">
+                <div class="step-title">{{ t('创建规则') }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 监控设置 -->
+          <div class="monitoring-settings">
+            <div class="setting-item">
+              <label>{{ t('监控渠道') }}:</label>
+              <a-select v-model:value="monitoringChannel" style="width: 150px">
+                <a-select-option value="meta">Meta</a-select-option>
+              </a-select>
+            </div>
+            <div class="setting-item">
+              <label>{{ t('监控对象') }}:</label>
+              <a-tabs v-model:activeKey="monitoringObject" type="card">
+                <a-tab-pane key="ad-account" :tab="t('广告账号')" />
+                <a-tab-pane key="campaign" :tab="t('广告系列')" />
+                <a-tab-pane key="ad-group" :tab="t('广告组')" />
+                <a-tab-pane key="ad" :tab="t('广告')" />
+                <a-tab-pane key="ad-material" :tab="t('广告+素材')" />
+                <a-tab-pane key="material" :tab="t('素材')" />
+              </a-tabs>
+            </div>
+          </div>
+
+          <div v-if="!isEditMode" class="template-hint">
+            {{ t('请选择下方模板或直接创建规则:') }}
+          </div>
+
+          <!-- 规则模板卡片 -->
+          <div v-if="!isEditMode" class="rule-templates">
+            <div
+              v-for="template in ruleTemplates"
+              :key="template.id"
+              class="template-card"
+              @click="selectTemplate(template.id)"
+            >
+              <div class="template-icon" :style="{ background: template.color }">
+                <component :is="template.icon" />
+              </div>
+              <div class="template-title">{{ template.title }}</div>
+              <div v-if="template.description" class="template-desc">
+                {{ template.description }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 步骤2: 配置规则 -->
+        <div v-show="currentStep === 2" class="step-content">
+          <div class="step-header">
+            <div class="step-title-wrap">
+<!--              <a-popconfirm-->
+<!--                :open="headerBackConfirmVisible"-->
+<!--                :title="t('当前填写内容将丢失，确认返回吗？')"-->
+<!--                :ok-text="t('确认')"-->
+<!--                :cancel-text="t('取消')"-->
+<!--                @confirm="confirmHeaderBack"-->
+<!--                @cancel="headerBackConfirmVisible = false"-->
+<!--              >-->
+                <a-tooltip :title="t('返回上一级')">
+                  <a-button shape="circle" class="back-icon-button" @click="onHeaderBackClick">
+                    <arrow-left-outlined />
+                  </a-button>
+                </a-tooltip>
+<!--              </a-popconfirm>-->
+              <div class="step-title-block">
+                <div class="step-title">
+                  {{ pageTitle }}
+                  <span class="step-title-type" v-if="selectedTemplateTitle">
+                    {{ t('规则类型') }}：{{ selectedTemplateTitle }}
+                  </span>
+                </div>
+                <div class="step-subtitle">
+                  {{
+                    t(
+                      '因网络延迟等客观因素,以下条件判断可能无法100%准确，仅供辅助参考,请注意广告账户的安全使用,避免账户被盗',
+                    )
+                  }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 筛选 + 指标过滤（广告防盗刷模板不使用本区域） -->
+          <div v-if="!isAntiFraudTemplate" class="rule-section">
+            <div class="section-title">
+              <filter-outlined />
+              {{ t('筛选') }}
+            </div>
+            <div class="filter-row">
+              <a-select
+                v-model:value="ruleConfig.filters.adAccount"
+                :placeholder="t('广告账户: 请选择')"
+                style="width: 200px"
+                allow-clear
+              >
+                <a-select-option v-for="acc in adAccountOptions" :key="acc.id" :value="acc.id">
+                  {{ acc.name }}
+                </a-select-option>
+              </a-select>
+              <a-select
+                v-model:value="ruleConfig.filters.channel"
+                :placeholder="t('渠道: 请选择')"
+                style="width: 200px"
+                allow-clear
+              >
+                <a-select-option v-for="ch in channelOptions" :key="ch.id" :value="ch.id">
+                  {{ ch.name }}
+                </a-select-option>
+              </a-select>
+              <a-select
+                v-model:value="ruleConfig.filters.product"
+                :placeholder="t('产品: 请选择')"
+                style="width: 150px"
+                allow-clear
+              >
+                <a-select-option v-for="prod in productOptions" :key="prod.id" :value="prod.id">
+                  {{ prod.name }}
+                </a-select-option>
+              </a-select>
+            </div>
+
+            <!-- 指标过滤 -->
+            <div class="metric-filter">
+              <div class="metric-title">
+                {{ t('指标过滤') }}
+                <a-tooltip>
+                  <template #title>
+                    {{
+                      t('因三方数据指标的延迟较长,若选择监控三方指标,建议选择2天及以前的数据时间')
+                    }}
+                  </template>
+                  <info-circle-outlined style="margin-left: 8px; color: #1890ff" />
+                </a-tooltip>
+              </div>
+              <a-alert
+                type="info"
+                :message="
+                  t('因三方数据指标的延迟较长,若选择监控三方指标,建议选择2天及以前的数据时间')
+                "
+                show-icon
+                style="margin-bottom: 16px"
+              />
+              <div
+                v-for="(condition, index) in ruleConfig.metricConditions"
+                :key="index"
+                class="metric-condition"
+              >
+                <div class="condition-number">{{ index + 1 }}</div>
+                <a-select
+                  v-model:value="condition.metric"
+                  style="width: 350px"
+                  :options="metricOptions"
+                />
+                <a-select
+                  v-model:value="condition.date"
+                  :placeholder="t('今天')"
+                  style="width: 150px"
+                >
+                  <a-select-option
+                    v-for="date in dateOptions"
+                    :key="date.value"
+                    :value="date.value"
+                  >
+                    {{ date.label }}
+                  </a-select-option>
+                </a-select>
+                <a-select
+                  v-model:value="condition.operator"
+                  style="width: 80px"
+                  :options="operatorOptions"
+                />
+                <a-select
+                  v-model:value="condition.valueType"
+                  style="width: 100px"
+                  :options="getValueTypeOptions(condition.metric)"
+                />
+                <!-- 单值：>,<,>=,<=,=；范围：介于/不介于 -->
+                <template
+                  v-if="condition.operator === 'between' || condition.operator === 'not_between'"
+                >
+                  <a-input-number
+                    v-model:value="condition.valueMin"
+                    :placeholder="'最小值'"
+                    style="width: 120px"
+                    required
+                  />
+                  <span style="margin: 0 6px; color: #666">~</span>
+                  <a-input-number
+                    v-model:value="condition.valueMax"
+                    :placeholder="'最大值'"
+                    style="width: 120px"
+                    required
+                  />
+                </template>
+                <a-input-number
+                  v-else
+                  v-model:value="condition.value"
+                  :placeholder="t('数值')"
+                  style="width: 120px"
+                  required
+                />
+                <a-select
+                  v-if="condition.valueType === 'number'"
+                  v-model:value="condition.valueUnit"
+                  style="width: 80px"
+                  :options="valueUnitOptions"
+                />
+                <a-select
+                  v-else-if="condition.valueType === 'spend'"
+                  v-model:value="condition.currency"
+                  style="width: 80px"
+                  :options="spendCurrencyOptions"
+                />
+                <a-select
+                  v-else
+                  v-model:value="condition.currency"
+                  style="width: 80px"
+                  :options="currencyOptions"
+                />
+
+                <a-button
+                  v-if="ruleConfig.metricConditions.length > 1"
+                  type="link"
+                  danger
+                  @click="removeCondition(index)"
+                  style="margin-left: 8px"
+                >
+                  {{ t('删除') }}
+                </a-button>
+              </div>
+              <a-button type="link" @click="addCondition" style="padding: 0">
+                {{ t('添加条件') }}
+              </a-button>
+            </div>
+          </div>
+
+          <!-- 广告防盗刷：专用条件（与参考产品一致，不走筛选/指标过滤） -->
+          <div v-else class="rule-section anti-fraud-template-section">
+            <div class="section-title">
+              <safety-outlined />
+              {{ t('防盗刷条件') }}
+            </div>
+            <anti-fraud-rule-section v-model="ruleConfig.antiFraud" />
+          </div>
+
+          <!-- 执行动作 -->
+          <div class="rule-section">
+            <div class="section-title">
+              <play-circle-outlined />
+              {{ t('执行动作') }}
+              <a-tooltip>
+                <template #title>{{ t('依次执行以下动作') }}</template>
+                <info-circle-outlined style="margin-left: 8px; color: #1890ff" />
+              </a-tooltip>
+            </div>
+            <a-checkbox v-model:checked="ruleConfig.executeInOrder">
+              {{ t('依次执行以下动作') }}
+            </a-checkbox>
+            <div class="action-list">
+              <div v-for="(action, index) in ruleConfig.actions" :key="index" class="action-card">
+                <div class="action-card-number">{{ index + 1 }}</div>
+                <a-button
+                  v-if="ruleConfig.actions.length > 1"
+                  type="link"
+                  danger
+                  class="action-card-delete"
+                  @click="removeAction(index)"
+                >
+                  {{ t('删除') }}
+                </a-button>
+
+                <div class="action-card-content">
+                  <div class="action-config">
+                    <div class="action-top-row">
+                      <a-select
+                        v-model:value="action.type"
+                        class="action-type-select"
+                        @change="() => handleActionTypeChange(index)"
+                      >
+                        <a-select-option value="status">{{ t('状态') }}</a-select-option>
+                        <a-select-option value="bid">{{ t('出价') }}</a-select-option>
+                        <a-select-option value="budget">{{ t('日预算') }}</a-select-option>
+                        <a-select-option value="total-budget">{{ t('总预算') }}</a-select-option>
+                        <a-select-option value="roas-target">
+                          {{ t('广告花费回报目标') }}
+                        </a-select-option>
+                        <a-select-option value="edit-tag">{{ t('编辑标签') }}</a-select-option>
+                        <a-select-option value="send-email">{{ t('发送邮件') }}</a-select-option>
+                        <a-select-option value="send-dingtalk">
+                          {{ t('发送钉钉群') }}
+                        </a-select-option>
+                        <a-select-option value="send-wecom">
+                          {{ t('发送企业微信群') }}
+                        </a-select-option>
+                        <a-select-option value="send-feishu">{{ t('发送飞书群') }}</a-select-option>
+                      </a-select>
+
+                      <template v-if="action.type === 'send-email'">
+                        <div class="primary-area">
+                          <a-select
+                            v-model:value="action.config.recipients"
+                            mode="multiple"
+                            :placeholder="t('发送对象')"
+                            class="recipient-multi-select"
+                            :options="getActionEmailOptions(index)"
+                            allow-clear
+                            show-search
+                            :filter-option="filterSendTargetOption"
+                          >
+                            <template #dropdownRender="{ menuNode: menu }">
+                              <VNodes :vnodes="menu" />
+                              <a-divider style="margin: 4px 0" />
+                              <a-space class="select-add-row">
+                                <a-input
+                                  v-model:value="actionEmailDrafts[index]"
+                                  :placeholder="t('请输入后添加')"
+                                  @press-enter="() => addActionEmailRecipient(index)"
+                                />
+                                <a-button type="text" @click="() => addActionEmailRecipient(index)">
+                                  <template #icon><PlusOutlined /></template>
+                                </a-button>
+                              </a-space>
+                            </template>
+                          </a-select>
+                        </div>
+                      </template>
+
+                      <template v-if="action.type === 'status'">
+                        <div class="primary-area">
+                          <a-select v-model:value="action.config.status" class="primary-select">
+                            <a-select-option value="pause">{{ t('暂停') }}</a-select-option>
+                            <a-select-option value="enable">{{ t('开启') }}</a-select-option>
+                          </a-select>
+                        </div>
+                      </template>
+
+                      <template v-if="action.type === 'bid'">
+                        <div class="primary-area">
+                          <a-select v-model:value="action.config.bidAction" class="primary-select">
+                            <a-select-option value="increase">{{ t('增加数值') }}</a-select-option>
+                            <a-select-option value="decrease">{{ t('减少数值') }}</a-select-option>
+                          </a-select>
+                        </div>
+                      </template>
+
+                      <template v-if="action.type === 'budget' || action.type === 'total-budget'">
+                        <div class="primary-area">
+                          <a-select
+                            v-model:value="action.config.budgetAction"
+                            class="primary-select"
+                          >
+                            <a-select-option value="increase">{{ t('增加数值') }}</a-select-option>
+                            <a-select-option value="decrease">{{ t('减少数值') }}</a-select-option>
+                          </a-select>
+                        </div>
+                      </template>
+
+                      <template v-if="action.type === 'roas-target'">
+                        <div class="primary-area">
+                          <a-select v-model:value="action.config.roasAction" class="primary-select">
+                            <a-select-option value="increase">{{ t('增加数值') }}</a-select-option>
+                            <a-select-option value="decrease">{{ t('减少数值') }}</a-select-option>
+                          </a-select>
+                        </div>
+                      </template>
+
+                      <template v-if="action.type === 'edit-tag'">
+                        <div class="primary-area">
+                          <tag-select
+                            v-model="action.config.tag"
+                            :tag-folders="tagTreeData[index]?.tagFolders || []"
+                            :tags="tagTreeData[index]?.tags || []"
+                            :tag-options="tagTreeData[index]?.tagOptions || []"
+                            :placeholder="t('请选择标签')"
+                            :creatable="true"
+                            :create-option-api="(tagId, name, parentId, isTagLevel) => handleCreateTagOption(tagId, name, parentId, isTagLevel, index)"
+                            class="primary-select"
+                          />
+                        </div>
+                      </template>
+
+                      <template
+                        v-if="['send-dingtalk', 'send-wecom', 'send-feishu'].includes(action.type)"
+                      >
+                        <div class="primary-area">
+                          <a-select
+                            v-model:value="action.config.webhookUrls"
+                            mode="multiple"
+                            :placeholder="t('发送对象')"
+                            class="recipient-multi-select"
+                            :options="getActionImOptions(index)"
+                            allow-clear
+                            show-search
+                            :filter-option="filterSendTargetOption"
+                          >
+                            <template #dropdownRender="{ menuNode: menu }">
+                              <VNodes :vnodes="menu" />
+                              <a-divider style="margin: 4px 0" />
+                              <a-space class="select-add-row">
+                                <a-input
+                                  v-model:value="actionImDrafts[index]"
+                                  :placeholder="t('请输入后添加')"
+                                  @press-enter="() => addActionImTarget(index)"
+                                />
+                                <a-button type="text" @click="() => addActionImTarget(index)">
+                                  <template #icon><PlusOutlined /></template>
+                                </a-button>
+                              </a-space>
+                            </template>
+                          </a-select>
+                        </div>
+                      </template>
+                    </div>
+
+                    <div class="action-details">
+                      <template v-if="action.type === 'send-email'">
+                        <a-input
+                          v-model:value="action.config.subject"
+                          :placeholder="t('邮件主题')"
+                          class="full-width-input"
+                        />
+                        <a-textarea
+                          v-model:value="action.config.body"
+                          :placeholder="t('邮件正文')"
+                          :rows="3"
+                          class="full-width-textarea"
+                        />
+                        <div class="action-help-row">
+                          <a href="#" class="action-help-link" @click.prevent>
+                            {{ t('如何找到以上参数') }}
+                          </a>
+                        </div>
+                      </template>
+
+                      <template v-if="action.type === 'bid'">
+                        <div class="detail-stack">
+                          <a-input-number
+                            v-model:value="action.config.bidValue"
+                            :placeholder="t('数值')"
+                            class="full-width-input-number"
+                          />
+                          <div class="detail-text-row">
+                            <span>
+                              {{
+                                action.config.bidAction === 'increase'
+                                  ? t('且最高不超过')
+                                  : t('且最低不小于')
+                              }}
+                            </span>
+                          </div>
+                          <div class="detail-row">
+                            <a-input-number
+                              v-model:value="action.config.bidLimit"
+                              :placeholder="t('数值')"
+                              class="detail-input-number"
+                            />
+                            <span class="detail-suffix">USD</span>
+                          </div>
+                        </div>
+                      </template>
+
+                      <template v-if="action.type === 'budget' || action.type === 'total-budget'">
+                        <div class="detail-stack">
+                          <a-input-number
+                            v-model:value="action.config.budgetValue"
+                            :placeholder="t('数值')"
+                            class="full-width-input-number"
+                          />
+                          <div class="detail-text-row">
+                            <span>
+                              {{
+                                action.config.budgetAction === 'increase'
+                                  ? t('且最高不超过')
+                                  : t('且最低不小于')
+                              }}
+                            </span>
+                          </div>
+                          <div class="detail-row">
+                            <a-input-number
+                              v-model:value="action.config.budgetLimit"
+                              :placeholder="t('数值')"
+                              class="detail-input-number"
+                            />
+                            <span class="detail-suffix">USD</span>
+                          </div>
+                          <div v-if="action.type === 'budget'" class="budget-strategy">
+                            <div class="strategy-title">{{ t('第二天的预算策略') }}:</div>
+                            <a-radio-group v-model:value="action.config.budgetStrategy">
+                              <a-radio value="continue">{{ t('继续沿用调整后的预算') }}</a-radio>
+                              <a-radio value="restore">
+                                {{
+                                  t(
+                                    '还原为AI助手最后一次调整成功前的预算(可在任务中心批量编辑类型中查看定时调整任务)',
+                                  )
+                                }}
+                              </a-radio>
+                            </a-radio-group>
+                          </div>
+                        </div>
+                      </template>
+
+                      <template v-if="action.type === 'roas-target'">
+                        <div class="detail-stack">
+                          <a-input-number
+                            v-model:value="action.config.roasValue"
+                            :placeholder="t('数值')"
+                            class="full-width-input-number"
+                            :min="0"
+                            :step="0.01"
+                          />
+                          <div class="detail-text-row">
+                            <span>
+                              {{
+                                action.config.roasAction === 'increase'
+                                  ? t('且最高不超过')
+                                  : t('且最低不小于')
+                              }}
+                            </span>
+                          </div>
+                          <div class="detail-row">
+                            <a-input-number
+                              v-model:value="action.config.roasLimit"
+                              :placeholder="t('数值')"
+                              class="detail-input-number"
+                              :min="0"
+                              :step="0.01"
+                            />
+                          </div>
+                        </div>
+                      </template>
+
+                      <template v-if="action.type === 'edit-tag'">
+                        <div class="detail-stack">
+                          <a-select
+                            v-model:value="action.config.tagAction"
+                            :placeholder="t('设置方式')"
+                            class="full-width-select"
+                          >
+                            <a-select-option value="add">{{ t('添加标签') }}</a-select-option>
+                            <a-select-option value="remove">{{ t('移除标签') }}</a-select-option>
+                            <a-select-option value="replace">{{ t('替换标签') }}</a-select-option>
+                          </a-select>
+                          <div v-if="action.config.tagAction === 'replace'">
+                            <div class="detail-label">{{ t('将标签设置为') }}</div>
+                            <tag-select
+                              v-model="action.config.newTag"
+                              :tag-folders="tagTreeData[index]?.tagFolders || []"
+                              :tags="tagTreeData[index]?.tags || []"
+                              :tag-options="tagTreeData[index]?.tagOptions || []"
+                              :placeholder="t('请选择标签')"
+                              :creatable="true"
+                              :create-option-api="(tagId, name, parentId, isTagLevel) => handleCreateTagOption(tagId, name, parentId, isTagLevel, index)"
+                              class="full-width-select"
+                            />
+                          </div>
+                        </div>
+                      </template>
+
+                      <template
+                        v-if="['send-dingtalk', 'send-wecom', 'send-feishu'].includes(action.type)"
+                      >
+                        <a-input
+                          v-model:value="action.config.imSubject"
+                          :placeholder="t('消息主题')"
+                          class="full-width-input"
+                        />
+                        <a-textarea
+                          v-model:value="action.config.imMessage"
+                          :placeholder="t('消息内容')"
+                          :rows="3"
+                          class="full-width-textarea"
+                        />
+                      </template>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <a-button type="link" class="add-action-link" @click="addAction">
+              <plus-outlined />
+              {{ t('添加动作') }}
+            </a-button>
+          </div>
+
+          <!-- 执行频次 -->
+          <div class="rule-section">
+            <div class="section-title">
+              <clock-circle-outlined />
+              {{ t('执行频次') }}
+            </div>
+            <div class="frequency-setting">
+              <span>
+                {{ t('若监控对象在多次检查中均满足条件,那么距离上次执行动作的时间间隔是') }}
+              </span>
+              <a-select
+                v-model:value="ruleConfig.executionInterval"
+                style="width: 100px; margin-left: 8px"
+              >
+                <a-select-option value="24h">24h</a-select-option>
+                <a-select-option value="12h">12h</a-select-option>
+                <a-select-option value="6h">6h</a-select-option>
+              </a-select>
+            </div>
+            <div class="check-time-setting">
+              <div class="setting-row">
+                <label>{{ t('使用时区') }}:</label>
+                <a-select v-model:value="ruleConfig.timezone" style="width: 150px">
+                  <a-select-option value="UTC+8">UTC+8</a-select-option>
+                  <a-select-option value="UTC+0">UTC+0</a-select-option>
+                </a-select>
+                <span class="help-text">
+                  {{ t('请选择广告账户对应的时区,以确保数据与媒体后台保持一致') }}
+                </span>
+              </div>
+              <div class="setting-row flex-wrap">
+                <label>{{ t('生效时段') }}:</label>
+                <a-radio-group v-model:value="ruleConfig.effectivePeriod" button-style="solid">
+                  <a-radio-button value="long-term">{{ t('长期') }}</a-radio-button>
+                  <a-radio-button value="custom">{{ t('自定义') }}</a-radio-button>
+                </a-radio-group>
+              </div>
+              <div class="setting-row flex-wrap">
+                <label>{{ t('检查频次') }}:</label>
+                <a-radio-group v-model:value="ruleConfig.checkFrequency" button-style="solid">
+                  <a-radio-button value="15min">{{ t('每15分钟') }}</a-radio-button>
+                  <a-radio-button value="30min">{{ t('每半小时') }}</a-radio-button>
+                  <a-radio-button value="1h">{{ t('每小时') }}</a-radio-button>
+                  <a-radio-button value="daily">{{ t('每天') }}</a-radio-button>
+                  <a-radio-button value="weekly">{{ t('每周') }}</a-radio-button>
+                  <a-radio-button value="custom">{{ t('自定义') }}</a-radio-button>
+                </a-radio-group>
+              </div>
+              <div v-if="ruleConfig.checkFrequency === 'custom'" class="custom-time-slots">
+                <div
+                  v-for="(time, index) in ruleConfig.customCheckTimes"
+                  :key="index"
+                  class="time-slot-row"
+                >
+                  <a-date-picker
+                    v-model:value="ruleConfig.customCheckTimes[index]"
+                    format="YYYY-MM-DD HH:mm"
+                    show-time
+                    :default-value="dayjs().startOf('day')"
+                    placeholder="选择日期和时间"
+                    style="width: 180px"
+                    :disabled-date="
+                      (current: dayjs.Dayjs) => current && current < dayjs().startOf('day')
+                    "
+                  />
+                  <a-button
+                    v-if="ruleConfig.customCheckTimes.length > 1"
+                    type="text"
+                    danger
+                    @click="removeTimeSlot(index)"
+                  >
+                    <close-outlined />
+                  </a-button>
+                </div>
+                <a-button
+                  v-if="ruleConfig.customCheckTimes.length < 10"
+                  type="link"
+                  @click="addTimeSlot"
+                  class="add-time-slot-btn"
+                >
+                  <plus-outlined />
+                  {{ t('新增') }}
+                </a-button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 基础信息 -->
+          <div class="rule-section">
+            <div class="section-title">
+              <file-text-outlined />
+              {{ t('基础信息') }}
+            </div>
+            <a-form :model="ruleConfig.basicInfo" layout="vertical">
+              <a-form-item :label="t('规则名称')">
+                <a-input
+                  v-model:value="ruleConfig.basicInfo.ruleName"
+                  :placeholder="t('请输入规则名称')"
+                />
+              </a-form-item>
+              <a-form-item :label="t('规则描述')">
+                <a-textarea
+                  v-model:value="ruleConfig.basicInfo.description"
+                  :placeholder="t('请输入规则描述')"
+                  :rows="3"
+                />
+              </a-form-item>
+              <a-form-item :label="t('规则状态')">
+                <a-radio-group v-model:value="ruleConfig.basicInfo.status" button-style="solid">
+                  <a-radio-button value="enabled">{{ t('启用') }}</a-radio-button>
+                  <a-radio-button value="disabled">{{ t('停用') }}</a-radio-button>
+                </a-radio-group>
+              </a-form-item>
+              <a-form-item :label="t('货币单位')">
+                <a-radio-group v-model:value="ruleConfig.basicInfo.currency" button-style="solid">
+                  <a-radio-button value="USD">{{ t('美元') }}</a-radio-button>
+                  <a-radio-button value="CNY">{{ t('人民币') }}</a-radio-button>
+                </a-radio-group>
+              </a-form-item>
+            </a-form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="currentStep === 2" class="footer-actions">
+      <a-button type="primary" size="large" :loading="submitLoading" @click="handleSubmit">
+        {{ t('提交') }}
+      </a-button>
+      <a-button size="large" @click="onCancelClick">{{ t('取消') }}</a-button>
+    </div>
+    <a-modal
+      v-model:open="cancelConfirmVisible"
+      :title="t('提示')"
+      :ok-text="t('确认')"
+      :cancel-text="t('继续编辑')"
+      @ok="confirmCancelBack"
+    >
+      <p>{{ t('当前填写内容将丢失，确认取消吗？') }}</p>
+    </a-modal>
+  </div>
+</template>
+
+<script lang="ts" setup>
+import { ref, watch, onMounted, nextTick, computed, defineComponent } from 'vue';
+import { useI18n } from 'vue-i18n';
+import dayjs from 'dayjs';
+import {
+  ArrowLeftOutlined,
+  PlusOutlined,
+  CloseOutlined,
+  BellOutlined,
+  StopOutlined,
+  SafetyOutlined,
+  ReloadOutlined,
+  RiseOutlined,
+  FallOutlined,
+  FileAddOutlined,
+  MinusOutlined,
+  TagOutlined,
+  FilterOutlined,
+  PlayCircleOutlined,
+  ClockCircleOutlined,
+  FileTextOutlined,
+  InfoCircleOutlined,
+  FolderOutlined,
+} from '@ant-design/icons-vue';
+import { message } from 'ant-design-vue';
+import AntiFraudRuleSection from './components/anti-fraud-rule-section.vue';
+import TagSelect from '@/components/tag-select/index.vue';
+import { getRuleTemplates, getMetaTagsTree, createRule, updateRule, createTagOption } from '@/api/promotion/index';
+import metricFilterOptionsRaw from './metric-filter-options.json';
+
+const { t } = useI18n();
+const emit = defineEmits<{
+  (e: 'close'): void;
+}>();
+
+const props = defineProps<{
+  editData?: any;
+}>();
+
+const isEditMode = computed(() => !!props.editData);
+const pageTitle = computed(() => (isEditMode.value ? t('编辑规则') : t('创建规则')));
+
+// 编辑模式加载数据期间，跳过 monitoringObject watch 的重置逻辑
+const isLoadingEditData = ref(false);
+
+const currentStep = ref(1);
+const monitoringChannel = ref('meta');
+const monitoringObject = ref('ad-account');
+const selectedTemplate = ref<string | null>(null);
+
+/** 与后端 RuleTemplatesController 中「广告防盗刷」模板 id 一致 */
+const ANTI_FRAUD_TEMPLATE_ID = 'anti-fraud';
+const isAntiFraudTemplate = computed(() => selectedTemplate.value === ANTI_FRAUD_TEMPLATE_ID);
+
+const selectedTemplateTitle = computed(() => {
+  if (!selectedTemplate.value) return '';
+  return ruleTemplates.value.find(tpl => tpl.id === selectedTemplate.value)?.title ?? t('直接创建');
+});
+const agreedToDisclaimer = ref(false);
+const headerBackConfirmVisible = ref(false);
+const cancelConfirmVisible = ref(false);
+const submitLoading = ref(false);
+
+type RuleTemplateApi = {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  color: string;
+};
+
+type RuleTemplateCard = {
+  id: string;
+  title: string;
+  description: string;
+  icon: any; // @ant-design/icons-vue 图标组件
+  color: string;
+};
+
+type ValueTypeRule = {
+  includes: string[];
+  excludes?: string[];
+  options: string[];
+};
+
+type DateOption = { label: string; value: string };
+type OperatorOption = { label: string; value: string };
+
+type MetricFilterOptionsConfig = {
+  dateOptions: DateOption[];
+  operatorOptions: OperatorOption[];
+  valueTypeDefaults: string[];
+  valueTypeRules: ValueTypeRule[];
+  currencyOptions: string[];
+  metrics: string[];
+};
+
+const iconComponentByName: Record<string, any> = {
+  BellOutlined,
+  StopOutlined,
+  SafetyOutlined,
+  ReloadOutlined,
+  RiseOutlined,
+  FallOutlined,
+  FileAddOutlined,
+  MinusOutlined,
+  TagOutlined,
+  PlusOutlined,
+};
+
+const ruleTemplates = ref<RuleTemplateCard[]>([]);
+const loadingRuleTemplates = ref(false);
+
+/** 广告账户 mock 数据 */
+const adAccountOptions = ref([
+  { id: 'acc_001', name: 'Meta 广告账户 - US' },
+  { id: 'acc_002', name: 'Meta 广告账户 - EU' },
+  { id: 'acc_003', name: 'Meta 广告账户 - APAC' },
+]);
+
+/** 渠道 mock 数据 */
+const channelOptions = ref([
+  { id: 'ch_001', name: 'Meta' },
+  { id: 'ch_002', name: 'Google' },
+  { id: 'ch_003', name: 'TikTok' },
+]);
+
+/** 产品 mock 数据 */
+const productOptions = ref([
+  { id: 'prod_001', name: '夏季促销' },
+  { id: 'prod_002', name: '新品推广' },
+  { id: 'prod_003', name: '品牌曝光' },
+]);
+
+const loadRuleTemplates = async () => {
+  loadingRuleTemplates.value = true;
+  try {
+    const apiTemplates = await getRuleTemplates(monitoringObject.value);
+    ruleTemplates.value = (apiTemplates ?? []).map((tpl: RuleTemplateApi) => ({
+      id: tpl.id,
+      title: tpl.title,
+      description: tpl.description,
+      color: tpl.color,
+      icon: iconComponentByName[tpl.icon] ?? iconComponentByName.PlusOutlined,
+    }));
+  } finally {
+    loadingRuleTemplates.value = false;
+  }
+};
+
+const metricFilterOptionsConfig = metricFilterOptionsRaw as MetricFilterOptionsConfig;
+
+const metricOptions = metricFilterOptionsConfig.metrics.map(m => ({
+  label: m.label,
+  value: m.value,
+}));
+
+const DEFAULT_METRIC = metricOptions[0]?.value ?? 'bid';
+
+// 指标映射：前端英文值 -> 中文显示标签（用于值类型匹配）
+const metricEnglishToLabel: Record<string, string> = Object.fromEntries(
+  metricFilterOptionsConfig.metrics.map(m => [m.value, m.label]),
+);
+
+// 值类型映射：中文标签 -> 英文值
+const valueTypeChineseToEnglish: Record<string, string> = {
+  花费: 'spend',
+  百分比: 'percentage',
+  数值: 'number',
+  点击率: 'ctr',
+  单次点击费用: 'cpc',
+  广告支出回报率: 'roas',
+};
+
+// 值类型映射：英文值 -> 中文标签（用于显示）
+const valueTypeEnglishToChinese: Record<string, string> = Object.fromEntries(
+  Object.entries(valueTypeChineseToEnglish).map(([cn, en]) => [en, cn]),
+);
+
+onMounted(async () => {
+  if (!isEditMode.value) {
+    loadRuleTemplates();
+  }
+  if (isEditMode.value && props.editData) {
+    isLoadingEditData.value = true;
+    const data = props.editData;
+    monitoringChannel.value = data.channel || 'meta';
+    monitoringObject.value = data.monitoring_object || 'ad-account';
+
+    // 等待模板加载完成后，再填充编辑数据
+    await loadRuleTemplates();
+    selectedTemplate.value = data.template_id || null;
+
+    // 使用 Object.assign 替换整个对象以保持响应式
+    Object.assign(ruleConfig.value, {
+      filters: {
+        adAccount:
+          data.filters?.ad_group_ids?.[0]?.toString() ||
+          data.filters?.adgroup_ids?.[0]?.toString() ||
+          undefined,
+        channel: data.filters?.campaign_ids?.[0]?.toString() || undefined,
+        product: data.filters?.status?.[0]?.toLowerCase(),
+      },
+      metricConditions: (data.metric_conditions?.conditions || []).map((c: any) => {
+        const mappedValueType = valueTypeChineseToEnglish[c.value_type] || c.value_type || 'number';
+        return {
+          metric: c.metric || 'spend',
+          date: c.date_preset || 'today',
+          operator: c.operator || '>',
+          valueType: mappedValueType,
+          value: c.value,
+          valueMin: c.value_min,
+          valueMax: c.value_max,
+          valueUnit:
+            mappedValueType === 'number' ? valueUnitEnglishToChinese[c.value_unit] || '个' : '个',
+          currency: mappedValueType === 'spend' ? c.value_unit || 'USD' : 'USD',
+        };
+      }),
+      actions: (data.actions?.actions || []).map((a: any) => ({
+        type: a.type,
+        enabled: a.enabled,
+        config: a.config || {},
+      })),
+      executeInOrder: !!data.execute_in_order,
+      executionInterval: data.execution_interval || '24h',
+      timezone: data.timezone || 'Asia/Shanghai',
+      effectivePeriod: data.effective_period || 'long-term',
+      checkFrequency: data.check_frequency || '1h',
+      customCheckTimes: [dayjs().startOf('day')],
+      basicInfo: {
+        ruleName: data.name || '',
+        description: data.description || '',
+        status: data.status === 1 ? 'enabled' : 'disabled',
+        currency: data.currency || 'USD',
+      },
+      antiFraud: data.anti_fraud_config || { enabled: false },
+    });
+
+    // 编辑模式下，加载 edit-tag 动作的标签树
+    ruleConfig.value.actions.forEach((action, index) => {
+      if (action.type === 'edit-tag') {
+        loadTagTree(index);
+      }
+    });
+
+    isLoadingEditData.value = false;
+
+    nextTick(() => {
+      currentStep.value = 2;
+    });
+  }
+});
+
+const createDefaultRuleConfig = () => ({
+  filters: {
+    adAccount: undefined,
+    channel: undefined,
+    product: undefined,
+  },
+  metricConditions: [
+    {
+      metric: DEFAULT_METRIC,
+      date: 'today',
+      operator: '>',
+      valueType: 'number',
+      value: 50,
+      valueMin: undefined,
+      valueMax: undefined,
+      valueUnit: '个',
+      currency: 'USD',
+    },
+  ],
+  actions: [
+    {
+      type: 'send-email',
+      config: {
+        recipients: [],
+        subject: '',
+        body: '',
+      },
+    },
+  ],
+  executeInOrder: true,
+  executionInterval: '24h',
+  timezone: 'UTC+8',
+  effectivePeriod: 'long-term',
+  checkFrequency: '1h',
+  customCheckTimes: [dayjs().startOf('day')] as dayjs.Dayjs[],
+  basicInfo: {
+    ruleName: '',
+    description: '',
+    status: 'enabled',
+    currency: 'USD',
+  },
+  antiFraud: {
+    accountScope: 'all' as const,
+    specifiedAccountIds: [] as string[],
+    conditionMatch: 'all' as const,
+    notCreatedInAdsPolar: false,
+    nonWorkingHours: false,
+    nonWorkingHourSlotIds: [] as string[],
+  },
+});
+
+// 表单数据：跨步骤切换不丢；切换规则模板或监控对象时会重置
+const ruleConfig = ref(createDefaultRuleConfig());
+
+// VNodes 组件：用于渲染 ant-design dropdown 菜单节点
+const VNodes = defineComponent({
+  props: {
+    vnodes: { type: Object, required: true },
+  },
+  render() {
+    return this.vnodes;
+  },
+});
+
+// action 内联相关类型
+type ActionType =
+  | 'status'
+  | 'bid'
+  | 'budget'
+  | 'total-budget'
+  | 'roas-target'
+  | 'edit-tag'
+  | 'send-email'
+  | 'send-dingtalk'
+  | 'send-wecom'
+  | 'send-feishu';
+
+type ActionConfigInline = {
+  recipients: string[];
+  subject: string;
+  body: string;
+  status: string;
+  bidAction: string;
+  bidValue?: number;
+  bidLimit?: number;
+  budgetAction: string;
+  budgetValue?: number;
+  budgetLimit?: number;
+  budgetStrategy: string;
+  roasAction: string;
+  roasValue?: number;
+  roasLimit?: number;
+  tag?: string;
+  tagAction: string;
+  newTag?: string;
+  webhookUrls: string[];
+  imSubject: string;
+  imMessage: string;
+};
+
+type ActionInline = {
+  type: ActionType;
+  enabled: boolean;
+  config: ActionConfigInline;
+};
+
+// action 内联辅助 ref 和函数
+const actionEmailOptions = ref<Record<number, string[]>>({});
+const actionImOptions = ref<Record<number, string[]>>({});
+const actionEmailDrafts = ref<Record<number, string>>({});
+const actionImDrafts = ref<Record<number, string>>({});
+const tagTreeData = ref<Record<number, { tagFolders: any[]; tags: any[]; tagOptions: any[] }>>({});
+
+const filterSendTargetOption = (input: string, option: { label?: string; value?: string }) => {
+  const q = (input || '').toLowerCase();
+  const label = String(option?.label ?? option?.value ?? '');
+  return label.toLowerCase().includes(q);
+};
+
+const getActionEmailOptions = (index: number) => {
+  const pool = actionEmailOptions.value[index] ?? [];
+  return pool.map(o => ({ value: o, label: o }));
+};
+
+const getActionImOptions = (index: number) => {
+  const pool = actionImOptions.value[index] ?? [];
+  return pool.map(o => ({ value: o, label: o }));
+};
+
+const syncActionEmailOptions = (index: number, recipients: string[]) => {
+  if (!actionEmailOptions.value[index]) {
+    actionEmailOptions.value[index] = [];
+  }
+  recipients.forEach(r => {
+    if (r && !actionEmailOptions.value[index].includes(r)) {
+      actionEmailOptions.value[index].push(r);
+    }
+  });
+};
+
+const syncActionImOptions = (index: number, urls: string[]) => {
+  if (!actionImOptions.value[index]) {
+    actionImOptions.value[index] = [];
+  }
+  urls.forEach(u => {
+    if (u && !actionImOptions.value[index].includes(u)) {
+      actionImOptions.value[index].push(u);
+    }
+  });
+};
+
+const addActionEmailRecipient = (index: number) => {
+  const raw = actionEmailDrafts.value[index]?.trim();
+  if (!raw) return;
+  const action = ruleConfig.value.actions[index];
+  syncActionEmailOptions(index, [raw]);
+  if (!action.config.recipients.includes(raw)) {
+    action.config.recipients = [...action.config.recipients, raw];
+  }
+  actionEmailDrafts.value[index] = '';
+};
+
+const addActionImTarget = (index: number) => {
+  const raw = actionImDrafts.value[index]?.trim();
+  if (!raw) return;
+  const action = ruleConfig.value.actions[index];
+  syncActionImOptions(index, [raw]);
+  if (!action.config.webhookUrls.includes(raw)) {
+    action.config.webhookUrls = [...action.config.webhookUrls, raw];
+  }
+  actionImDrafts.value[index] = '';
+};
+
+const handleActionTypeChange = (index: number) => {
+  const action = ruleConfig.value.actions[index];
+  const prev = action.config;
+  action.config = {
+    recipients: prev.recipients ?? [],
+    subject: prev.subject ?? '',
+    body: prev.body ?? '',
+    status: prev.status ?? 'pause',
+    bidAction: prev.bidAction ?? 'increase',
+    bidValue: prev.bidValue,
+    bidLimit: prev.bidLimit,
+    budgetAction: prev.budgetAction ?? 'increase',
+    budgetValue: prev.budgetValue,
+    budgetLimit: prev.budgetLimit,
+    budgetStrategy: prev.budgetStrategy ?? 'continue',
+    roasAction: prev.roasAction ?? 'increase',
+    roasValue: prev.roasValue,
+    roasLimit: prev.roasLimit,
+    tag: prev.tag ?? [],
+    tagAction: prev.tagAction ?? 'add',
+    newTag: prev.newTag ?? [],
+    webhookUrls: prev.webhookUrls ?? [],
+    imSubject: prev.imSubject ?? '',
+    imMessage: prev.imMessage ?? '',
+  };
+  syncActionEmailOptions(index, prev.recipients ?? []);
+  syncActionImOptions(index, prev.webhookUrls ?? []);
+  if (action.type === 'edit-tag' && !tagTreeData.value[index]?.tagOptions?.length) {
+    loadTagTree(index);
+  }
+};
+
+const loadTagTree = async (index: number) => {
+  try {
+    const res = await getMetaTagsTree();
+    const { tagFolders = [], tags = [], tagOptions = [] } = res?.data ?? {};
+    tagTreeData.value[index] = { tagFolders, tags, tagOptions };
+  } catch (error) {
+    console.error('加载标签树失败:', error);
+    tagTreeData.value[index] = { tagFolders: [], tags: [], tagOptions: [] };
+  }
+};
+
+const handleCreateTagOption = async (tagId: number, name: string, parentId: number, isTagLevel: boolean, actionIndex: number) => {
+  const payload = isTagLevel
+    ? { tag_id: tagId, name, parent_id: 0 }
+    : { name, parent_id: parentId };
+  await createTagOption(payload);
+  await loadTagTree(actionIndex);
+};
+
+// 监听 actions 数组变化，为新 action 初始化下拉选项
+watch(
+  () => ruleConfig.value.actions.map(a => a.config),
+  configs => {
+    configs.forEach((config, i) => {
+      if (config) {
+        syncActionEmailOptions(i, config.recipients ?? []);
+        syncActionImOptions(i, config.webhookUrls ?? []);
+      }
+    });
+  },
+  { deep: true },
+);
+
+watch(monitoringObject, (newVal, oldVal) => {
+  // 编辑模式由 onMounted 负责加载，跳过 watch 中的加载逻辑避免数据被覆盖
+  if (isLoadingEditData.value) return;
+  loadRuleTemplates();
+  // 监控对象切换后模板列表变化，清空「设置规则」与已选模板，避免沿用上一对象下的配置
+  ruleConfig.value = createDefaultRuleConfig();
+  selectedTemplate.value = null;
+  agreedToDisclaimer.value = false;
+});
+
+const dateOptions = metricFilterOptionsConfig.dateOptions;
+
+const operatorOptions = metricFilterOptionsConfig.operatorOptions.map(op => ({
+  label: op.label === '介于' || op.label === '不介于' ? t(op.label) : op.label,
+  value: op.value,
+}));
+
+const toSelectOptions = (values: string[]) => values.map(value => ({ label: t(value), value }));
+
+const valueTypeDefaultOptions = toSelectOptions(metricFilterOptionsConfig.valueTypeDefaults);
+
+const getValueTypeValuesByMetric = (metric: string) => {
+  if (!metric) return metricFilterOptionsConfig.valueTypeDefaults;
+  // 使用中文标签进行匹配（valueTypeRules 使用中文关键词）
+  const chineseLabel = metricEnglishToLabel[metric] || metric;
+  const matchedRule = metricFilterOptionsConfig.valueTypeRules.find(rule => {
+    const includeOk = rule.includes.some(keyword => chineseLabel.includes(keyword));
+    if (!includeOk) return false;
+    const excludeOk = (rule.excludes ?? []).every(keyword => !chineseLabel.includes(keyword));
+    return excludeOk;
+  });
+  // 返回英文值而非中文标签
+  const chineseOptions = matchedRule?.options ?? metricFilterOptionsConfig.valueTypeDefaults;
+  return chineseOptions.map(opt => valueTypeChineseToEnglish[opt] || opt);
+};
+
+const getValueTypeOptions = (metric: string) => {
+  const values = getValueTypeValuesByMetric(metric);
+  if (values.length) {
+    return values.map(v => ({ label: valueTypeEnglishToChinese[v] || v, value: v }));
+  }
+  return valueTypeDefaultOptions;
+};
+
+const currencyOptions = metricFilterOptionsConfig.currencyOptions.map(value => ({
+  label: value,
+  value,
+}));
+
+const normalizeConditionValueType = (condition: { metric: string; valueType: string }) => {
+  const availableValueTypes = getValueTypeValuesByMetric(condition.metric);
+  if (!availableValueTypes.includes(condition.valueType)) {
+    condition.valueType = availableValueTypes[0] ?? 'number';
+  }
+};
+
+const valueUnitOptions = [
+  { label: '个', value: '个' },
+  { label: '次', value: '次' },
+  { label: '%', value: '%' },
+];
+
+// 值单位映射：英文 -> 中文（单向，提交时用 Object.fromEntries 反转）
+const valueUnitEnglishToChinese: Record<string, string> = {
+  count: '个',
+  time: '次',
+  percent: '%',
+  USD: 'USD',
+};
+
+// 反转映射用于提交
+const valueUnitChineseToEnglish = Object.fromEntries(
+  Object.entries(valueUnitEnglishToChinese).map(([en, cn]) => [cn, en]),
+);
+
+const spendCurrencyOptions = [{ label: 'USD', value: 'USD' }];
+
+const normalizeConditionUnits = (condition: {
+  valueType: string;
+  valueUnit?: string;
+  currency?: string;
+}) => {
+  if (condition.valueType === 'number') {
+    const allowed = valueUnitOptions.map(o => o.value);
+    if (!condition.valueUnit || !allowed.includes(condition.valueUnit)) {
+      condition.valueUnit = allowed[0] ?? '个';
+    }
+  }
+
+  if (condition.valueType === 'spend') {
+    condition.currency = 'USD';
+  }
+};
+
+const normalizeConditionOperatorValues = (condition: {
+  operator: string;
+  value?: number;
+  valueMin?: number;
+  valueMax?: number;
+}) => {
+  const isRange = condition.operator === 'between' || condition.operator === 'not_between';
+
+  if (isRange) {
+    // 从单值切换过来时，尽可能把旧值迁移到 valueMin。
+    if (condition.valueMin === undefined && condition.value !== undefined) {
+      condition.valueMin = condition.value;
+    }
+  } else {
+    // 非范围时，隐藏字段不参与提交，清掉避免残留脏值。
+    if (condition.value === undefined && condition.valueMin !== undefined) {
+      condition.value = condition.valueMin;
+    }
+    condition.valueMin = undefined;
+    condition.valueMax = undefined;
+  }
+};
+
+watch(
+  () => ruleConfig.value.metricConditions.map(condition => condition.metric),
+  () => {
+    ruleConfig.value.metricConditions.forEach(condition => {
+      normalizeConditionValueType(condition);
+      normalizeConditionUnits(condition);
+    });
+  },
+  { immediate: true },
+);
+
+watch(
+  () => ruleConfig.value.metricConditions.map(condition => condition.valueType),
+  () => {
+    ruleConfig.value.metricConditions.forEach(condition => normalizeConditionUnits(condition));
+  },
+  { immediate: true },
+);
+
+watch(
+  () => ruleConfig.value.metricConditions.map(condition => condition.operator),
+  () => {
+    ruleConfig.value.metricConditions.forEach(condition =>
+      normalizeConditionOperatorValues(condition),
+    );
+  },
+  { immediate: true },
+);
+
+const selectTemplate = (templateId: string) => {
+  const previousTemplateId = selectedTemplate.value;
+  selectedTemplate.value = templateId;
+
+  // 切换规则类型（含首次从「未选」点到某一模板）时重置「设置规则」表单
+  if (previousTemplateId !== templateId) {
+    ruleConfig.value = createDefaultRuleConfig();
+    agreedToDisclaimer.value = false;
+  }
+
+  currentStep.value = 2;
+};
+
+const switchStep = (step: number) => {
+  currentStep.value = step === 1 ? 1 : 2;
+};
+
+const addCondition = () => {
+  const defaultValueType = getValueTypeValuesByMetric(DEFAULT_METRIC)[0] ?? 'number';
+  ruleConfig.value.metricConditions.push({
+    metric: DEFAULT_METRIC,
+    date: 'today',
+    operator: '>',
+    valueType: defaultValueType,
+    value: undefined,
+    valueMin: undefined,
+    valueMax: undefined,
+    valueUnit: '个',
+    currency: 'USD',
+  });
+};
+
+const removeCondition = (index: number) => {
+  ruleConfig.value.metricConditions.splice(index, 1);
+};
+
+const addAction = () => {
+  ruleConfig.value.actions.push({
+    type: 'send-email',
+    enabled: true,
+    config: {
+      recipients: [],
+      subject: '',
+      body: '',
+      status: 'pause',
+      bidAction: 'increase',
+      bidValue: undefined,
+      bidLimit: undefined,
+      budgetAction: 'increase',
+      budgetValue: undefined,
+      budgetLimit: undefined,
+      budgetStrategy: 'continue',
+      roasAction: 'increase',
+      roasValue: undefined,
+      roasLimit: undefined,
+      tag: undefined,
+      tagAction: 'add',
+      newTag: undefined,
+      webhookUrls: [],
+      imSubject: '',
+      imMessage: '',
+    },
+  });
+};
+
+const removeAction = (index: number) => {
+  ruleConfig.value.actions.splice(index, 1);
+};
+
+const addTimeSlot = () => {
+  ruleConfig.value.customCheckTimes.push(dayjs().startOf('day'));
+};
+
+const removeTimeSlot = (index: number) => {
+  ruleConfig.value.customCheckTimes.splice(index, 1);
+};
+
+const hasUnsavedChanges = () => {
+  // 仅将“第2步设置规则”视为可丢失内容：
+  // 第1步切换模板/监控对象不触发返回确认。
+  return JSON.stringify(ruleConfig.value) !== JSON.stringify(createDefaultRuleConfig());
+};
+
+const goRuleManage = () => {
+  emit('close');
+};
+
+const goCreateRule = () => {
+  // 单页父子组件模式下，当前即为创建页，不需要路由跳转。
+  return;
+};
+
+/** 离开创建页：由父组件切换列表，不走路由跳转 */
+const navigateBackWithState = () => {
+  emit('close');
+};
+
+const onHeaderBackClick = (e: Event) => {
+  e.stopPropagation();
+  // 编辑模式：直接返回列表页
+  if (isEditMode.value) {
+    navigateBackWithState();
+    return;
+  }
+  // 第2步点击返回，仅回到”选择规则类型”步骤，不离开当前页面。
+  if (currentStep.value === 2) {
+    switchStep(1);
+    return;
+  }
+
+  // 第1步点击返回，才离开创建页返回上一级。
+  if (!hasUnsavedChanges()) {
+    navigateBackWithState();
+    return;
+  }
+  headerBackConfirmVisible.value = true;
+};
+
+const onCancelClick = (e: Event) => {
+  e.stopPropagation();
+  cancelConfirmVisible.value = true;
+};
+
+const confirmHeaderBack = () => {
+  headerBackConfirmVisible.value = false;
+  navigateBackWithState();
+};
+
+const confirmCancelBack = () => {
+  cancelConfirmVisible.value = false;
+  navigateBackWithState();
+};
+
+/** 构建提交数据 */
+const buildSubmitData = () => {
+  const config = ruleConfig.value;
+
+  // 处理指标条件
+  const conditions = config.metricConditions.map(cond => ({
+    metric: cond.metric,
+    date_preset: cond.date,
+    operator: cond.operator,
+    value_type: cond.valueType,
+    value: cond.operator === 'between' || cond.operator === 'not_between' ? undefined : cond.value,
+    value_min:
+      cond.operator === 'between' || cond.operator === 'not_between' ? cond.valueMin : undefined,
+    value_max:
+      cond.operator === 'between' || cond.operator === 'not_between' ? cond.valueMax : undefined,
+    value_unit:
+      valueUnitChineseToEnglish[
+        cond.valueType === 'number'
+          ? (cond.valueUnit ?? '个')
+          : cond.valueType === 'spend'
+            ? (cond.currency ?? 'USD')
+            : ''
+      ] ?? undefined,
+  }));
+
+  // 处理执行动作
+  const actions = config.actions.map(action => {
+    const cfg = { ...(action.config || {}) };
+    return { type: action.type, enabled: true, config: cfg };
+  });
+
+  // 构建提交数据
+  return {
+    name: config.basicInfo.ruleName,
+    description: config.basicInfo.description,
+    channel: monitoringChannel.value,
+    monitoring_object: monitoringObject.value,
+    template_id: selectedTemplate.value || '',
+    status: config.basicInfo.status === 'enabled' ? 1 : 0,
+    currency: config.basicInfo.currency,
+    timezone: config.timezone,
+    effective_period: config.effectivePeriod,
+    check_frequency: config.checkFrequency,
+    execution_interval: config.executionInterval,
+    execute_in_order: config.executeInOrder ? 1 : 0,
+    filters: {
+      status: config.filters.product ? [config.filters.product.toUpperCase()] : [],
+      campaign_ids: config.filters.channel ? [config.filters.channel] : [],
+      ad_group_ids: config.filters.adAccount ? [config.filters.adAccount] : [],
+    },
+    metric_conditions: {
+      logic: 'and',
+      conditions,
+    },
+    anti_fraud_config: config.antiFraud?.enabled ? config.antiFraud : { enabled: false },
+    actions: {
+      execute_in_order: config.executeInOrder,
+      actions,
+    },
+  };
+};
+
+// 校验表单所有必填字段
+const validateForm = (): boolean => {
+  if (!ruleConfig.value.basicInfo.ruleName) {
+    message.warning(t('请输入规则名称'));
+    return false;
+  }
+
+  for (let i = 0; i < ruleConfig.value.metricConditions.length; i++) {
+    const cond = ruleConfig.value.metricConditions[i];
+    const idx = i + 1;
+    if (cond.operator === 'between' || cond.operator === 'not_between') {
+      if (cond.valueMin === null || cond.valueMin === undefined) {
+        message.warning(t('请填写第') + idx + t('条条件的最小值'));
+        return false;
+      }
+      if (cond.valueMax === null || cond.valueMax === undefined) {
+        message.warning(t('请填写第') + idx + t('条条件的最大值'));
+        return false;
+      }
+    } else {
+      if (cond.value === null || cond.value === undefined) {
+        message.warning(t('请填写第') + idx + t('条条件的数值'));
+        return false;
+      }
+    }
+  }
+
+  for (let i = 0; i < ruleConfig.value.actions.length; i++) {
+    const action = ruleConfig.value.actions[i];
+    const idx = i + 1;
+    if (action.type === 'send-email') {
+      if (!action.config.recipients || action.config.recipients.length === 0) {
+        message.warning(t('请填写第') + idx + t('条动作的收件人'));
+        return false;
+      }
+      if (!action.config.subject) {
+        message.warning(t('请填写第') + idx + t('条动作的邮件主题'));
+        return false;
+      }
+    } else if (action.type === 'bid') {
+      if (!action.config.bidAction) {
+        message.warning(t('请选择第') + idx + t('条动作的操作类型'));
+        return false;
+      }
+      if (action.config.bidValue === null || action.config.bidValue === undefined) {
+        message.warning(t('请填写第') + idx + t('条动作的数值'));
+        return false;
+      }
+      if (action.config.bidLimit === null || action.config.bidLimit === undefined) {
+        message.warning(t('请填写第') + idx + t('条动作的限制值'));
+        return false;
+      }
+    } else if (action.type === 'budget' || action.type === 'total-budget') {
+      if (!action.config.budgetAction) {
+        message.warning(t('请选择第') + idx + t('条动作的操作类型'));
+        return false;
+      }
+      if (action.config.budgetValue === null || action.config.budgetValue === undefined) {
+        message.warning(t('请填写第') + idx + t('条动作的数值'));
+        return false;
+      }
+      if (action.config.budgetLimit === null || action.config.budgetLimit === undefined) {
+        message.warning(t('请填写第') + idx + t('条动作的限制值'));
+        return false;
+      }
+    } else if (action.type === 'roas-target') {
+      if (!action.config.roasAction) {
+        message.warning(t('请选择第') + idx + t('条动作的操作类型'));
+        return false;
+      }
+      if (action.config.roasValue === null || action.config.roasValue === undefined) {
+        message.warning(t('请填写第') + idx + t('条动作的数值'));
+        return false;
+      }
+      if (action.config.roasLimit === null || action.config.roasLimit === undefined) {
+        message.warning(t('请填写第') + idx + t('条动作的限制值'));
+        return false;
+      }
+    } else if (action.type === 'edit-tag') {
+      if (!action.config.tagAction) {
+        message.warning(t('请选择第') + idx + t('条动作的设置方式'));
+        return false;
+      }
+      if (action.config.tagAction === 'replace' && !action.config.newTag) {
+        message.warning(t('请选择第') + idx + t('条动作的目标标签'));
+        return false;
+      }
+    } else if (['send-dingtalk', 'send-wecom', 'send-feishu'].includes(action.type)) {
+      if (!action.config.imSubject) {
+        message.warning(t('请填写第') + idx + t('条动作的消息主题'));
+        return false;
+      }
+      if (!action.config.imMessage) {
+        message.warning(t('请填写第') + idx + t('条动作的消息内容'));
+        return false;
+      }
+    }
+  }
+
+  return true;
+};
+
+const handleSubmit = async () => {
+  if (!validateForm()) return;
+
+  submitLoading.value = true;
+  try {
+    const submitData = buildSubmitData();
+    if (isEditMode.value) {
+      await updateRule(props.editData.id, submitData);
+      message.success(t('规则更新成功'));
+    } else {
+      await createRule(submitData);
+      message.success(t('规则创建成功'));
+    }
+    emit('close');
+  } catch (error) {
+    console.error(isEditMode.value ? '更新规则失败:' : '创建规则失败:', error);
+    message.error(t(isEditMode.value ? '更新失败，请重试' : '创建失败，请重试'));
+  } finally {
+    submitLoading.value = false;
+  }
+};
+
+const handleConfirm = () => {
+  if (!agreedToDisclaimer.value) {
+    message.warning(t('请先阅读并同意免责声明'));
+    return;
+  }
+  handleSubmit();
+};
+
+const handleSaveTemplate = () => {
+  message.success(t('模板保存成功'));
+};
+</script>
+
+<style lang="less" scoped>
+.create-rule-page {
+  .page-head {
+    margin-bottom: 12px;
+  }
+
+  .wizard-layout {
+    display: flex;
+    gap: 24px;
+    background: #fff;
+    padding: 24px;
+    border-radius: 4px;
+  }
+
+  .wizard-steps-nav {
+    width: 200px;
+    flex-shrink: 0;
+    background: #fafafa;
+    border: 1px solid #f0f0f0;
+    border-radius: 8px;
+    padding: 8px;
+  }
+
+  .wizard-step-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: #666;
+    transition: all 0.2s;
+    user-select: none;
+
+    &:hover {
+      background: #f0f7ff;
+      color: #1890ff;
+    }
+
+    &.active {
+      background: #e6f7ff;
+      color: #1890ff;
+      font-weight: 600;
+    }
+  }
+
+  .wizard-step-index {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #d9d9d9;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+    transition: all 0.2s;
+  }
+
+  .wizard-step-item.active {
+    .wizard-step-index {
+      background: #1890ff;
+      color: #fff;
+    }
+  }
+
+  .wizard-main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .step-content {
+    background: #fff;
+    padding: 24px;
+    border-radius: 4px;
+    margin-bottom: 16px;
+
+    .step-header {
+      margin-bottom: 24px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+
+      .step-title-wrap {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .step-title-block {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .back-icon-button {
+        border-color: #d9d9d9;
+        color: #595959;
+      }
+
+      .back-icon-button:hover {
+        border-color: #40a9ff;
+        color: #1890ff;
+      }
+
+      .step-title {
+        font-size: 20px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+
+      .step-title-type {
+        font-size: 14px;
+        font-weight: 500;
+        color: #1890ff;
+        margin-left: 10px;
+        vertical-align: middle;
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(24, 144, 255, 0.25);
+        background: rgba(24, 144, 255, 0.08);
+        box-shadow: 0 2px 8px rgba(24, 144, 255, 0.08);
+      }
+
+      .step-subtitle {
+        color: #666;
+      }
+    }
+
+    .monitoring-settings {
+      margin-bottom: 24px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid #e8e8e8;
+
+      .setting-item {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 16px;
+
+        label {
+          min-width: 80px;
+          font-weight: 500;
+        }
+      }
+    }
+
+    .template-hint {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+
+    .rule-templates {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 16px;
+
+      .template-card {
+        padding: 24px;
+        border: 1px solid #e8e8e8;
+        border-radius: 4px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s;
+
+        &:hover {
+          border-color: #1890ff;
+          box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
+        }
+
+        .template-icon {
+          width: 64px;
+          height: 64px;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin: 0 auto 12px;
+          font-size: 32px;
+          color: #fff;
+        }
+
+        .template-title {
+          font-size: 16px;
+          font-weight: 500;
+          margin-bottom: 8px;
+        }
+
+        .template-desc {
+          font-size: 12px;
+          color: #666;
+          line-height: 1.5;
+        }
+      }
+    }
+
+    .rule-section {
+      margin-bottom: 24px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid #e8e8e8;
+
+      &:last-child {
+        border-bottom: none;
+      }
+
+      .section-title {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .filter-row {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+
+      .metric-filter {
+        .metric-title {
+          font-size: 14px;
+          font-weight: 500;
+          margin-bottom: 16px;
+          display: flex;
+          align-items: center;
+        }
+
+        .metric-condition {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 12px;
+
+          .condition-number {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #1890ff;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            flex-shrink: 0;
+          }
+        }
+      }
+
+      .action-list {
+        margin-top: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .action-card {
+        background: #f7f8fa;
+        border-radius: 10px;
+        padding: 16px;
+        position: relative;
+      }
+
+      .action-card-number {
+        position: absolute;
+        top: 14px;
+        left: 14px;
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: #595959;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .action-card-content {
+        padding-left: 44px; // 给编号预留位置，保证左侧对齐一致
+        padding-right: 100px; // 给右上角删除按钮预留空间，避免覆盖内容
+      }
+
+      .action-card-delete {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        padding: 0;
+      }
+
+      .add-action-link {
+        padding: 0;
+        display: flex;
+        align-items: center;
+        gap: 0;
+        color: #1890ff;
+      }
+
+      // action-config 内联样式
+      .action-config {
+        width: 100%;
+
+        .action-top-row {
+          display: flex;
+          align-items: flex-start;
+          gap: 16px;
+        }
+
+        .action-type-select {
+          width: 180px;
+          flex-shrink: 0;
+        }
+
+        .primary-area {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .primary-select {
+          width: 100%;
+        }
+
+        .recipient-multi-select {
+          width: 100%;
+        }
+
+        .select-add-row {
+          width: 100%;
+          padding: 4px 8px;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+
+          :deep(.ant-input) {
+            flex: 1;
+            min-width: 0;
+          }
+        }
+
+        .action-details {
+          margin-top: 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .full-width-input {
+          width: 100%;
+        }
+        .full-width-textarea {
+          width: 100%;
+        }
+        .full-width-input-number {
+          width: 100%;
+        }
+        .full-width-select {
+          width: 100%;
+        }
+
+        .detail-stack {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .detail-text-row {
+          color: #666;
+          font-size: 12px;
+          line-height: 1.4;
+        }
+
+        .detail-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .detail-input-number {
+          flex: 1;
+          width: 100%;
+        }
+
+        .detail-suffix {
+          color: #666;
+          flex-shrink: 0;
+        }
+
+        .budget-strategy {
+          .strategy-title {
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: #333;
+          }
+        }
+
+        .detail-label {
+          color: #666;
+          font-size: 12px;
+          margin-bottom: 6px;
+        }
+
+        .action-help-row {
+          margin-top: -6px;
+        }
+
+        .action-help-link {
+          font-size: 12px;
+          color: #999;
+          text-decoration: none;
+
+          &:hover {
+            color: #666;
+            text-decoration: underline;
+          }
+        }
+      }
+
+      .frequency-setting {
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+      }
+
+      .check-time-setting {
+        .setting-row {
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 12px;
+          margin-bottom: 16px;
+
+          label {
+            min-width: 80px;
+            font-weight: 500;
+            flex-shrink: 0;
+          }
+
+          .help-text {
+            font-size: 12px;
+            color: #999;
+            margin-left: 8px;
+          }
+        }
+      }
+    }
+
+    .custom-time-slots {
+      margin-top: 12px;
+      padding-left: 92px;
+
+      .time-slot-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+
+      .add-time-slot-btn {
+        padding: 0;
+        color: #1890ff;
+      }
+    }
+  }
+
+  .footer-actions {
+    background: #fff;
+    padding: 0 24px 100px;
+    border-radius: 4px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+  }
+}
+</style>

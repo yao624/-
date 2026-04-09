@@ -1,0 +1,105 @@
+<template>
+  <Modal
+    v-model="visible"
+    :title="title"
+    @on-ok="handleOk"
+    @on-cancel="handleCancel"
+  >
+    <div class="size-modal">
+      <Form :label-width="60">
+        <FormItem :label="$t('bgSeting.width') || '宽度'">
+          <InputNumber v-model="tempWidth" :min="1" :max="10000" style="width: 100%" />
+        </FormItem>
+        <FormItem :label="$t('bgSeting.height') || '高度'">
+          <InputNumber v-model="tempHeight" :min="1" :max="10000" style="width: 100%" />
+        </FormItem>
+      </Form>
+
+      <div class="preset-sizes">
+        <div class="preset-title">常用尺寸</div>
+        <div class="preset-buttons">
+          <Button
+            v-for="preset in presets"
+            :key="preset.name"
+            size="small"
+            @click="selectPreset(preset)"
+          >
+            {{ preset.name }}
+          </Button>
+        </div>
+      </div>
+    </div>
+  </Modal>
+</template>
+
+<script setup>
+import { ref } from 'vue';
+
+const props = defineProps({
+  title: {
+    type: String,
+    default: '设置尺寸',
+  },
+});
+
+const emit = defineEmits(['set']);
+
+const visible = ref(false);
+const tempWidth = ref(1920);
+const tempHeight = ref(1080);
+
+const presets = [
+  { name: '1920x1080', width: 1920, height: 1080 },
+  { name: '1080x1920', width: 1080, height: 1920 },
+  { name: '1080x1080', width: 1080, height: 1080 },
+  { name: '750x1334', width: 750, height: 1334 },
+  { name: '375x667', width: 375, height: 667 },
+  { name: '1280x720', width: 1280, height: 720 },
+];
+
+const showSetSize = (w = 1920, h = 1080) => {
+  tempWidth.value = w;
+  tempHeight.value = h;
+  visible.value = true;
+};
+
+const selectPreset = (preset) => {
+  tempWidth.value = preset.width;
+  tempHeight.value = preset.height;
+};
+
+const handleOk = () => {
+  emit('set', tempWidth.value, tempHeight.value);
+  visible.value = false;
+};
+
+const handleCancel = () => {
+  visible.value = false;
+};
+
+defineExpose({
+  showSetSize,
+});
+</script>
+
+<style scoped lang="less">
+.size-modal {
+  padding: 10px 0;
+}
+
+.preset-sizes {
+  margin-top: 20px;
+}
+
+.preset-title {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 10px;
+}
+
+.preset-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+</style>

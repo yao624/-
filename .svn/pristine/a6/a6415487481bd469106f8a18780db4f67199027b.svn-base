@@ -1,0 +1,895 @@
+<template>
+  <page-container :title="'定时报表'" :showPageHeader="true">
+    <div class="scheduled-report-container managed-module-font 3xl:[zoom:0.9] 4xl:[zoom:1.1]">
+      <div class="filter-section-card">
+        <div class="filter-grid">
+          <div class="filter-item">
+            <span class="filter-label">报表名称:</span>
+            <a-input v-model:value="reportName" placeholder="请输入" size="small" allow-clear />
+          </div>
+          <div class="filter-item">
+            <span class="filter-label">报表内容:</span>
+            <a-select v-model:value="reportContent" placeholder="请输入" size="small" allow-clear :options="reportContentOptions" />
+          </div>
+          <div class="filter-item">
+            <span class="filter-label">推送状态:</span>
+            <a-select v-model:value="pushStatus" placeholder="请选择" size="small" allow-clear :options="pushStatusOptions" />
+          </div>
+          <div class="filter-item">
+            <span class="filter-label">状态:</span>
+            <a-select v-model:value="status" placeholder="请选择" size="small" allow-clear :options="statusOptions" />
+          </div>
+          <div class="filter-item">
+            <span class="filter-label">创建人:</span>
+            <a-select v-model:value="creator" placeholder="请选择" size="small" allow-clear :options="creatorOptions" />
+          </div>
+        </div>
+
+        <div class="action-row">
+          <a-button type="primary" size="small" @click="handleAddReport">新建</a-button>
+          <div class="info-tip">
+            <info-circle-outlined />
+            <span>当前公司主体已创建0个，上限为15个。如有问题，请联系您的运营经理</span>
+          </div>
+          <div class="right-actions">
+            <a-button size="small" @click="handleRefresh">
+              <template #icon><reload-outlined /></template> 刷新
+            </a-button>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-section">
+        <a-table
+          :columns="columns"
+          :data-source="dataSource"
+          :row-key="record => record.id"
+          :loading="loading"
+          :scroll="{ x: 1200, y: safeTableHeight }"
+          :pagination="pagination"
+          @change="handleTableChange"
+          size="small"
+        >
+          <template #bodyCell="{ column, text, record }">
+            <template v-if="column.dataIndex === 'status'">
+              <a-switch :checked="text === 'ENABLED'" size="small" />
+            </template>
+            <template v-if="column.dataIndex === 'operation'">
+              <a @click="handleEdit(record)">编辑</a>
+              <a-divider type="vertical" />
+              <a @click="handleCopy(record)">复制</a>
+              <a-divider type="vertical" />
+              <a @click="handleDelete(record)">删除</a>
+              <a-divider type="vertical" />
+              <a-dropdown>
+                <a class="ant-dropdown-link" @click.prevent>
+                  更多 <down-outlined />
+                </a>
+                <template #overlay>
+                  <a-menu @click="({ key }) => handleMoreClick(key, record)">
+                    <a-menu-item key="download">下载</a-menu-item>
+                    <a-menu-item key="execute">立即执行</a-menu-item>
+                    <a-menu-item key="detail">详情</a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
+            </template>
+          </template>
+        </a-table>
+      </div>
+    </div>
+
+    <!-- 新建/编辑报表弹窗 -->
+    <a-modal
+      v-model:visible="modalVisible"
+      :title="modalTitle"
+      width="1100px"
+      @ok="handleModalOk"
+      ok-text="确定"
+      cancel-text="取消"
+      :body-style="{ padding: '0', backgroundColor: '#fff' }"
+      class="custom-report-modal"
+    >
+      <div class="report-modal-content">
+        <!-- 基础信息 -->
+        <div class="modal-section">
+          <div class="section-title">基础信息</div>
+          <div class="section-body">
+            <a-form :label-col="{ style: { width: '120px' } }" :wrapper-col="{ flex: '1' }">
+              <a-form-item label="报表名称">
+                <a-input v-model:value="formState.name" placeholder="请输入" style="width: 100%; max-width: 650px" />
+                <div class="quick-tags">
+                  <a-tag v-for="tag in ['昨天', '上周(周一至周日)', '上周(周日至周六)']" :key="tag" @click="formState.name = tag">{{ tag }}</a-tag>
+                </div>
+              </a-form-item>
+              
+              <a-form-item label="报表生成时间">
+                <div class="frequency-row">
+                  <a-radio-group v-model:value="formState.frequencyType" button-style="outline">
+                    <a-radio-button value="daily">每天</a-radio-button>
+                    <a-radio-button value="weekly">每周</a-radio-button>
+                    <a-radio-button value="custom">自定义</a-radio-button>
+                  </a-radio-group>
+                </div>
+                <div class="time-select-row">
+                  <a-time-picker v-model:value="formState.time" format="HH:mm" value-format="HH:mm" placeholder="请选择" style="width: 120px" />
+                </div>
+                <div class="add-link-wrapper">
+                  <a class="add-link">添加</a>
+                </div>
+              </a-form-item>
+
+              <a-form-item label="通知对象">
+                <div class="notice-object-box">
+                  <div class="object-item">
+                    <span class="label">邮件通知</span>
+                    <a-input v-model:value="formState.email" placeholder="请输入" style="width: 260px" />
+                  </div>
+                  <a class="add-link">添加</a>
+                </div>
+              </a-form-item>
+            </a-form>
+          </div>
+        </div>
+
+        <!-- 数据内容 -->
+        <div class="modal-section data-section">
+          <div class="section-title">
+            数据内容
+            <a-tooltip title="通过设置一个或多个卡片，在定时邮件中为您展示指定维度与指标的数据报表。">
+              <info-circle-outlined style="margin-left: 8px; color: #1890ff" />
+            </a-tooltip>
+            <span class="guide-text">详情请查看 <a class="use-guide">使用指南</a></span>
+          </div>
+          <div class="section-body card-body">
+            <a-form :label-col="{ style: { width: '100px' } }" :wrapper-col="{ flex: '1' }">
+              <a-form-item label="标题">
+                <a-input v-model:value="formState.cardName" placeholder="请输入" :maxlength="100" show-count style="width: 260px" />
+              </a-form-item>
+              
+              <a-form-item label="报表类型">
+                <a-radio-group v-model:value="formState.reportType" button-style="outline">
+                  <a-radio-button value="comprehensive">综合</a-radio-button>
+                  <a-radio-button value="material">素材</a-radio-button>
+                </a-radio-group>
+              </a-form-item>
+
+              <a-form-item label="渠道">
+                <a-select v-model:value="formState.level" style="width: 260px">
+                  <a-select-option value="total">汇总</a-select-option>
+                </a-select>
+              </a-form-item>
+
+              <a-form-item label="数据时间">
+                <div class="data-time-row">
+                  <a-select v-model:value="formState.dateRange" style="width: 180px" :options="dateRangeOptions" placeholder="请选择时间" />
+                  <a-checkbox v-model:checked="formState.compare">对比</a-checkbox>
+                </div>
+              </a-form-item>
+
+              <a-form-item label="维度">
+                <template #label>
+                  <span>维度 <setting-outlined class="setting-icon" /></span>
+                </template>
+                <div class="dimension-row">
+                  <a-tag class="date-tag">日期</a-tag>
+                  <span class="dimension-tip">
+                    <info-circle-outlined style="color: #1890ff; margin-right: 4px" />
+                    您可以通过左侧齿轮设置选择维度
+                  </span>
+                </div>
+              </a-form-item>
+
+              <a-form-item label="筛选">
+                <template #label>
+                  <span>筛选 <setting-outlined class="setting-icon" /></span>
+                </template>
+              </a-form-item>
+
+              <a-form-item label="指标">
+                <template #label>
+                  <span>指标 <setting-outlined class="setting-icon" /></span>
+                </template>
+                <div class="metrics-container">
+                  <div v-for="m in selectedMetrics" :key="m" class="metric-tag">
+                    <span class="drag-handle">:::</span>
+                    <span class="tag-text">{{ m }}</span>
+                    <span class="close-icon" @click="handleRemoveMetric(m)">×</span>
+                  </div>
+                </div>
+              </a-form-item>
+
+              <a-form-item label="排序">
+                <div class="sort-row">
+                  <a-select v-model:value="formState.sortBy" style="width: 150px" :options="sortOptions" placeholder="请选择" />
+                  <a-select v-model:value="formState.sortOrder" style="width: 120px">
+                    <a-select-option value="desc">降序</a-select-option>
+                    <a-select-option value="asc">升序</a-select-option>
+                  </a-select>
+                </div>
+              </a-form-item>
+
+              <a-form-item label="数据筛选">
+                <a-radio-group v-model:value="formState.limit" button-style="outline">
+                  <a-radio-button :value="10">前10条</a-radio-button>
+                  <a-radio-button :value="20">前20条</a-radio-button>
+                  <a-radio-button :value="50">前50条</a-radio-button>
+                </a-radio-group>
+              </a-form-item>
+            </a-form>
+          </div>
+          <div class="add-card-wrapper">
+            <a class="add-card-link">新增数据卡片</a>
+          </div>
+        </div>
+      </div>
+    </a-modal>
+  </page-container>
+</template>
+
+
+
+<script lang="ts">
+import { defineComponent, ref, computed, onMounted, reactive } from 'vue';
+import { useRouter } from 'vue-router';
+import { Modal, message } from 'ant-design-vue';
+import { InfoCircleOutlined, ReloadOutlined, DownOutlined, SettingOutlined } from '@ant-design/icons-vue';
+import { useTableHeight } from '@/utils/hooks/useTableHeight';
+import { fetchMetaScheduledReports, deleteMetaScheduledReport, downloadMetaScheduledReport, MetaScheduledReportRow } from '@/api/meta-scheduled-report';
+
+export default defineComponent({
+  name: 'ScheduledReport',
+  components: {
+    InfoCircleOutlined,
+    ReloadOutlined,
+    DownOutlined,
+    SettingOutlined,
+  },
+  setup() {
+    const router = useRouter();
+    const { tableHeight } = useTableHeight();
+    const safeTableHeight = computed(() => {
+      const v = tableHeight.value;
+      return Number.isFinite(v) && v > 200 ? v : 200;
+    });
+
+    const loading = ref(false);
+    const dataSource = ref<MetaScheduledReportRow[]>([]);
+    
+    // 筛选状态
+    const reportName = ref('');
+    const reportContent = ref(undefined);
+    const pushStatus = ref(undefined);
+    const status = ref(undefined);
+    const creator = ref(undefined);
+
+    const reportContentOptions = [
+      { label: '内容A', value: 'A' },
+      { label: '内容B', value: 'B' },
+    ];
+    const pushStatusOptions = [
+      { label: '推送中', value: 'PUSHING' },
+      { label: '已停止', value: 'STOPPED' },
+    ];
+    const statusOptions = [
+      { label: '开启', value: 'ENABLED' },
+      { label: '关闭', value: 'DISABLED' },
+    ];
+    const creatorOptions = [
+      { label: '创建人1', value: '1' },
+      { label: '创建人2', value: '2' },
+    ];
+
+    const dateRangeOptions = [
+      { label: '今天', value: 'today' },
+      { label: '昨天', value: 'yesterday' },
+      { label: '过去2天 (含今天)', value: 'last2_with_today' },
+      { label: '过去3天 (含今天)', value: 'last3_with_today' },
+      { label: '过去7天 (含今天)', value: 'last7_with_today' },
+      { label: '过去3天', value: 'last3' },
+      { label: '过去7天', value: 'last7' },
+      { label: '上周 (周一至周日)', value: 'last_week_mon_sun' },
+      { label: '过去27天至前17天', value: 'last27_17' },
+    ];
+
+    const metricOptions = [
+      { label: '花销', value: 'spend' },
+      { label: '花销 (AdsPolar设置币种)', value: 'spend_ads_polar' },
+      { label: '展示数', value: 'impressions' },
+      { label: '千次展示成本', value: 'cpm' },
+      { label: '点击数', value: 'clicks' },
+      { label: '点击成本', value: 'cpc' },
+      { label: '点击率', value: 'ctr' },
+      { label: '转化数', value: 'conversions' },
+      { label: '转化成本', value: 'cost_per_conversion' },
+      { label: '转化率', value: 'conversion_rate' },
+      { label: '注册数', value: 'registrations' },
+      { label: '付费次数', value: 'purchase_count' },
+      { label: '付费金额', value: 'purchase_amount' },
+      { label: '总销售额', value: 'total_sales' },
+      { label: '订单量', value: 'orders' },
+      { label: 'ROAS', value: 'roas' },
+    ];
+
+    const sortOptions = metricOptions.map(m => ({ label: m.label, value: m.value }));
+
+    const columns = [
+      { title: '状态', key: 'status', dataIndex: 'status', width: 80, align: 'center' },
+      { title: '报表名称', key: 'report_name', dataIndex: 'report_name', width: 150, align: 'center' },
+      { title: '报表内容', key: 'report_content', dataIndex: 'report_content', width: 150, align: 'center' },
+      { title: '数据状态', key: 'push_status', dataIndex: 'push_status', width: 120, align: 'center' },
+      { title: '操作', key: 'operation', dataIndex: 'operation', width: 220, align: 'center' },
+      { title: '频率', key: 'frequency', dataIndex: 'frequency', width: 120, align: 'center' },
+      { title: '数据时间', key: 'push_time', dataIndex: 'push_time', width: 180, align: 'center' },
+      { title: '创建时间', key: 'created_time', dataIndex: 'created_time', width: 180, align: 'center' },
+      { title: '创建人', key: 'creator', dataIndex: 'creator', width: 100, align: 'center' },
+    ];
+
+    // 弹窗相关
+    const modalVisible = ref(false);
+    const modalTitle = ref('新建报表');
+    const formState = reactive({
+      name: '',
+      frequencyType: 'daily',
+      time: '00:15',
+      email: '111@qq.com',
+      cardName: '11',
+      reportType: 'comprehensive',
+      level: 'total',
+      dateRange: 'last27_17',
+      compare: false,
+      dimension: 'date',
+      sortBy: 'spend',
+      sortOrder: 'desc',
+      limit: 10
+    });
+
+    const selectedMetrics = ref(['花销', '花销 (AdsPolar设置币种)', '展示数', '千次展示成本', '点击数', '点击成本', '点击率', '转化数', '转化成本', '转化率', '注册数', '付费次数', '付费金额']);
+    const selectedMetricValues = ref(['spend', 'spend_ads_polar', 'impressions', 'cpm', 'clicks', 'cpc', 'ctr', 'conversions', 'cost_per_conversion', 'conversion_rate', 'registrations', 'purchase_count', 'purchase_amount']);
+
+    const handleMetricChange = (values: string[]) => {
+      selectedMetrics.value = metricOptions
+        .filter(opt => values.includes(opt.value))
+        .map(opt => opt.label);
+    };
+
+    const handleRemoveMetric = (metricLabel: string) => {
+      selectedMetrics.value = selectedMetrics.value.filter(m => m !== metricLabel);
+      const opt = metricOptions.find(o => o.label === metricLabel);
+      if (opt) {
+        selectedMetricValues.value = selectedMetricValues.value.filter(v => v !== opt.value);
+      }
+    };
+
+    const pagination = ref({
+      current: 1,
+      pageSize: 20,
+      total: 1,
+      showQuickJumper: true,
+      showSizeChanger: true,
+      pageSizeOptions: ['10', '20', '50', '100'],
+      showTotal: (total: number) => `共 ${total} 条`,
+    });
+
+    const handleAddReport = () => {
+      router.push('/instrument/scheduled-report/edit');
+    };
+    const handleRefresh = () => {
+      loadData();
+    };
+    const handleEdit = (record: MetaScheduledReportRow) => {
+      router.push({
+        path: '/instrument/scheduled-report/edit',
+        query: { id: record.id }
+      });
+    };
+    const handleCopy = (record: MetaScheduledReportRow) => {
+      console.log('Copy record:', record);
+    };
+    const handleDelete = async (record: MetaScheduledReportRow) => {
+      Modal.confirm({
+        title: '确认删除',
+        content: `确定要删除报表「${record.report_name}」吗？删除后不可恢复。`,
+        okText: '删除',
+        okType: 'danger',
+        cancelText: '取消',
+        async onOk() {
+          await deleteMetaScheduledReport(record.id);
+          await loadData();
+        },
+      });
+    };
+    const handleTableChange = (paginationArg: any) => {
+      pagination.value.current = paginationArg.current;
+      pagination.value.pageSize = paginationArg.pageSize;
+      loadData();
+    };
+    const handleModalOk = () => {
+      modalVisible.value = false;
+    };
+
+    const handleMoreClick = async (key: string, record: MetaScheduledReportRow) => {
+      if (key === 'download') {
+        try {
+          const blob = await downloadMetaScheduledReport(record.id);
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${record.report_name || 'summary_report'}.xlsx`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(url);
+        } catch (e) {
+          message.error('下载失败，请稍后重试');
+        }
+        return;
+      }
+      // 其它 key（execute/detail）后续可在这里补充
+    };
+
+    const loadData = async () => {
+      loading.value = true;
+      try {
+        const res = await fetchMetaScheduledReports({
+          pageNo: pagination.value.current,
+          pageSize: pagination.value.pageSize,
+          reportName: reportName.value || undefined,
+          status: status.value || undefined,
+          creator: creator.value || undefined,
+        });
+        dataSource.value = res.data;
+        pagination.value.total = res.totalCount;
+      } finally {
+        loading.value = false;
+      }
+    };
+
+    onMounted(() => {
+      loadData();
+    });
+
+    return {
+      columns,
+      dataSource,
+      loading,
+      pagination,
+      safeTableHeight,
+      reportName,
+      reportContent,
+      pushStatus,
+      status,
+      creator,
+      reportContentOptions,
+      pushStatusOptions,
+      statusOptions,
+      creatorOptions,
+      dateRangeOptions,
+      metricOptions,
+      sortOptions,
+      modalVisible,
+      modalTitle,
+      formState,
+      selectedMetrics,
+      selectedMetricValues,
+      handleModalOk,
+      handleRemoveMetric,
+      handleMetricChange,
+      handleAddReport,
+      handleRefresh,
+      handleEdit,
+      handleCopy,
+      handleDelete,
+      handleTableChange,
+      loadData,
+      handleMoreClick,
+    };
+  },
+});
+</script>
+
+
+<style scoped lang="less">
+.scheduled-report-container {
+  background-color: transparent;
+  padding: 12px 0;
+  min-height: 100%;
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  .filter-section-card {
+    background: #fff;
+    padding: 16px 24px;
+    border-bottom: 1px solid #f0f0f0;
+
+    .filter-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 24px;
+      margin-bottom: 16px;
+
+      .filter-item {
+        display: flex;
+        align-items: center;
+        min-width: 240px;
+
+        .filter-label {
+          min-width: 65px;
+          padding-right: 8px;
+          font-size: 14px;
+          color: #333;
+          white-space: nowrap;
+        }
+
+        :deep(.ant-input), :deep(.ant-select) {
+          flex: 1;
+          border-radius: 2px;
+        }
+      }
+    }
+
+    .action-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #f5f5f5;
+
+      .info-tip {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 14px;
+        color: #1890ff;
+        background: #e6f7ff;
+        padding: 6px 16px;
+        border-radius: 2px;
+        border: 1px solid #91d5ff;
+      }
+
+      .right-actions {
+        margin-left: auto;
+      }
+
+      :deep(.ant-btn) {
+        border-radius: 2px;
+        font-size: 14px;
+        height: 32px;
+      }
+    }
+  }
+
+  .table-section {
+    padding: 0 24px;
+    background: #fff;
+    overflow: hidden;
+
+    :deep(.ant-table) {
+      font-size: 14px;
+
+      .ant-table-thead > tr > th {
+        background: #fafafa;
+        color: #333;
+        font-weight: 500;
+        padding: 12px 16px;
+        border-bottom: 1px solid #f0f0f0;
+
+        &::before {
+          display: none;
+        }
+      }
+
+      .ant-table-tbody > tr > td {
+        padding: 12px 16px;
+        border-bottom: 1px solid #f0f0f0;
+      }
+    }
+  }
+
+  // 弹窗样式
+  .report-modal-content {
+    padding: 32px 48px;
+    background-color: #fff;
+
+    .modal-section {
+      background: #fff;
+      padding: 0;
+      margin-bottom: 32px;
+      border-radius: 0;
+      box-shadow: none;
+
+      &.data-section {
+        border-top: 1px solid #f0f0f0;
+        padding-top: 32px;
+      }
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+
+      .section-title {
+        font-size: 16px;
+        font-weight: 500;
+        margin-bottom: 32px;
+        display: flex;
+        align-items: center;
+        color: #000;
+        line-height: 1;
+
+        .guide-text {
+          margin-left: 12px;
+          font-size: 13px;
+          color: #8c8c8c;
+          font-weight: 400;
+          .use-guide {
+            color: #1890ff;
+            &:hover { text-decoration: underline; }
+          }
+        }
+      }
+
+      .section-body {
+        :deep(.ant-form-item) {
+          margin-bottom: 24px;
+          
+          .ant-form-item-label {
+            padding-right: 24px;
+            > label {
+              height: 32px;
+              color: #262626;
+              font-size: 14px;
+              font-weight: 400;
+              
+              .setting-icon {
+                margin-left: 4px;
+                color: #595959;
+                font-size: 14px;
+                cursor: pointer;
+                &:hover { color: #1890ff; }
+              }
+            }
+          }
+        }
+
+        .quick-tags {
+          margin-top: 12px;
+          display: flex;
+          gap: 12px;
+          .ant-tag {
+            cursor: pointer;
+            border: none;
+            background: #f5f5f5;
+            color: #595959;
+            padding: 4px 16px;
+            font-size: 13px;
+            border-radius: 2px;
+            transition: all 0.3s;
+            &:hover {
+              background: #e6f7ff;
+              color: #1890ff;
+            }
+          }
+        }
+
+        .frequency-row {
+          display: block;
+          margin-bottom: 12px;
+          
+          :deep(.ant-radio-button-wrapper) {
+            height: 34px;
+            line-height: 32px;
+            padding: 0 20px;
+            border-radius: 4px !important;
+            margin-right: 12px;
+            border-left: 1px solid #d9d9d9 !important;
+            
+            &::before { display: none !important; }
+            
+            &:first-child { border-radius: 4px !important; }
+            &:last-child { border-radius: 4px !important; }
+            
+            &.ant-radio-button-wrapper-checked {
+              background: #fff;
+              color: #1890ff;
+              border-color: #1890ff !important;
+            }
+          }
+        }
+
+        .time-select-row {
+          display: block;
+          margin-bottom: 12px;
+        }
+
+        .notice-object-box {
+          background: #f8f9fb;
+          padding: 32px 40px;
+          border-radius: 4px;
+          display: inline-flex;
+          flex-direction: column;
+          gap: 16px;
+          border: none;
+          min-width: 550px;
+          
+          .object-item {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            .label {
+              color: #262626;
+              font-size: 14px;
+              width: 80px;
+            }
+            :deep(.ant-input) {
+              background: #fff;
+            }
+          }
+
+          .add-link {
+            margin-left: 100px;
+          }
+        }
+
+        .add-link {
+          color: #1890ff;
+          font-size: 14px;
+          cursor: pointer;
+          &:hover { opacity: 0.8; }
+        }
+      }
+
+      .card-body {
+        background: #f8f9fb;
+        padding: 48px;
+        border-radius: 4px;
+        border: none;
+
+        :deep(.ant-form-item-label > label) {
+          font-weight: 400;
+        }
+
+        .data-time-row, .sort-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .dimension-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          .date-tag {
+            background: #fff;
+            border: 1px solid #d9d9d9;
+            color: #262626;
+            padding: 4px 20px;
+            font-size: 14px;
+            border-radius: 2px;
+          }
+          .dimension-tip {
+            color: #8c8c8c;
+            font-size: 13px;
+          }
+        }
+
+        :deep(.ant-radio-button-wrapper) {
+          height: 34px;
+          line-height: 32px;
+          padding: 0 20px;
+          border-radius: 4px !important;
+          margin-right: 12px;
+          border-left: 1px solid #d9d9d9 !important;
+          
+          &::before { display: none !important; }
+          
+          &.ant-radio-button-wrapper-checked {
+            background: #fff;
+            color: #1890ff;
+            border-color: #1890ff !important;
+          }
+        }
+
+        .metrics-container {
+          display: block;
+          padding-top: 4px;
+
+          .metric-tag {
+            display: inline-flex;
+            align-items: center;
+            background: #fff;
+            border: 1px solid #d9d9d9;
+            padding: 0 10px;
+            height: 32px;
+            border-radius: 2px;
+            gap: 12px;
+            margin-right: 12px;
+            margin-bottom: 12px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+            
+            .drag-handle {
+              color: #bfbfbf;
+              cursor: move;
+              font-size: 14px;
+              letter-spacing: 1px;
+              font-weight: 300;
+            }
+            .tag-text {
+              color: #000;
+              font-size: 13px;
+              font-weight: 400;
+            }
+            .close-icon {
+              color: #bfbfbf;
+              cursor: pointer;
+              font-size: 14px;
+              margin-left: 4px;
+              font-weight: 300;
+              &:hover { color: #ff4d4f; }
+            }
+          }
+        }
+      }
+
+      .add-card-wrapper {
+        margin-top: 32px;
+      }
+
+      .add-card-link {
+        color: #1890ff;
+        font-size: 14px;
+        cursor: pointer;
+        &:hover { text-decoration: underline; }
+      }
+    }
+  }
+}
+
+/* 超宽屏适配：增大内容左右留白 */
+@media (min-width: 1280px) {
+  .scheduled-report-container {
+    .filter-section-card {
+      padding: 18px 32px;
+    }
+    .table-section {
+      padding: 0 32px;
+    }
+  }
+}
+
+@media (min-width: 1440px) {
+  .scheduled-report-container {
+    .filter-section-card {
+      padding: 20px 36px;
+    }
+    .table-section {
+      padding: 0 36px;
+    }
+  }
+}
+
+@media (min-width: 1920px) {
+  .scheduled-report-container {
+    .filter-section-card {
+      padding: 22px 40px;
+    }
+    .table-section {
+      padding: 0 40px;
+    }
+  }
+}
+
+@media (min-width: 2560px) {
+  .scheduled-report-container {
+    .filter-section-card {
+      padding: 24px 48px;
+    }
+    .table-section {
+      padding: 0 48px;
+    }
+  }
+}
+</style>
+
+
+
+

@@ -514,4 +514,48 @@ CREATE TABLE IF NOT EXISTS `meta_scheduled_report_runs` (
     FOREIGN KEY (`report_id`) REFERENCES `meta_scheduled_reports` (`id`)
     ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Meta工具-定时报表-运行记录表';
+/* =====================================================================
+ * 2026-04-08 链接模块功能更新
+ * 说明: 增加链接多语言字段、导入能力，并修复所有者判定
+ * 涉及文件: database/migrations/2026_04_08_160000_add_language_fields_to_links_table.php
+ *          backend/app/Http/Resources/LinkResource.php
+ *          backend/app/Http/Controllers/LinkController.php
+ * ===================================================================== */
 
+/* =====================================================================
+ * 2026-04-08 links 表结构更新
+ * 迁移文件: database/migrations/2026_04_08_160000_add_language_fields_to_links_table.php
+ * 数据表: links
+ * 新增字段: default_locale VARCHAR(32) NULL,
+ *          language_variants JSON NULL,
+ *          import_source VARCHAR(32) NULL
+ * ===================================================================== */
+
+ALTER TABLE `links`
+  ADD COLUMN `default_locale` VARCHAR(32) NULL COMMENT '默认语言代码' AFTER `notes`,
+  ADD COLUMN `language_variants` JSON NULL COMMENT '多语言 URL 变体配置' AFTER `default_locale`,
+  ADD COLUMN `import_source` VARCHAR(32) NULL COMMENT '手动或导入来源标记' AFTER `language_variants`;
+/* =====================================================================
+ * 2026-04-08 links 独立标签表
+ * 迁移文件: database/migrations/2026_04_08_170000_create_link_tags_table.php
+ * 数据表: link_tags
+ * 用途说明: links 模块不再复用通用 tags/taggables，改为使用独立 link_tags 表存储链接标签
+ * ===================================================================== */
+
+CREATE TABLE `link_tags` (
+  `id` CHAR(26) NOT NULL COMMENT '主键 ULID',
+  `link_id` CHAR(26) NOT NULL COMMENT '关联 links.id',
+  `user_id` VARCHAR(26) NOT NULL COMMENT '所属用户 ID',
+  `name` VARCHAR(191) NOT NULL COMMENT '标签名称',
+  `created_at` TIMESTAMP NULL DEFAULT NULL,
+  `updated_at` TIMESTAMP NULL DEFAULT NULL,
+  `deleted_at` TIMESTAMP NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_link_tags_link_user` (`link_id`, `user_id`),
+  KEY `idx_link_tags_user_name` (`user_id`, `name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='链接模块独立标签表';
+/* =====================================================================
+ * 2026-04-08 link_tags 表注释补充
+ * 迁移文件: database/migrations/2026_04_08_180000_add_comments_to_link_tags_table.php
+ * 修改说明: 为 link_tags 表及其字段补充中文注释，并将存储引擎调整为 InnoDB
+ * ===================================================================== */

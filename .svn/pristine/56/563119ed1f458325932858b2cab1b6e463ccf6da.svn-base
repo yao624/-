@@ -1,0 +1,1008 @@
+<template>
+  <page-container :title="'任务中心'" :showPageHeader="true">
+    <div class="task-center-container managed-module-font 3xl:[zoom:0.9] 4xl:[zoom:1.1]">
+      <div class="filter-section">
+        <!-- 类型选择 -->
+        <div class="filter-row">
+          <span class="filter-label">类型:</span>
+          <div class="type-tabs">
+            <div
+              v-for="tab in typeTabs"
+              :key="tab.value"
+              :class="['type-tab', { active: activeType === tab.value }]"
+              @click="activeType = tab.value"
+            >
+              {{ tab.label }}
+            </div>
+          </div>
+        </div>
+
+        <!-- 动态筛选条件 -->
+        <div class="filter-grid">
+          <!-- 公共/创建广告 筛选条件 (activeType === 'create_ad') -->
+          <template v-if="activeType === 'create_ad'">
+            <div class="filter-item">
+              <span class="filter-label">任务:</span>
+              <a-select v-model:value="filters.task" placeholder="请选择" size="small" allow-clear style="width: 200px" :options="taskOptions" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">资产:</span>
+              <a-select v-model:value="filters.asset" placeholder="请选择" size="small" allow-clear style="width: 200px" :options="assetOptions" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">状态:</span>
+              <a-select v-model:value="filters.status" placeholder="不限" size="small" allow-clear style="width: 200px" :options="statusOptions" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">结果:</span>
+              <a-select v-model:value="filters.result" placeholder="请选择" size="small" allow-clear style="width: 200px" :options="resultOptions" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">提交方式:</span>
+              <a-select v-model:value="filters.submitMethod" placeholder="请选择" size="small" allow-clear style="width: 200px" :options="submitMethodOptions" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">播放时间:</span>
+              <a-range-picker v-model:value="filters.dateRange" size="small" style="width: 240px" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">任务ID:</span>
+              <a-input v-model:value="filters.taskId" placeholder="请输入" size="small" style="width: 200px" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">创建人:</span>
+              <a-select v-model:value="filters.creator" placeholder="请选择" size="small" allow-clear style="width: 200px" :options="creatorOptions" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">临时小组:</span>
+              <a-select v-model:value="filters.tempGroup" placeholder="请选择" size="small" allow-clear style="width: 200px" :options="tempGroupOptions" />
+            </div>
+          </template>
+
+          <!-- 批量编辑 筛选条件 (activeType === 'batch_edit') -->
+          <template v-else-if="activeType === 'batch_edit'">
+            <div class="filter-item">
+              <span class="filter-label">通道:</span>
+              <a-select v-model:value="filters.channel" placeholder="请选择" size="small" allow-clear style="width: 200px" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">账户:</span>
+              <a-select v-model:value="filters.account" placeholder="请选择" size="small" allow-clear style="width: 200px" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">状态:</span>
+              <a-select v-model:value="filters.status" placeholder="不限" size="small" allow-clear style="width: 200px" :options="statusOptions" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">结果:</span>
+              <a-select v-model:value="filters.result" placeholder="请选择" size="small" allow-clear style="width: 200px" :options="resultOptions" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">提交时间:</span>
+              <a-range-picker v-model:value="filters.submitTimeRange" size="small" style="width: 240px" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">执行时间:</span>
+              <a-range-picker v-model:value="filters.executeTimeRange" size="small" style="width: 240px" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">任务ID:</span>
+              <a-input v-model:value="filters.taskId" placeholder="请输入" size="small" style="width: 200px" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">创建人:</span>
+              <a-select v-model:value="filters.creator" placeholder="请选择" size="small" allow-clear style="width: 200px" :options="creatorOptions" />
+            </div>
+          </template>
+
+          <!-- 素材推送 筛选条件 (activeType === 'material_push') -->
+          <template v-else-if="activeType === 'material_push'">
+            <div class="filter-item">
+              <span class="filter-label">渠道:</span>
+              <a-select v-model:value="filters.channel" placeholder="请选择" size="small" allow-clear style="width: 200px" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">YouTube 渠道:</span>
+              <a-select v-model:value="filters.youtubeChannel" placeholder="请选择" size="small" allow-clear style="width: 200px" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">资产:</span>
+              <a-select v-model:value="filters.asset" placeholder="请选择" size="small" allow-clear style="width: 200px" :options="assetOptions" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">状态:</span>
+              <a-select v-model:value="filters.status" placeholder="不限" size="small" allow-clear style="width: 200px" :options="statusOptions" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">结果:</span>
+              <a-select v-model:value="filters.result" placeholder="请选择" size="small" allow-clear style="width: 200px" :options="resultOptions" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">提交时间:</span>
+              <a-range-picker v-model:value="filters.submitTimeRange" size="small" style="width: 240px" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">任务ID:</span>
+              <a-input v-model:value="filters.taskId" placeholder="请输入" size="small" style="width: 200px" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">创建人:</span>
+              <a-select v-model:value="filters.creator" placeholder="请选择" size="small" allow-clear style="width: 200px" :options="creatorOptions" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">TikTok资产:</span>
+              <a-select v-model:value="filters.tiktokAsset" placeholder="请选择" size="small" allow-clear style="width: 200px" />
+            </div>
+          </template>
+
+          <!-- AI运行记录 筛选条件 (activeType === 'ai_record') -->
+          <template v-else-if="activeType === 'ai_record'">
+            <div class="filter-item">
+              <span class="filter-label">渠道:</span>
+              <a-select v-model:value="filters.channel" placeholder="请选择" size="small" allow-clear style="width: 200px" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">广告资产:</span>
+              <a-select v-model:value="filters.adAsset" placeholder="请选择" size="small" allow-clear style="width: 200px" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">规则:</span>
+              <a-select v-model:value="filters.rule" placeholder="搜索规则名称或ID" size="small" allow-clear style="width: 200px" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">批次ID:</span>
+              <a-input v-model:value="filters.batchId" placeholder="请输入" size="small" style="width: 200px" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">执行结果:</span>
+              <a-select v-model:value="filters.executeResult" placeholder="请选择" size="small" allow-clear style="width: 200px" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">执行策略:</span>
+              <a-select v-model:value="filters.executeStrategy" placeholder="请选择" size="small" allow-clear style="width: 200px" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">监控对象:</span>
+              <a-select v-model:value="filters.monitorTarget" placeholder="不限" size="small" allow-clear style="width: 200px" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">执行时间:</span>
+              <a-range-picker v-model:value="filters.executeTimeRange" size="small" style="width: 240px" />
+            </div>
+            <div class="filter-item">
+              <span class="filter-label">创建人:</span>
+              <a-select v-model:value="filters.creator" placeholder="请选择" size="small" allow-clear style="width: 200px" :options="creatorOptions" />
+            </div>
+          </template>
+        </div>
+
+        <div class="info-bar">
+          <div class="info-left">
+            <info-circle-filled class="info-icon" />
+            <span>本次任务共 0 个，已成功 0 个，已失败 0 个，正在推送 0 个，推送成功 0 个，推送失败 0 个</span>
+          </div>
+          <a-button size="small" @click="handleRefresh">
+            <template #icon><reload-outlined /></template>
+            刷新
+          </a-button>
+        </div>
+      </div>
+
+      <div class="table-section">
+        <a-table
+          class="task-center-main-table"
+          :columns="columns"
+          :data-source="dataSource"
+          :row-key="record => record.id"
+          :loading="loading"
+          :pagination="pagination"
+          :scroll="{ x: 1720 }"
+          @change="handleTableChange"
+          size="middle"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.dataIndex === 'channel'">
+              <img src="https://img.alicdn.com/imgextra/i4/O1CN01fN9I3O1Xw8WzJ9QGf_!!6000000002988-2-tps-200-200.png" style="width: 20px;" />
+            </template>
+            <template v-if="column.dataIndex === 'operation'">
+              <div class="table-ops">
+                <a @click="handleCopy(record)">复制</a>
+                <a @click="handleView(record)">详情</a>
+                <a @click="handleRetry(record)">重试</a>
+              </div>
+            </template>
+            <template v-if="column.dataIndex === 'creation_detail'">
+              <a-tooltip placement="topLeft">
+                <template #title>
+                  <div class="creation-details-tooltip">
+                    <div
+                      v-for="item in getCreationDetailItems(record)"
+                      :key="item.type"
+                      class="detail-item"
+                      :class="{ error: item.isError }"
+                    >
+                      {{ item.type }} {{ item.text }}
+                    </div>
+                  </div>
+                </template>
+                <div class="creation-detail-summary">
+                  {{ getCreationDetailSummary(record) }}
+                </div>
+              </a-tooltip>
+            </template>
+          </template>
+          <template #emptyText>
+            <div class="empty-text">No Data</div>
+          </template>
+        </a-table>
+      </div>
+
+      <a-modal
+        v-model:visible="detailModalVisible"
+        title="详情"
+        :footer="null"
+        width="1100px"
+        class="task-detail-modal"
+      >
+        <div v-if="detailData" class="task-detail-content">
+          <!-- 任务基本信息 -->
+          <div class="detail-section">
+            <div class="section-title">任务基本信息</div>
+            <div class="info-grid">
+              <!-- 左侧列 -->
+              <div class="info-column">
+                <div class="info-item">
+                  <span class="info-label">渠道</span>
+                  <div class="info-value">
+                    <img src="https://img.alicdn.com/imgextra/i4/O1CN01fN9I3O1Xw8WzJ9QGf_!!6000000002988-2-tps-200-200.png" style="width: 20px; margin-right: 8px;" />
+                    {{ detailData.job?.channel || 'TikTok' }}
+                  </div>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">产品</span>
+                  <div class="info-value">{{ detailData.job?.product || '-' }}</div>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">创建详情</span>
+                  <div class="info-value creation-details">
+                    <div class="detail-row">
+                      <span class="type">Campaign</span>
+                      <span class="status">成功：1 <a class="view-all">查看全部</a></span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="type">Adset</span>
+                      <span class="status">成功：1 <a class="view-all">查看全部</a></span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="type">Ad</span>
+                      <span class="status error">失败：1</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- 右侧列 -->
+              <div class="info-column">
+                <div class="info-item">
+                  <span class="info-label">账户</span>
+                  <div class="info-value">{{ detailData.job?.account || '-' }}</div>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">提交时间<br/>(UTC+8)</span>
+                  <div class="info-value">{{ detailData.job?.submit_time || '2023-11-29 16:05:07' }}</div>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">提交方式</span>
+                  <div class="info-value">{{ detailData.job?.submit_method || '立即提交' }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 任务详情列表 -->
+          <div class="detail-section list-section">
+            <div class="list-filter-row">
+              <div class="filter-group">
+                <div class="filter-item">
+                  <span class="label">层级:</span>
+                  <a-select v-model:value="detailFilters.level" size="small" style="width: 120px" :options="levelOptions" />
+                </div>
+                <div class="filter-item">
+                  <span class="label">状态:</span>
+                  <a-select v-model:value="detailFilters.status" size="small" style="width: 120px" :options="statusOptions" />
+                </div>
+                <div class="filter-item">
+                  <span class="label">结果:</span>
+                  <a-select v-model:value="detailFilters.result" size="small" style="width: 120px" :options="resultOptions" />
+                </div>
+              </div>
+              <div class="action-group">
+                <a-button size="small"><template #icon><reload-outlined /></template>刷新</a-button>
+                <a-button size="small">一键取消</a-button>
+                <a-button size="small" danger ghost class="retry-btn">一键重试失败</a-button>
+              </div>
+            </div>
+
+            <a-table
+              :columns="detailColumns"
+              :data-source="detailData.items || []"
+              size="small"
+              :pagination="{
+                total: detailData.items?.length || 0,
+                current: 1,
+                pageSize: 20,
+                showSizeChanger: true,
+                showTotal: total => `# ${total} 条`
+              }"
+            >
+              <template #bodyCell="{ column, text }">
+                <template v-if="column.dataIndex === 'result'">
+                  <span :class="['result-text', { 'error': text === '失败' || text === 'fail' }]">
+                    {{ text === 'fail' ? '失败' : '成功' }}
+                  </span>
+                </template>
+                <template v-if="column.dataIndex === 'error_reason'">
+                  <span class="error-reason">{{ text || 'Duplicated material name.' }}</span>
+                </template>
+              </template>
+            </a-table>
+          </div>
+        </div>
+      </a-modal>
+    </div>
+  </page-container>
+</template>
+
+<script lang="ts">
+import { defineComponent, ref, reactive, watch, onMounted } from 'vue';
+import { InfoCircleFilled, ReloadOutlined } from '@ant-design/icons-vue';
+import { fetchMetaTasks, fetchMetaTaskDetail } from '@/api/meta-task';
+
+export default defineComponent({
+  name: 'TaskCenter',
+  components: {
+    InfoCircleFilled,
+    ReloadOutlined,
+  },
+  setup() {
+    const activeType = ref('create_ad');
+    const typeTabs = [
+      { label: '创建广告', value: 'create_ad' },
+      { label: '批量编辑', value: 'batch_edit' },
+      { label: '素材推送', value: 'material_push' },
+      { label: 'AI运行记录', value: 'ai_record' },
+    ];
+
+    const filters = reactive({
+      task: undefined,
+      asset: undefined,
+      status: undefined,
+      result: undefined,
+      submitMethod: undefined,
+      dateRange: [] as any,
+      taskId: '',
+      creator: undefined,
+      tempGroup: undefined,
+      // 新增字段
+      channel: undefined,
+      account: undefined,
+      submitTimeRange: [] as any,
+      executeTimeRange: [] as any,
+      youtubeChannel: undefined,
+      tiktokAsset: undefined,
+      adAsset: undefined,
+      rule: undefined,
+      batchId: '',
+      executeResult: undefined,
+      executeStrategy: undefined,
+      monitorTarget: undefined,
+    });
+
+    const taskOptions = [{ label: '测试任务', value: 'test' }];
+    const assetOptions = [{ label: '资产1', value: 'asset1' }];
+    const statusOptions = [{ label: '进行中', value: 'processing' }, { label: '已完成', value: 'completed' }];
+    const resultOptions = [{ label: '成功', value: 'success' }, { label: '失败', value: 'fail' }];
+    const submitMethodOptions = [{ label: '手动', value: 'manual' }, { label: '自动', value: 'auto' }];
+    const creatorOptions = [{ label: '管理员', value: 'admin' }];
+    const tempGroupOptions = [{ label: '小组A', value: 'groupA' }];
+
+    const loading = ref(false);
+    const dataSource = ref([]);
+    const pagination = reactive({
+      current: 1,
+      pageSize: 20,
+      total: 0,
+      showSizeChanger: true,
+      pageSizeOptions: ['10', '20', '50', '100'],
+    });
+
+    const detailModalVisible = ref(false);
+    const detailData = ref<any>(null);
+
+    const detailFilters = reactive({
+      level: 'Ad',
+      status: undefined,
+      result: undefined,
+    });
+
+    const levelOptions = [{ label: 'Ad', value: 'Ad' }, { label: 'Adset', value: 'Adset' }, { label: 'Campaign', value: 'Campaign' }];
+
+    const detailColumns = [
+      { title: 'Campaign', dataIndex: 'campaign', width: 150 },
+      { title: 'Adset', dataIndex: 'adset', width: 150 },
+      { title: 'Ad', dataIndex: 'ad', width: 150 },
+      { title: '账户', dataIndex: 'account', width: 150 },
+      { title: '提交时间(UTC+8)', dataIndex: 'submit_time', width: 150 },
+      { title: '状态', dataIndex: 'status', width: 100 },
+      { title: '结果', dataIndex: 'result', width: 100 },
+      { title: '失败原因', dataIndex: 'error_reason', width: 200 },
+    ];
+
+    const columns: any[] = [
+      { title: '渠道', dataIndex: 'channel', width: 96, align: 'center' },
+      { title: '任务ID', dataIndex: 'id', width: 140 },
+      { title: '账户', dataIndex: 'account', width: 260 },
+      { title: '操作', dataIndex: 'operation', width: 180 },
+      { title: '产品', dataIndex: 'product', width: 140 },
+      { title: '提交时间(UTC+8)', dataIndex: 'submit_time', width: 200 },
+      { title: '创建详情', dataIndex: 'creation_detail', width: 340 },
+      { title: '提交方式', dataIndex: 'submit_method', width: 140 },
+      { title: '创建人', dataIndex: 'creator', width: 140 },
+    ];
+
+    const getCreationDetailItems = (record: any) => {
+      const adFailed = record?.id === '1';
+      return [
+        { type: 'Campaign', text: '成功：1', isError: false },
+        { type: 'Adset', text: '成功：1', isError: false },
+        { type: 'Ad', text: adFailed ? '失败：1' : '成功：1', isError: adFailed },
+      ];
+    };
+
+    const getCreationDetailSummary = (record: any) => {
+      return getCreationDetailItems(record)
+        .map((item) => `${item.type} ${item.text}`)
+        .join(' / ');
+    };
+
+    const formatDateValue = (v: any) => {
+      if (!v) return undefined;
+      if (typeof v === 'string') return v;
+      if (typeof v.format === 'function') {
+        return v.format('YYYY-MM-DD HH:mm:ss');
+      }
+      if (typeof v.toISOString === 'function') {
+        return v.toISOString();
+      }
+      return v;
+    };
+
+    const formatRangePair = (arr: any[] | undefined) => {
+      if (!arr || arr.length !== 2) return undefined;
+      const start = formatDateValue(arr[0]);
+      const end = formatDateValue(arr[1]);
+      return [start, end] as any;
+    };
+
+    const loadTasks = async () => {
+      loading.value = true;
+      try {
+        const res = await fetchMetaTasks({
+          pageNo: pagination.current,
+          pageSize: pagination.pageSize,
+          // 按当前选中的类型标签过滤
+          type: activeType.value,
+          taskId: filters.taskId ? filters.taskId : undefined,
+          asset: filters.asset ? filters.asset : undefined,
+          status: filters.status ? filters.status : undefined,
+          result: filters.result ? filters.result : undefined,
+          submitMethod: filters.submitMethod ? filters.submitMethod : undefined,
+          dateRange: formatRangePair(filters.dateRange),
+          creator: filters.creator ? filters.creator : undefined,
+          channel: filters.channel ? filters.channel : undefined,
+          account: filters.account ? filters.account : undefined,
+          submitTimeRange: formatRangePair(filters.submitTimeRange),
+          executeTimeRange: formatRangePair(filters.executeTimeRange),
+          batchId: filters.batchId ? filters.batchId : undefined,
+          adAsset: filters.adAsset ? filters.adAsset : undefined,
+          rule: filters.rule ? filters.rule : undefined,
+          executeResult: filters.executeResult ? filters.executeResult : undefined,
+          executeStrategy: filters.executeStrategy ? filters.executeStrategy : undefined,
+          monitorTarget: filters.monitorTarget ? filters.monitorTarget : undefined,
+        });
+
+        dataSource.value = res?.data ?? [];
+        pagination.total = res?.totalCount ?? 0;
+      } finally {
+        loading.value = false;
+      }
+    };
+
+    const handleRefresh = () => {
+      loadTasks();
+    };
+
+    const handleTableChange = (pag: any) => {
+      pagination.current = pag.current;
+      pagination.pageSize = pag.pageSize;
+      loadTasks();
+    };
+
+    const handleCopy = (record: any) => {
+      console.log('Copy task:', record);
+    };
+
+    const handleRetry = (record: any) => {
+      console.log('Retry task:', record);
+    };
+
+    const handleView = async (record: any) => {
+      loading.value = true;
+      try {
+        const res = await fetchMetaTaskDetail(record.id);
+        detailData.value = res?.data ?? null;
+        detailModalVisible.value = true;
+      } finally {
+        loading.value = false;
+      }
+    };
+
+    watch(activeType, () => {
+      pagination.current = 1;
+      loadTasks();
+    });
+
+    onMounted(() => {
+      loadTasks();
+    });
+
+    return {
+      activeType,
+      typeTabs,
+      filters,
+      taskOptions,
+      assetOptions,
+      statusOptions,
+      resultOptions,
+      submitMethodOptions,
+      creatorOptions,
+      tempGroupOptions,
+      loading,
+      dataSource,
+      pagination,
+      columns,
+      handleRefresh,
+      handleTableChange,
+      handleCopy,
+      handleRetry,
+      handleView,
+      detailModalVisible,
+      detailData,
+      detailFilters,
+      levelOptions,
+      detailColumns,
+      getCreationDetailItems,
+      getCreationDetailSummary,
+    };
+  },
+});
+</script>
+
+<style scoped lang="less">
+.task-center-container {
+  background-color: transparent;
+  padding: 12px 0;
+  min-height: 100%;
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  .filter-section {
+    background: #fff;
+    padding: 16px 24px;
+    border-bottom: 1px solid #f0f0f0;
+
+    .filter-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 18px;
+
+      .filter-label {
+        width: 48px;
+        font-size: 14px;
+        color: #333;
+        font-weight: 500;
+        flex-shrink: 0;
+      }
+
+      .type-tabs {
+        display: flex;
+        gap: 0;
+        border: 1px solid #d9d9d9;
+        border-radius: 2px;
+        overflow: hidden;
+
+        .type-tab {
+          padding: 6px 20px;
+          cursor: pointer;
+          font-size: 14px;
+          color: #666;
+          background: #fff;
+          border-right: 1px solid #d9d9d9;
+          transition: all 0.2s;
+
+          &:last-child {
+            border-right: none;
+          }
+
+          &:hover {
+            color: #1890ff;
+          }
+
+          &.active {
+            background: #e6f7ff;
+            color: #1890ff;
+            font-weight: 500;
+          }
+        }
+      }
+    }
+
+    .filter-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 24px;
+      margin-bottom: 20px;
+
+      .filter-item {
+        display: flex;
+        align-items: center;
+        min-width: 240px;
+
+        .filter-label {
+          width: auto;
+          min-width: 60px;
+          padding-right: 8px;
+          font-size: 14px;
+          color: #333;
+          white-space: nowrap;
+          text-align: left;
+        }
+
+        :deep(.ant-select), :deep(.ant-input) {
+          flex: 1;
+          .ant-select-selector, &.ant-input {
+            border-radius: 2px;
+            border-color: #d9d9d9;
+          }
+        }
+        
+        :deep(.ant-picker) {
+          flex: 1;
+          border-radius: 2px;
+        }
+      }
+    }
+
+    .info-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 14px;
+      border-top: 1px solid #f0f0f0;
+
+      .info-left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #666;
+        font-size: 14px;
+
+        .info-icon {
+          color: #1890ff;
+          font-size: 16px;
+        }
+      }
+
+      :deep(.ant-btn) {
+        border-radius: 2px;
+        font-size: 14px;
+        color: #666;
+        height: 32px;
+        
+        &:hover {
+          color: #1890ff;
+          border-color: #1890ff;
+        }
+      }
+    }
+  }
+
+  .table-section {
+    padding: 16px 24px 24px;
+    background: #fff;
+    overflow: hidden;
+    /* 表格区域占满可视高度，列表更易读 */
+    min-height: min(520px, calc(100vh - 320px));
+
+    .table-ops {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 14px;
+      
+      font-size: 15px;
+      a {
+        color: #1890ff;
+        &:hover { text-decoration: underline; }
+      }
+    }
+
+    .creation-details-mini {
+      font-size: 14px;
+      line-height: 1.85;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      row-gap: 8px;
+      min-height: 120px;
+      padding: 4px 0;
+      .detail-item {
+        color: #434343;
+        white-space: normal;
+        &.error { color: #ff4d4f; }
+      }
+    }
+
+    .creation-detail-summary {
+      font-size: 13px;
+      line-height: 22px;
+      color: #434343;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: default;
+    }
+
+    :deep(.task-center-main-table) {
+      font-size: 14px;
+
+      .ant-table-thead > tr > th {
+        background: #fafafa;
+        color: #262626;
+        font-weight: 600;
+        font-size: 14px;
+        padding: 12px 14px;
+        border-bottom: 1px solid #f0f0f0;
+
+        &::before {
+          display: none;
+        }
+      }
+
+      .ant-table-tbody > tr > td {
+        padding: 12px 14px !important;
+        border-bottom: 1px solid #f0f0f0;
+        vertical-align: middle;
+      }
+
+      .ant-table-cell {
+        padding: 12px 14px !important;
+        vertical-align: middle !important;
+      }
+
+      .ant-table-tbody > tr:hover > td {
+        background: rgba(24, 144, 255, 0.06);
+      }
+
+      .ant-table-measure-row {
+        display: none;
+      }
+    }
+  }
+}
+
+.creation-details-tooltip {
+  .detail-item {
+    line-height: 1.7;
+    color: #f0f0f0;
+    &.error {
+      color: #ff7875;
+    }
+  }
+}
+
+.task-detail-modal {
+  :deep(.ant-modal-content) {
+    border-radius: 4px;
+  }
+  :deep(.ant-modal-header) {
+    padding: 16px 24px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  :deep(.ant-modal-body) {
+    padding: 0;
+    background: #f0f2f5;
+  }
+
+  .task-detail-content {
+    .detail-section {
+      background: #fff;
+      padding: 24px;
+      margin-bottom: 12px;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+
+      .section-title {
+        font-size: 14px;
+        font-weight: 500;
+        margin-bottom: 24px;
+        color: #000;
+      }
+
+      .info-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0 48px;
+
+        .info-column {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+
+        .info-item {
+          display: flex;
+          align-items: flex-start;
+          line-height: 1.6;
+
+          .info-label {
+            width: 80px;
+            color: #8c8c8c;
+            font-size: 14px;
+            font-weight: 400;
+            flex-shrink: 0;
+          }
+
+          .info-value {
+            flex: 1;
+            color: #000;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+
+            &.creation-details {
+              display: flex;
+              flex-direction: column;
+              gap: 8px;
+              width: 100%;
+
+              .detail-row {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+
+                .type {
+                  width: 70px;
+                  color: #262626;
+                }
+
+                .status {
+                  display: flex;
+                  align-items: center;
+                  gap: 8px;
+                  &.error { color: #ff4d4f; }
+                  .view-all {
+                    color: #1890ff;
+                    font-size: 13px;
+                    cursor: pointer;
+                    &:hover { text-decoration: underline; }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      &.list-section {
+        padding: 16px 24px;
+
+        .list-filter-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 16px;
+
+          .filter-group {
+            display: flex;
+            gap: 24px;
+
+            .filter-item {
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              .label {
+                font-size: 14px;
+                color: #262626;
+              }
+            }
+          }
+
+          .action-group {
+            display: flex;
+            gap: 8px;
+
+            .retry-btn {
+              border-color: #ff4d4f;
+              color: #ff4d4f;
+              &:hover {
+                background: #fff1f0;
+              }
+            }
+          }
+        }
+
+        :deep(.ant-table) {
+          .result-text {
+            &.error { color: #ff4d4f; }
+          }
+          .error-reason {
+            color: #595959;
+          }
+          .ant-pagination {
+            margin: 16px 0 0;
+          }
+        }
+      }
+    }
+  }
+}
+
+/* 超宽屏适配：增大内容左右留白 */
+@media (min-width: 1280px) {
+  .task-center-container {
+    .filter-section {
+      padding: 18px 32px;
+    }
+    .table-section {
+      padding: 18px 32px 28px;
+    }
+  }
+}
+
+@media (min-width: 1440px) {
+  .task-center-container {
+    .filter-section {
+      padding: 20px 36px;
+    }
+    .table-section {
+      padding: 20px 36px 30px;
+    }
+  }
+}
+
+@media (min-width: 1920px) {
+  .task-center-container {
+    .filter-section {
+      padding: 22px 40px;
+    }
+    .table-section {
+      padding: 22px 40px 34px;
+    }
+  }
+}
+
+@media (min-width: 2560px) {
+  .task-center-container {
+    .filter-section {
+      padding: 24px 48px;
+    }
+    .table-section {
+      padding: 24px 48px 38px;
+    }
+  }
+}
+</style>
+
+

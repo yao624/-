@@ -1,0 +1,1664 @@
+<template>
+  <page-container
+    title="文案库（Meta / XMP）"
+    class="managed-module-font 3xl:[zoom:0.9] 4xl:[zoom:1.1]"
+  >
+    <a-layout class="meta-copy-layout" style="min-height: 520px; background: transparent">
+      <a-layout-sider :width="280" theme="light" style="border-right: 1px solid #f0f0f0">
+        <div ref="sidebarContainerRef" class="sidebar-outer-container">
+          <div class="sidebar-wrapper">
+            <a-spin :spinning="treeLoading">
+              <a-tree
+                class="library-tree"
+                :virtual="false"
+                draggable
+                show-icon
+                :show-line="{ showLeafIcon: false }"
+                :tree-data="sidebarTreeData"
+                :selected-keys="sidebarSelectedKeys"
+                :expanded-keys="expandedTreeKeys"
+                @expand="onSidebarExpand"
+                @select="onSidebarSelect"
+                :allowDrop="allowFolderDrop"
+                @dragenter="onTreeDragEnter"
+                @drop="onTreeDrop"
+              >
+                <template #title="{ title, node, dataRef }">
+                  <span class="tree-node-title">
+                    <span class="tree-node-left">
+                      <template v-if="getSidebarNodeType(node, dataRef) === 'group'">
+                        <span class="tree-node-text-plain">{{ title }}</span>
+                      </template>
+                      <template v-else>
+                        <DatabaseOutlined
+                          v-if="getSidebarNodeType(node, dataRef) === 'library'"
+                          class="tree-node-icon library-icon"
+                        />
+                        <FolderFilled
+                          v-else-if="getSidebarNodeType(node, dataRef) === 'folder'"
+                          class="tree-node-icon folder-icon"
+                        />
+                        <span class="tree-node-text-plain">{{ title }}</span>
+                      </template>
+                    </span>
+
+                    <template v-if="getSidebarNodeType(node, dataRef) === 'group'">
+                      <a-button
+                        type="link"
+                        size="small"
+                        class="tree-group-add-btn"
+                        @click.stop="openLibraryModal(getGroupTypeFromNode(node, dataRef))"
+                          @dragstart.prevent
+                      >
+                        新建
+                      </a-button>
+                    </template>
+
+                    <template
+                      v-else-if="
+                        getSidebarNodeType(node, dataRef) === 'library' ||
+                        getSidebarNodeType(node, dataRef) === 'folder'
+                      "
+                    >
+                      <a-dropdown :trigger="['click']" placement="bottomRight">
+                        <a-button
+                          type="text"
+                          size="small"
+                          class="sidebar-node-op-btn"
+                          @click.stop
+                          @dragstart.prevent
+                        >
+                          <EllipsisOutlined />
+                        </a-button>
+                        <template #overlay>
+                          <a-menu
+                            style="min-width: 120px"
+                            @click="({ key, domEvent }) => onSidebarNodeAction(key, domEvent, node, dataRef, title)"
+                          >
+                            <a-menu-item
+                              v-if="getSidebarNodeType(node, dataRef) === 'library'"
+                              key="create-folder"
+                            >
+                              新建文件夹
+                            </a-menu-item>
+                            <a-menu-item
+                              v-else-if="getSidebarNodeType(node, dataRef) === 'folder'"
+                              key="create-subfolder"
+                            >
+                              新建子文件夹
+                            </a-menu-item>
+                            <a-menu-item key="favorite">收藏</a-menu-item>
+                            <a-menu-item key="edit">编辑</a-menu-item>
+                            <a-menu-item key="delete">删除</a-menu-item>
+                          </a-menu>
+                        </template>
+                      </a-dropdown>
+                    </template>
+                  </span>
+                </template>
+              </a-tree>
+            </a-spin>
+          </div>
+        </div>
+      </a-layout-sider>
+      <a-layout-content style="padding: 0 16px">
+        <a-card size="small" :bordered="false">
+          <div class="mb-2 current-path">{{ currentPathText }}</div>
+          <a-space wrap style="margin-bottom: 12px">
+            <a-input
+              v-model:value="keyword"
+              allow-clear
+              placeholder="搜索正文/标题/描述/备注"
+              style="width: 220px"
+              @press-enter="reloadItems"
+            />
+            <a-button type="primary" @click="reloadItems">搜索</a-button>
+            <a-input
+              v-model:value="previewCountryCodes"
+              allow-clear
+              placeholder="预览国家：US,JP（与推广地区组一致，列表按对应语言显示）"
+              style="width: 320px"
+              @press-enter="reloadItems"
+            />
+            <a-button @click="reloadItems">应用预览</a-button>
+            <a-range-picker v-model:value="dateRange" />
+            <a-checkbox v-model:checked="includeChildren">包含子文件夹文案</a-checkbox>
+            <a-button type="primary" :disabled="!effectiveFolderId" @click="openItemModalCreate">新增文案</a-button>
+            <a-button
+              :disabled="!activeLibraryId || treeLoading || !rootFolderId"
+              @click="openFolderModal(currentFolderIdForCreate)"
+            >
+              新建文件夹
+            </a-button>
+            <a-button danger :disabled="!selectedRowKeys.length" @click="onBatchDelete">批量删除</a-button>
+            <a-tooltip title="刷新列表">
+              <a-button :icon="h(ReloadOutlined)" @click="reloadItems" />
+            </a-tooltip>
+          </a-space>
+          <a-table
+            :loading="tableLoading"
+            :columns="columns"
+            :data-source="tableRows"
+            :row-key="r => r.id"
+            :pagination="pagination"
+            :row-selection="{ selectedRowKeys, onChange: onSelectRows, getCheckboxProps }"
+            @change="onTableChange"
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="record?.__rowKind === 'folder' && column.dataIndex === 'primary_text'">
+                <span class="primary-text-with-icon">
+                  <FolderFilled class="table-folder-icon" />
+                  <span class="primary-text-name">{{ String(record?.primary_text ?? '') }}</span>
+                </span>
+              </template>
+              <template v-else-if="record?.__rowKind === 'folder'">
+                -
+              </template>
+              <template v-else-if="column.dataIndex === 'operation'">
+                <a-button type="link" size="small" @click="openItemModalEdit(record)">编辑</a-button>
+                <a-button type="link" size="small" danger @click="onDeleteItem(record)">删除</a-button>
+              </template>
+              <template v-else>
+                {{ (record as any)?.[String(column.dataIndex)] ?? '' }}
+              </template>
+            </template>
+          </a-table>
+        </a-card>
+      </a-layout-content>
+    </a-layout>
+    <a-modal v-model:open="folderOpen" :title="folderModalTitle" ok-text="保存" @ok="submitFolder">
+      <a-input v-model:value="folderName" placeholder="文件夹名称" />
+    </a-modal>
+    <a-modal v-model:open="libraryOpen" :title="libraryModalTitle" ok-text="保存" @ok="submitLibrary">
+      <a-form layout="vertical">
+        <a-form-item label="文案库名称">
+          <a-input v-model:value="libraryName" placeholder="请输入文案库名称" />
+        </a-form-item>
+        <a-form-item v-if="libraryType === 'enterprise'" label="可见范围">
+          <a-radio-group v-model:value="visibilityMode">
+            <a-radio-button value="all_company">全公司</a-radio-button>
+            <a-radio-button value="self_only">仅自己可见</a-radio-button>
+            <a-radio-button value="specific_users">指定用户可见</a-radio-button>
+          </a-radio-group>
+          <a-textarea
+            v-if="visibilityMode === 'specific_users'"
+            v-model:value="visibilityUsersText"
+            class="mt-2"
+            :rows="3"
+            placeholder="输入用户ID，逗号分隔"
+          />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
+    <a-modal v-model:open="itemOpen" :title="itemModalTitle" width="720px" ok-text="保存" @ok="submitItem">
+      <a-form layout="vertical">
+        <a-alert
+          type="info"
+          show-icon
+          class="mb-3"
+          message="默认文案为全语言回退；下方可维护各 Meta locale（如 en_US、ja_JP）的翻译。推广页选国家后请求列表时传 country_codes 即可自动匹配。"
+        />
+        <a-form-item label="正文 primary_text（默认）">
+          <a-textarea v-model:value="itemForm.primary_text" :rows="3" />
+        </a-form-item>
+        <a-form-item label="标题 headline（默认）">
+          <a-input v-model:value="itemForm.headline" />
+        </a-form-item>
+        <a-form-item label="描述 description（默认）">
+          <a-textarea v-model:value="itemForm.description" :rows="2" />
+        </a-form-item>
+        <a-form-item label="备注">
+          <a-textarea v-model:value="itemForm.remark" :rows="2" />
+        </a-form-item>
+
+        <a-divider orientation="left">多语言翻译</a-divider>
+        <a-space wrap class="mb-2">
+          <a-select
+            v-model:value="newLocaleToAdd"
+            allow-clear
+            show-search
+            :options="localeOptionsForAdd"
+            placeholder="选择 Meta locale 后添加"
+            style="width: 220px"
+            :filter-option="filterLocaleOption"
+          />
+          <a-button type="dashed" @click="addTranslationLocale">添加语言</a-button>
+        </a-space>
+        <div v-for="loc in translationLocaleKeys" :key="loc" class="translation-block">
+          <div class="translation-block-hd">
+            <span class="loc-label">{{ loc }}</span>
+            <a-button type="link" danger size="small" @click="removeTranslationLocale(loc)">移除</a-button>
+          </div>
+          <a-form-item label="正文">
+            <a-textarea v-model:value="itemTranslationsForm[loc].primary_text" :rows="2" />
+          </a-form-item>
+          <a-form-item label="标题">
+            <a-input v-model:value="itemTranslationsForm[loc].headline" />
+          </a-form-item>
+          <a-form-item label="描述">
+            <a-textarea v-model:value="itemTranslationsForm[loc].description" :rows="2" />
+          </a-form-item>
+        </div>
+      </a-form>
+    </a-modal>
+  </page-container>
+</template>
+
+<script setup lang="ts">
+import { computed, h, onMounted, reactive, ref, watch, onUnmounted } from 'vue';
+import type { TreeProps } from 'ant-design-vue';
+import { message, Modal } from 'ant-design-vue';
+import { DatabaseOutlined, FolderFilled, EllipsisOutlined, ReloadOutlined } from '@ant-design/icons-vue';
+import type { Dayjs } from 'dayjs';
+import {
+  batchDeleteMetaCopyItems,
+  createMetaCopyLibrary,
+  createMetaCopyFolder,
+  createMetaCopyItem,
+  deleteMetaCopyLibrary,
+  deleteMetaCopyFolder,
+  deleteMetaCopyItem,
+  fetchMetaCopyFolderTree,
+  fetchMetaCopyItem,
+  fetchMetaCopyItems,
+  fetchMetaCopyLibraries,
+  META_COPY_LOCALE_OPTIONS,
+  updateMetaCopyLibrary,
+  reorderMetaCopyFolders,
+  updateMetaCopyFolder,
+  updateMetaCopyItem,
+  type MetaCopyFolderTreeNode,
+  type MetaCopyItemRow,
+  type MetaCopyItemTranslations,
+  type MetaCopyLibraryRow,
+} from '@/api/meta-copy-library';
+
+const sidebarContainerRef = ref<HTMLElement | null>(null);
+
+function handleSidebarWheel(e: WheelEvent) {
+  const container = sidebarContainerRef.value;
+  if (!container) return;
+
+  // 如果容器内容宽度大于容器本身宽度（存在水平溢出）
+  if (container.scrollWidth > container.clientWidth) {
+    // 强制将所有垂直滚动转换为水平滚动，因为这是用户的核心诉求
+    if (e.deltaY !== 0) {
+      container.scrollLeft += e.deltaY;
+      e.preventDefault();
+    }
+  }
+}
+
+const libraries = ref<MetaCopyLibraryRow[]>([]);
+const activeLibraryId = ref<string | undefined>();
+
+const personalLibraries = computed(() => libraries.value.filter(l => l.type === 'personal'));
+const enterpriseLibraries = computed(() => libraries.value.filter(l => l.type === 'enterprise'));
+
+const treeLoading = ref(false);
+const treeData = ref<TreeProps['treeData']>([]);
+const selectedFolderKeys = ref<string[]>([]);
+const selectedFolderId = computed(() => selectedFolderKeys.value[0] ?? '');
+const folderMetaMap = ref<Record<string, { id: string; name: string; parent_id: string | null }>>({});
+const rootFolderId = computed(() => {
+  const roots = Object.values(folderMetaMap.value).filter(f => f.parent_id === null);
+  return roots[0]?.id ?? '';
+});
+const effectiveFolderId = computed(() => selectedFolderId.value || rootFolderId.value);
+const currentFolderIdForCreate = computed(() => selectedFolderId.value || rootFolderId.value || null);
+const activeLibrary = computed(() => libraries.value.find(l => l.id === activeLibraryId.value));
+const activeRootLabel = computed(() => (activeLibrary.value?.type === 'enterprise' ? '企业文案库' : '我的文案库'));
+const currentFolderPathText = computed(() => {
+  const folderId = selectedFolderId.value;
+  if (!folderId) return '根目录';
+  const names: string[] = [];
+  let cursor: string | null = folderId;
+  while (cursor) {
+    const node = folderMetaMap.value[cursor];
+    if (!node) break;
+    names.unshift(node.name);
+    cursor = node.parent_id;
+  }
+  return names.join(' / ') || '根目录';
+});
+const currentPathText = computed(() => {
+  if (!activeLibrary.value) return '未选择文案库';
+  return `${activeRootLabel.value} / ${activeLibrary.value.name} / ${currentFolderPathText.value}`;
+});
+
+function getSidebarNodeType(node: any, dataRef: any): 'group' | 'library' | 'folder' | '' {
+  const typeFromDataRef = dataRef && typeof dataRef.nodeType === 'string' ? dataRef.nodeType : '';
+  const typeFromNode = node && typeof node.nodeType === 'string' ? node.nodeType : '';
+  const typeFromNodeDataRef =
+    node && node.dataRef && typeof node.dataRef.nodeType === 'string' ? node.dataRef.nodeType : '';
+  return (typeFromDataRef || typeFromNode || typeFromNodeDataRef || '') as any;
+}
+
+function getGroupTypeFromNode(node: any, dataRef: any): 'personal' | 'enterprise' {
+  const key = String(dataRef?.key || node?.key || '');
+  return key.includes('enterprise') ? 'enterprise' : 'personal';
+}
+
+const sidebarFolderTreeData = computed(() => {
+  const walk = (nodes: any[]): any[] =>
+    nodes.map(n => ({
+      key: `folder:${String(n.key)}`,
+      title: String(n.title),
+      nodeType: 'folder',
+      libraryId: activeLibraryId.value,
+      folderId: String(n.key),
+      children: n.children?.length ? walk(n.children) : undefined,
+    }));
+  return walk((treeData.value as any[]) ?? []);
+});
+
+const sidebarTreeData = computed(() => [
+  {
+    key: 'group:personal',
+    title: '我的文案库',
+    nodeType: 'group',
+    selectable: false,
+    children: personalLibraries.value.map(lib => ({
+      key: `library:${lib.id}`,
+      title: lib.name,
+      nodeType: 'library',
+      libraryId: lib.id,
+      children: activeLibraryId.value === lib.id ? sidebarFolderTreeData.value : undefined,
+    })),
+  },
+  {
+    key: 'group:enterprise',
+    title: '企业文案库',
+    nodeType: 'group',
+    selectable: false,
+    children: enterpriseLibraries.value.map(lib => ({
+      key: `library:${lib.id}`,
+      title: lib.name,
+      nodeType: 'library',
+      libraryId: lib.id,
+      children: activeLibraryId.value === lib.id ? sidebarFolderTreeData.value : undefined,
+    })),
+  },
+]);
+
+const sidebarSelectedKeys = computed(() => {
+  if (selectedFolderId.value) return [`folder:${selectedFolderId.value}`];
+  if (activeLibraryId.value) return [`library:${activeLibraryId.value}`];
+  return [];
+});
+
+const expandedTreeKeys = ref<string[]>(['group:personal', 'group:enterprise']);
+
+const favoriteNodeKeys = ref<string[]>([]);
+const libraryEditingId = ref<string | null>(null);
+
+function mapTree(
+  nodes: MetaCopyFolderTreeNode[],
+  parentId: string | null = null,
+  rootFolderId?: string,
+): TreeProps['treeData'] {
+  return nodes.flatMap(n => {
+    // 展示层永不显示“根目录”节点；点击文案库一级即表示根目录。
+    if (rootFolderId && n.id === rootFolderId) {
+      if (!n.children?.length) return [];
+      return n.children.map(child => ({
+        title: child.name,
+        key: child.id,
+        parentId: n.id, // 逻辑上仍属于根目录
+        sort_order: child.sort_order,
+        children: child.children?.length ? mapTree(child.children, child.id, rootFolderId) : undefined,
+      }));
+    }
+
+    return [
+      {
+        title: n.name,
+        key: n.id,
+        parentId,
+        sort_order: n.sort_order,
+        children: n.children?.length ? mapTree(n.children, n.id, rootFolderId) : undefined,
+      },
+    ];
+  });
+}
+
+async function loadLibraries() {
+  try {
+    libraries.value = await fetchMetaCopyLibraries();
+    const hasActive = !!activeLibraryId.value && libraries.value.some(l => l.id === activeLibraryId.value);
+    if (!hasActive) {
+      activeLibraryId.value = personalLibraries.value[0]?.id ?? enterpriseLibraries.value[0]?.id;
+    }
+    if (activeLibraryId.value) {
+      const key = `library:${activeLibraryId.value}`;
+      if (!expandedTreeKeys.value.includes(key)) expandedTreeKeys.value.push(key);
+    }
+  } catch (e) {
+    message.error('加载文案库失败');
+  }
+}
+
+async function loadTree() {
+  if (!activeLibraryId.value) {
+    treeData.value = [];
+    return;
+  }
+  treeLoading.value = true;
+  try {
+    const raw = await fetchMetaCopyFolderTree(activeLibraryId.value);
+    const meta: Record<string, { id: string; name: string; parent_id: string | null }> = {};
+    const walk = (arr: MetaCopyFolderTreeNode[], parent: string | null) => {
+      arr.forEach(item => {
+        meta[item.id] = { id: item.id, name: item.name, parent_id: parent };
+        if (item.children?.length) walk(item.children, item.id);
+      });
+    };
+    walk(raw, null);
+    folderMetaMap.value = meta;
+    const roots = Object.values(meta).filter(f => f.parent_id === null);
+    const logicalRootId = roots[0]?.id;
+
+    treeData.value = mapTree(raw, null, logicalRootId);
+
+    // 不自动选中“根目录”节点：点击文案库一级即表示根目录。
+    if (selectedFolderKeys.value.length && !meta[selectedFolderKeys.value[0]]) {
+      selectedFolderKeys.value = [];
+    }
+    await reloadItems();
+  } catch {
+    message.error('加载文件夹失败');
+    treeData.value = [];
+    folderMetaMap.value = {};
+  } finally {
+    treeLoading.value = false;
+  }
+}
+
+function setActiveLibrary(id?: string) {
+  if (!id || activeLibraryId.value === id) return;
+  activeLibraryId.value = id;
+  selectedFolderKeys.value = [];
+  folderMetaMap.value = {};
+  loadTree();
+  items.value = [];
+  pagination.total = 0;
+}
+
+const libraryOpen = ref(false);
+const libraryType = ref<'personal' | 'enterprise'>('personal');
+
+const libraryName = ref('');
+const visibilityMode = ref<'all_company' | 'self_only' | 'specific_users'>('all_company');
+const visibilityUsersText = ref('');
+const libraryModalTitle = computed(() => {
+  if (libraryEditingId.value) return libraryType.value === 'enterprise' ? '编辑企业文案库' : '编辑我的文案库';
+  return libraryType.value === 'enterprise' ? '新建企业文案库' : '新建我的文案库';
+});
+
+function openLibraryModal(type: 'personal' | 'enterprise') {
+  libraryEditingId.value = null;
+  libraryType.value = type;
+  libraryName.value = '';
+  visibilityMode.value = 'all_company';
+  visibilityUsersText.value = '';
+  libraryOpen.value = true;
+}
+
+function openLibraryEditModal(lib: MetaCopyLibraryRow) {
+  libraryEditingId.value = lib.id;
+  libraryType.value = lib.type;
+  libraryName.value = lib.name;
+  visibilityUsersText.value = '';
+  visibilityMode.value = 'all_company';
+
+  if (lib.type === 'enterprise') {
+    const scope: any = lib.visibility_scope || null;
+    const mode = scope && typeof scope.mode === 'string' ? scope.mode : 'all_company';
+    if (mode === 'specific_users') {
+      visibilityMode.value = 'specific_users';
+      const userIds = Array.isArray(scope.user_ids) ? scope.user_ids : [];
+      visibilityUsersText.value = userIds.map((x: any) => String(x)).join(',');
+    } else if (mode === 'self_only') {
+      visibilityMode.value = 'self_only';
+    } else {
+      visibilityMode.value = 'all_company';
+    }
+  }
+
+  libraryOpen.value = true;
+}
+
+async function submitLibrary() {
+  const name = libraryName.value.trim();
+  if (!name) {
+    message.warning('请填写文案库名称');
+    return;
+  }
+
+  let visibilityScope: Record<string, unknown> | null = null;
+  if (libraryType.value === 'enterprise') {
+    visibilityScope = { mode: visibilityMode.value };
+    if (visibilityMode.value === 'specific_users') {
+      visibilityScope.user_ids = visibilityUsersText.value
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean);
+    }
+  }
+
+  try {
+    if (libraryEditingId.value) {
+      await updateMetaCopyLibrary(libraryEditingId.value, {
+        name,
+        visibility_scope: visibilityScope,
+      });
+      message.success('文案库已保存');
+      libraryEditingId.value = null;
+      libraryOpen.value = false;
+      await loadLibraries();
+    } else {
+      await createMetaCopyLibrary({
+        name,
+        type: libraryType.value,
+        visibility_scope: visibilityScope,
+      });
+      libraryOpen.value = false;
+      await loadLibraries();
+      const list = libraryType.value === 'enterprise' ? enterpriseLibraries.value : personalLibraries.value;
+      const created = list.find(l => l.name === name);
+      if (created) setActiveLibrary(created.id);
+      message.success('文案库创建成功');
+    }
+  } catch (e: any) {
+    message.error(e?.response?.data?.message || '创建文案库失败');
+  }
+}
+
+function onTreeSelect(keys: string[]) {
+  selectedFolderKeys.value = keys as string[];
+  pagination.current = 1;
+  reloadItems();
+}
+
+function onSidebarExpand(keys: string[]) {
+  expandedTreeKeys.value = keys;
+}
+
+function onSidebarSelect(keys: string[], info: any) {
+  const node = info?.node;
+  const nodeType = getSidebarNodeType(node, node?.dataRef);
+
+  // 点击任意层级菜单时，只要该节点有子节点就强制展开
+  const selectedKey = keys?.[0];
+  const hasChildren = Array.isArray(node?.children) ? node.children.length > 0 : false;
+  if (selectedKey && hasChildren && !expandedTreeKeys.value.includes(selectedKey)) {
+    expandedTreeKeys.value.push(selectedKey);
+  }
+
+  // 兜底：不要依赖 node.folderId / node.libraryId 是否存在
+  // 以 keys[0] 为准，确保选中状态能稳定更新。
+  if (selectedKey && selectedKey.startsWith('folder:')) {
+    const folderId = selectedKey.slice('folder:'.length);
+    if (!folderId) return;
+    selectedFolderKeys.value = [folderId];
+    pagination.current = 1;
+    reloadItems();
+    return;
+  }
+
+  if (selectedKey && selectedKey.startsWith('library:')) {
+    const libId = selectedKey.slice('library:'.length);
+    if (!libId) return;
+
+    const key = `library:${libId}`;
+    if (!expandedTreeKeys.value.includes(key)) expandedTreeKeys.value.push(key);
+
+    if (activeLibraryId.value === libId) {
+      selectedFolderKeys.value = [];
+      pagination.current = 1;
+      reloadItems();
+      return;
+    }
+    setActiveLibrary(libId);
+    selectedFolderKeys.value = [];
+    return;
+  }
+
+  if (nodeType === 'library') {
+    const libId = String(node.libraryId || '');
+    if (!libId) return;
+    const key = `library:${libId}`;
+    if (!expandedTreeKeys.value.includes(key)) expandedTreeKeys.value.push(key);
+    if (activeLibraryId.value === libId) {
+      // 点击当前文案库一级节点：切回根目录并刷新列表
+      selectedFolderKeys.value = [];
+      pagination.current = 1;
+      reloadItems();
+      return;
+    }
+    setActiveLibrary(libId);
+    selectedFolderKeys.value = [];
+    return;
+  }
+  if (nodeType === 'folder') {
+    const folderId = String(node.folderId || '');
+    if (!folderId) return;
+    selectedFolderKeys.value = [folderId];
+    pagination.current = 1;
+    reloadItems();
+  }
+}
+
+function getSidebarLibraryId(node: any, dataRef: any): string {
+  if (dataRef && typeof dataRef.libraryId === 'string') return dataRef.libraryId;
+  if (node && typeof node.libraryId === 'string') return node.libraryId;
+  return '';
+}
+
+function getSidebarFolderId(node: any, dataRef: any): string {
+  if (dataRef && typeof dataRef.folderId === 'string') return dataRef.folderId;
+  if (node && typeof node.folderId === 'string') return node.folderId;
+  return '';
+}
+
+function toggleSidebarFavorite(nodeType: 'library' | 'folder', id: string) {
+  const favKey = `${nodeType}:${id}`;
+  const idx = favoriteNodeKeys.value.findIndex(k => k === favKey);
+  if (idx >= 0) {
+    favoriteNodeKeys.value.splice(idx, 1);
+    message.success('已取消收藏');
+  } else {
+    favoriteNodeKeys.value.push(favKey);
+    message.success('已收藏');
+  }
+}
+
+function onSidebarNodeAction(
+  actionKey: string,
+  domEvent: any,
+  node: any,
+  dataRef: any,
+  title: string,
+) {
+  if (domEvent && domEvent.stopPropagation) domEvent.stopPropagation();
+
+  const nodeType = getSidebarNodeType(node, dataRef);
+
+  if (nodeType === 'library') {
+    const libId = getSidebarLibraryId(node, dataRef);
+    if (!libId) return;
+
+    if (actionKey === 'create-folder') {
+      // 从“文案库”节点菜单创建：默认创建到该库根目录
+      setActiveLibrary(libId);
+      openFolderModal(rootFolderId.value || null);
+      return;
+    }
+
+    if (actionKey === 'favorite') {
+      toggleSidebarFavorite('library', libId);
+      return;
+    }
+
+    if (actionKey === 'edit') {
+      const lib = libraries.value.find(l => l.id === libId);
+      if (!lib) return;
+      openLibraryEditModal(lib);
+      return;
+    }
+
+    if (actionKey === 'delete') {
+      Modal.confirm({
+        title: '删除该文案库？',
+        content: '仅在后端允许删除时生效。',
+        async onOk() {
+          try {
+            await deleteMetaCopyLibrary(libId);
+            message.success('已删除');
+            await loadLibraries();
+            await loadTree();
+          } catch (e: any) {
+            message.error(e?.response?.data?.message || '删除失败');
+          }
+        },
+      });
+    }
+  }
+
+  if (nodeType === 'folder') {
+    const folderId = getSidebarFolderId(node, dataRef);
+    if (!folderId) return;
+
+    if (actionKey === 'create-subfolder') {
+      // 从“文件夹”节点菜单创建：创建到当前文件夹下
+      openFolderModal(folderId);
+      return;
+    }
+
+    if (actionKey === 'favorite') {
+      toggleSidebarFavorite('folder', folderId);
+      return;
+    }
+
+    if (actionKey === 'edit') {
+      openFolderEditModal(folderId, title);
+      return;
+    }
+
+    if (actionKey === 'delete') {
+      Modal.confirm({
+        title: '删除该文件夹？',
+        content: '需无子文件夹且无文案。',
+        async onOk() {
+          await deleteFolderById(folderId);
+        },
+      });
+    }
+  }
+}
+
+async function onTreeDrop(info: any) {
+  const dragNodeKey = String(info.dragNode?.key || '');
+  const dropNodeKey = String(info.node?.key || '');
+
+  if (!dragNodeKey || !dropNodeKey) return;
+  if (!isFolderNodeKey(dragNodeKey)) return;
+  const sourceLibraryId = activeLibraryId.value;
+  if (!sourceLibraryId) return;
+
+  const dragKey = normalizeFolderKey(dragNodeKey);
+  if (!dragKey) return;
+
+  const nodes = treeData.value as TreeNode[];
+  const dragParentId = getNodeParentIdByKey(nodes, dragKey) ?? null;
+
+  const findNodeByKey = (list: TreeNode[], key: string): TreeNode | undefined => {
+    const stack: TreeNode[] = [...list];
+    while (stack.length) {
+      const n = stack.pop()!;
+      if (String(n.key) === key) return n;
+      if (n.children?.length) stack.push(...n.children);
+    }
+    return undefined;
+  };
+
+  // 拖拽落点：
+  // - 落到“文件夹节点”：在源库内移动到目标文件夹（parent_id 可能会变化）
+  // - 落到“文案库一级/分组节点”：视为移动到目标库根目录下
+  let targetLibraryId = sourceLibraryId;
+  let targetParentId: string | null = null;
+  let siblingKeys: string[] = [];
+
+  if (isFolderNodeKey(dropNodeKey)) {
+    targetLibraryId = sourceLibraryId;
+
+    const dropKey = normalizeFolderKey(dropNodeKey);
+    if (!dropKey || dragKey === dropKey) return;
+
+    // dropToGap=false：放到节点内容上，目标父级为 dropKey
+    // dropToGap=true：放到节点间隙上，目标父级为 dropKey 的 parentId
+    //
+    // 但当 dropKey 是“空叶子节点”（没有子文件夹）时，Ant Tree 有时也会走 dropToGap 分支；
+    // 这会导致我们把目标父级算成 dropKey 的 parentId，从而无法实现“拖进空文件夹下”。
+    const dropNodeMeta = findNodeByKey(nodes, dropKey);
+    const dropIsLeaf = !dropNodeMeta?.children?.length;
+    const treatAsContentDrop = dropIsLeaf && !!info.dropToGap;
+
+    if (!info.dropToGap || treatAsContentDrop) {
+      targetParentId = dropKey;
+    } else {
+      const p = getNodeParentIdByKey(nodes, dropKey);
+      if (p === undefined) return;
+      targetParentId = p;
+    }
+
+    const infoForSibling = treatAsContentDrop ? { ...info, dropToGap: false } : info;
+    siblingKeys = getSiblingKeysByDrop(infoForSibling, nodes, dragKey, dropKey, targetParentId);
+  } else {
+    // 目标库 id（用于跨库移动时）
+    const targetFromDropKey = getTargetLibraryIdFromDropKey(dropNodeKey);
+    if (!targetFromDropKey) return;
+
+    targetLibraryId = targetFromDropKey;
+
+    // 计算目标库根目录 id，并把文件夹移动到根目录下
+    const { rootId, rootChildrenIds } = await getLibraryRootInfo(targetLibraryId);
+    if (!rootId) return;
+
+    targetParentId = rootId;
+    const withoutDrag = rootChildrenIds.filter(id => id !== dragKey);
+    // 目前落到“库一级/分组节点”：默认置为末尾（无需精确计算插入位置）
+    siblingKeys = [...withoutDrag, dragKey];
+  }
+
+  if (siblingKeys.length === 0) return;
+
+  try {
+    await updateMetaCopyFolder(dragKey, { parent_id: targetParentId });
+    await reorderMetaCopyFolders({
+      library_id: targetLibraryId,
+      parent_id: targetParentId,
+      ordered_ids: siblingKeys,
+    });
+
+    // 源库需要把拖拽节点从旧兄弟序列移除（当父级变化或跨库时）
+    const shouldReorderSource =
+      dragParentId !== targetParentId || targetLibraryId !== sourceLibraryId;
+
+    if (shouldReorderSource) {
+      const oldSiblingKeys = getSiblingKeysByParentId(
+        treeData.value as TreeNode[],
+        dragParentId,
+      ).filter(id => id !== dragKey);
+      if (oldSiblingKeys.length) {
+        await reorderMetaCopyFolders({
+          library_id: sourceLibraryId,
+          parent_id: dragParentId,
+          ordered_ids: oldSiblingKeys,
+        });
+      }
+    }
+    message.success('已移动文件夹');
+    // 变更了文件夹顺序后，刷新根目录缓存，避免下一次拖拽顺序计算使用旧数据
+    libraryRootInfoCache.delete(sourceLibraryId);
+    libraryRootInfoCache.delete(targetLibraryId);
+    if (targetLibraryId !== sourceLibraryId) {
+      setActiveLibrary(targetLibraryId);
+    } else {
+      await loadTree();
+    }
+  } catch (e: any) {
+    message.error(e?.response?.data?.message || '移动失败');
+  }
+}
+
+const folderKeyPrefix = 'folder:';
+const libraryKeyPrefix = 'library:';
+const groupKeyPrefix = 'group:';
+function isFolderNodeKey(key: string) {
+  return key.startsWith(folderKeyPrefix);
+}
+function isLibraryNodeKey(key: string) {
+  return key.startsWith(libraryKeyPrefix);
+}
+function isGroupNodeKey(key: string) {
+  return key.startsWith(groupKeyPrefix);
+}
+function normalizeLibraryKey(key: string) {
+  return isLibraryNodeKey(key) ? key.slice(libraryKeyPrefix.length) : key;
+}
+function isSameActiveLibraryForDrop(dropKey: string) {
+  if (!activeLibraryId.value) return false;
+  if (isLibraryNodeKey(dropKey)) {
+    return normalizeLibraryKey(dropKey) === activeLibraryId.value;
+  }
+  if (isGroupNodeKey(dropKey)) {
+    const isEnterprise = dropKey.includes('enterprise');
+    const activeType = libraries.value.find(l => l.id === activeLibraryId.value)?.type;
+    if (!activeType) return false;
+    return (activeType === 'enterprise') === isEnterprise;
+  }
+  return false;
+}
+
+const libraryRootInfoCache = new Map<string, { rootId: string; rootChildrenIds: string[] }>();
+async function getLibraryRootInfo(libraryId: string) {
+  const cached = libraryRootInfoCache.get(libraryId);
+  if (cached) return cached;
+
+  const raw = await fetchMetaCopyFolderTree(libraryId);
+  const root = raw?.[0];
+  const rootId = root?.id ?? '';
+  const rootChildrenIds = Array.isArray(root?.children) ? root!.children!.map(c => String(c.id)) : [];
+  const info = { rootId: String(rootId), rootChildrenIds };
+  libraryRootInfoCache.set(libraryId, info);
+  return info;
+}
+
+function getTargetLibraryIdFromDropKey(dropKey: string) {
+  if (isLibraryNodeKey(dropKey)) return normalizeLibraryKey(dropKey);
+  if (isGroupNodeKey(dropKey)) {
+    const targetType = dropKey.includes('enterprise') ? 'enterprise' : 'personal';
+    // 优先使用当前激活的同类型库；否则取列表中的第一个
+    const activeSameType = libraries.value.find(l => l.id === activeLibraryId.value && l.type === targetType);
+    return activeSameType?.id ?? libraries.value.find(l => l.type === targetType)?.id ?? null;
+  }
+  return null;
+}
+function normalizeFolderKey(key: string) {
+  return isFolderNodeKey(key) ? key.slice(folderKeyPrefix.length) : key;
+}
+
+function getNodeParentIdByKey(nodes: TreeNode[], key: string): string | null | undefined {
+  for (const n of nodes) {
+    if (String(n.key) === key) return n.parentId ?? null;
+    if (n.children?.length) {
+      const hit = getNodeParentIdByKey(n.children, key);
+      if (hit !== undefined) return hit;
+    }
+  }
+  return undefined;
+}
+
+function allowFolderDrop({ dragNode, dropNode }: any) {
+  const dragKey = String(dragNode?.key || '');
+  const dropKey = String(dropNode?.key || '');
+
+  // 只允许拖拽文件夹节点
+  if (!isFolderNodeKey(dragKey)) return false;
+
+  // 允许落到：
+  // 1) 其它文件夹节点
+  // 2) 当前激活的文案库一级节点
+  // 3) 当前激活类型（我的/企业）的分组节点
+  if (isFolderNodeKey(dropKey)) return true;
+  if (isLibraryNodeKey(dropKey) || isGroupNodeKey(dropKey)) return !!getTargetLibraryIdFromDropKey(dropKey);
+  return false;
+}
+
+function onTreeDragEnter(info: any) {
+  const key = String(info?.node?.key || '');
+  if (isLibraryNodeKey(key) || isGroupNodeKey(key)) {
+    // 拖拽到“文案库一级节点”时，确保其展开，否则可能无法触发 drop
+    if (!expandedTreeKeys.value.includes(key)) expandedTreeKeys.value.push(key);
+    return;
+  }
+
+  if (!isFolderNodeKey(key)) return;
+
+  // 拖拽进入更深层时，尽量自动展开父链，便于继续落点
+  // 注意：根目录节点在展示层被隐藏，因此遇到 rootFolderId 就停止向上展开。
+  const normalizedId = normalizeFolderKey(key);
+  const expandedSet = new Set(expandedTreeKeys.value);
+
+  // 展开自身
+  expandedSet.add(key);
+
+  // 展开父链（直到 rootFolderId 为止）
+  let cursor: string | null | undefined = normalizedId;
+  while (cursor) {
+    const meta = folderMetaMap.value[cursor];
+    const parentId = meta?.parent_id;
+    if (!parentId) break;
+
+    if (rootFolderId.value && parentId === rootFolderId.value) break;
+
+    expandedSet.add(`folder:${parentId}`);
+    cursor = parentId;
+  }
+
+  expandedTreeKeys.value = Array.from(expandedSet);
+}
+
+const items = ref<MetaCopyItemRow[]>([]);
+const tableLoading = ref(false);
+const keyword = ref('');
+/** 与推广地区组 countries_included 的 key 一致，如 US,JP */
+const previewCountryCodes = ref('');
+const includeChildren = ref(false);
+const dateRange = ref<[Dayjs, Dayjs] | null>(null);
+const selectedRowKeys = ref<string[]>([]);
+
+const pagination = reactive({
+  current: 1,
+  pageSize: 10,
+  total: 0,
+  showSizeChanger: true,
+  showTotal: (t: number) => `共 ${t} 条`,
+});
+
+const columns = [
+  { title: '命中语言', dataIndex: 'resolved_locale', ellipsis: true, width: 96 },
+  { title: '正文', dataIndex: 'primary_text', ellipsis: true, width: 200 },
+  { title: '标题', dataIndex: 'headline', ellipsis: true, width: 140 },
+  { title: '描述', dataIndex: 'description', ellipsis: true, width: 160 },
+  { title: '备注', dataIndex: 'remark', ellipsis: true, width: 120 },
+  { title: '曝光', dataIndex: 'impressions', width: 100 },
+  { title: '点击', dataIndex: 'clicks', width: 90 },
+  { title: '花费', dataIndex: 'spend', width: 110 },
+  { title: '转化', dataIndex: 'conversions', width: 90 },
+  { title: '收入', dataIndex: 'revenue', width: 110 },
+  { title: '操作', dataIndex: 'operation', width: 140, fixed: 'right' as const },
+];
+
+type TableRow = MetaCopyItemRow & { __rowKind?: 'folder' | 'item' };
+
+function findTreeNodeByKey(nodes: any[], key: string): any | undefined {
+  const stack: any[] = [...(nodes ?? [])];
+  while (stack.length) {
+    const n = stack.pop();
+    if (!n) continue;
+    if (String(n.key) === key) return n;
+    if (Array.isArray(n.children) && n.children.length) stack.push(...n.children);
+  }
+  return undefined;
+}
+
+// 取“当前选中容器（文案库根/文件夹）下的直接子文件夹”
+const directChildFolderNodes = computed<any[]>(() => {
+  if (!activeLibraryId.value) return [];
+  const containerId = effectiveFolderId.value;
+  if (!containerId) return [];
+
+  // 根目录在展示层会被隐藏，因此：根目录的子文件夹就是 treeData 顶层节点
+  if (rootFolderId.value && containerId === rootFolderId.value) {
+    return (treeData.value ?? []) as any[];
+  }
+
+  const hit = findTreeNodeByKey(treeData.value as any[], containerId);
+  return (hit?.children ?? []) as any[];
+});
+
+const tableRows = computed<TableRow[]>(() => {
+  if (!activeLibraryId.value || !effectiveFolderId.value) return items.value as TableRow[];
+
+  const folderRows: TableRow[] = (directChildFolderNodes.value ?? []).map(n => ({
+    id: `__folder__:${String(n.key)}`,
+    library_id: activeLibraryId.value as string,
+    folder_id: String(n.key),
+    status: 'folder',
+    primary_text: String(n.title ?? ''),
+    headline: '',
+    description: '',
+    remark: '',
+    __rowKind: 'folder' as const,
+  }));
+
+  return [
+    ...folderRows,
+    ...(items.value ?? []).map(i => ({
+      ...i,
+      __rowKind: 'item' as const,
+    })),
+  ];
+});
+
+function getCheckboxProps(record: any) {
+  // 文件夹行不属于真实数据，禁用勾选，避免批量删除把“结构行”当作数据删除
+  if (record?.__rowKind === 'folder') return { disabled: true };
+  return {};
+}
+
+async function reloadItems() {
+  if (!effectiveFolderId.value) {
+    items.value = [];
+    pagination.total = 0;
+    return;
+  }
+  tableLoading.value = true;
+  try {
+    const cc = previewCountryCodes.value?.trim();
+    const res = await fetchMetaCopyItems({
+      folder_id: effectiveFolderId.value,
+      include_children: includeChildren.value ? 1 : 0,
+      keyword: keyword.value || undefined,
+      date_start: dateRange.value?.[0] ? dateRange.value[0].format('YYYY-MM-DD') : undefined,
+      date_end: dateRange.value?.[1] ? dateRange.value[1].format('YYYY-MM-DD') : undefined,
+      pageNo: pagination.current,
+      pageSize: pagination.pageSize,
+      ...(cc ? { country_codes: cc } : {}),
+    });
+    items.value = res.data ?? [];
+    pagination.total = res.totalCount ?? 0;
+  } catch {
+    message.error('加载文案列表失败');
+  } finally {
+    tableLoading.value = false;
+  }
+}
+
+function onTableChange(pag: { current?: number; pageSize?: number }) {
+  if (pag.current != null) pagination.current = pag.current;
+  if (pag.pageSize != null) pagination.pageSize = pag.pageSize;
+  reloadItems();
+}
+
+function onSelectRows(keys: string[]) {
+  selectedRowKeys.value = keys;
+}
+
+watch(includeChildren, () => {
+  pagination.current = 1;
+  reloadItems();
+});
+
+watch(dateRange, () => {
+  pagination.current = 1;
+  reloadItems();
+});
+
+type TreeNode = {
+  key: string;
+  parentId?: string | null;
+  children?: TreeNode[];
+};
+
+function getSiblingKeysByParentId(nodes: TreeNode[], parentId: string | null): string[] {
+  const stack: TreeNode[] = [...nodes];
+  if (parentId === null) return nodes.map(n => String(n.key));
+
+  // 根目录节点在展示层被隐藏，但拖拽时 parentId 仍会等于逻辑根目录 id。
+  // 此时当前层就是根目录的子节点兄弟集合。
+  if (rootFolderId.value && parentId === rootFolderId.value) {
+    return nodes.map(n => String(n.key));
+  }
+
+  while (stack.length) {
+    const node = stack.pop()!;
+    if (String(node.key) === parentId) {
+      return (node.children ?? []).map(c => String(c.key));
+    }
+    if (node.children?.length) stack.push(...node.children);
+  }
+  return [];
+}
+
+function getSiblingKeysByDrop(
+  info: any,
+  nodes: TreeNode[],
+  dragKey: string,
+  dropKey: string,
+  targetParentId: string | null,
+): string[] {
+  const dropToGap = !!info.dropToGap;
+
+  const siblings = getSiblingKeysByParentId(nodes, targetParentId);
+  const withoutDrag = siblings.filter(id => id !== dragKey);
+
+  // 放到节点内容上：作为 dropKey 的子节点（这里简单追加到末尾）
+  if (!dropToGap) return [...withoutDrag, dragKey];
+  if (siblings.length === 0) return [];
+
+  const targetIndex = withoutDrag.findIndex(id => id === dropKey);
+  if (targetIndex < 0) return [...withoutDrag, dragKey];
+
+  const dropPosList = String(info.node?.pos || '').split('-');
+  const nodePosIndex = Number(dropPosList[dropPosList.length - 1] ?? 0);
+  const dropPosition = Number(info.dropPosition) - nodePosIndex;
+  const insertAt = dropPosition < 0 ? targetIndex : targetIndex + 1;
+  withoutDrag.splice(insertAt, 0, dragKey);
+  return withoutDrag;
+}
+
+/* 文件夹 */
+const folderEditingId = ref<string | null>(null);
+const folderOpen = ref(false);
+const folderName = ref('');
+const folderParentId = ref<string | null | undefined>(undefined);
+const folderModalTitle = computed(() =>
+  folderEditingId.value
+    ? '编辑文件夹'
+    : folderParentId.value
+      ? '新建子文件夹'
+      : '在根目录新建文件夹',
+);
+function openFolderModal(parentId: string | null | undefined) {
+  if (!activeLibraryId.value) {
+    message.warning('请先选择文案库');
+    return;
+  }
+  folderEditingId.value = null;
+  // 如果 parentId 没拿到（比如刚切库/树还没加载完），避免 parent_id 变成 null
+  // 导致后端创建“另一个根目录”，前端又会隐藏其中一个根节点。
+  folderParentId.value = (parentId ?? undefined) ? (parentId as string) : rootFolderId.value || null;
+  folderName.value = '';
+  folderOpen.value = true;
+}
+
+function openFolderEditModal(folderId: string, title: string) {
+  folderEditingId.value = folderId;
+  folderParentId.value = undefined;
+  folderName.value = title || folderMetaMap.value[folderId]?.name || '';
+  folderOpen.value = true;
+}
+async function submitFolder() {
+  if (!activeLibraryId.value || !folderName.value.trim()) {
+    message.warning('请填写文件夹名称');
+    return;
+  }
+  try {
+    if (folderEditingId.value) {
+      await updateMetaCopyFolder(folderEditingId.value, { name: folderName.value.trim() });
+      message.success('已保存文件夹');
+    } else {
+      await createMetaCopyFolder({
+        library_id: activeLibraryId.value,
+        parent_id: folderParentId.value ?? undefined,
+        name: folderName.value.trim(),
+      });
+      message.success('已创建文件夹');
+    }
+    folderOpen.value = false;
+    await loadTree();
+  } catch (e: any) {
+    message.error(e?.response?.data?.message || '创建失败');
+  }
+}
+
+function onDeleteFolder() {
+  const id = selectedFolderId.value;
+  if (!id) return;
+  Modal.confirm({
+    title: '删除该文件夹？',
+    content: '需无子文件夹且无文案。',
+    async onOk() {
+      await deleteFolderById(id);
+    },
+  });
+}
+
+async function deleteFolderById(folderId: string) {
+  try {
+    await deleteMetaCopyFolder(folderId);
+    message.success('已删除');
+    if (selectedFolderKeys.value[0] === folderId) {
+      selectedFolderKeys.value = [];
+    }
+    await loadTree();
+    items.value = [];
+  } catch (e: any) {
+    message.error(e?.response?.data?.message || '删除失败');
+  }
+}
+
+/* 文案 */
+const itemOpen = ref(false);
+const itemEditingId = ref<string | null>(null);
+const itemModalTitle = computed(() => (itemEditingId.value ? '编辑文案' : '新增文案'));
+const itemForm = reactive({
+  primary_text: '',
+  headline: '',
+  description: '',
+  remark: '',
+});
+
+/** 多语言块（locale → 三字段） */
+const itemTranslationsForm = reactive<MetaCopyItemTranslations>({});
+const newLocaleToAdd = ref<string | undefined>(undefined);
+
+const translationLocaleKeys = computed(() => Object.keys(itemTranslationsForm).sort());
+
+const localeOptionsForAdd = computed(() =>
+  META_COPY_LOCALE_OPTIONS.filter(o => !translationLocaleKeys.value.includes(o.value)).map(o => ({
+    value: o.value,
+    label: `${o.label}（${o.value}）`,
+  })),
+);
+
+function filterLocaleOption(input: string, option: { label?: string; value?: string }) {
+  const q = (input || '').toLowerCase().trim();
+  if (!q) return true;
+  const label = String(option?.label ?? '').toLowerCase();
+  const value = String(option?.value ?? '').toLowerCase();
+  return label.includes(q) || value.includes(q);
+}
+
+function clearItemTranslationsForm() {
+  for (const k of Object.keys(itemTranslationsForm)) {
+    delete itemTranslationsForm[k];
+  }
+}
+
+function addTranslationLocale() {
+  const loc = (newLocaleToAdd.value || '').trim();
+  if (!loc) {
+    message.warning('请选择要添加的语言');
+    return;
+  }
+  if (itemTranslationsForm[loc]) {
+    message.warning('该语言已存在');
+    return;
+  }
+  itemTranslationsForm[loc] = { primary_text: '', headline: '', description: '' };
+  newLocaleToAdd.value = undefined;
+}
+
+function removeTranslationLocale(loc: string) {
+  if (itemTranslationsForm[loc]) {
+    delete itemTranslationsForm[loc];
+  }
+}
+
+function cleanTranslationsForSubmit(): MetaCopyItemTranslations | null {
+  const out: MetaCopyItemTranslations = {};
+  for (const loc of Object.keys(itemTranslationsForm)) {
+    const b = itemTranslationsForm[loc];
+    const pt = (b?.primary_text ?? '').trim();
+    const hl = (b?.headline ?? '').trim();
+    const dc = (b?.description ?? '').trim();
+    if (pt || hl || dc) {
+      out[loc] = {
+        ...(pt ? { primary_text: pt } : {}),
+        ...(hl ? { headline: hl } : {}),
+        ...(dc ? { description: dc } : {}),
+      };
+    }
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+function resetItemForm() {
+  itemForm.primary_text = '';
+  itemForm.headline = '';
+  itemForm.description = '';
+  itemForm.remark = '';
+  clearItemTranslationsForm();
+  newLocaleToAdd.value = undefined;
+}
+
+function openItemModalCreate() {
+  if (!activeLibraryId.value || !effectiveFolderId.value) {
+    message.warning('请先选择文件夹');
+    return;
+  }
+  itemEditingId.value = null;
+  resetItemForm();
+  itemOpen.value = true;
+}
+
+async function openItemModalEdit(row: MetaCopyItemRow) {
+  itemEditingId.value = row.id;
+  resetItemForm();
+  itemOpen.value = true;
+  try {
+    const res = await fetchMetaCopyItem(row.id);
+    const d = res?.data;
+    if (d) {
+      itemForm.primary_text = d.primary_text ?? '';
+      itemForm.headline = d.headline ?? '';
+      itemForm.description = d.description ?? '';
+      itemForm.remark = d.remark ?? '';
+      const tr = d.translations && typeof d.translations === 'object' ? d.translations : {};
+      clearItemTranslationsForm();
+      for (const loc of Object.keys(tr)) {
+        const block = tr[loc];
+        itemTranslationsForm[loc] = {
+          primary_text: block?.primary_text ?? '',
+          headline: block?.headline ?? '',
+          description: block?.description ?? '',
+        };
+      }
+    }
+  } catch {
+    message.error('加载文案详情失败');
+    itemForm.primary_text = row.primary_text ?? '';
+    itemForm.headline = row.headline ?? '';
+    itemForm.description = row.description ?? '';
+    itemForm.remark = row.remark ?? '';
+  }
+}
+
+async function submitItem() {
+  if (!activeLibraryId.value || !effectiveFolderId.value) {
+    message.warning('缺少库或文件夹');
+    return;
+  }
+  try {
+    const translations = cleanTranslationsForSubmit();
+    if (itemEditingId.value) {
+      await updateMetaCopyItem(itemEditingId.value, { ...itemForm, translations: translations ?? undefined });
+      message.success('已保存');
+    } else {
+      await createMetaCopyItem({
+        library_id: activeLibraryId.value,
+        folder_id: effectiveFolderId.value,
+        ...itemForm,
+        translations: translations ?? undefined,
+      });
+      message.success('已添加');
+    }
+    itemOpen.value = false;
+    await reloadItems();
+    await loadTree();
+  } catch (e: any) {
+    message.error(e?.response?.data?.message || '保存失败');
+  }
+}
+
+function onDeleteItem(row: MetaCopyItemRow) {
+  Modal.confirm({
+    title: '删除该文案？',
+    async onOk() {
+      await deleteMetaCopyItem(row.id);
+      message.success('已删除');
+      await reloadItems();
+      await loadTree();
+    },
+  });
+}
+
+function onBatchDelete() {
+  if (!selectedRowKeys.value.length) return;
+  Modal.confirm({
+    title: `删除选中的 ${selectedRowKeys.value.length} 条？`,
+    async onOk() {
+      await batchDeleteMetaCopyItems(selectedRowKeys.value);
+      message.success('已删除');
+      selectedRowKeys.value = [];
+      await reloadItems();
+      await loadTree();
+    },
+  });
+}
+
+onMounted(async () => {
+  await loadLibraries();
+  await loadTree();
+  if (sidebarContainerRef.value) {
+    // 使用原生的 addEventListener 并设置 { passive: false }，
+    // 这样 e.preventDefault() 才能在滚轮事件中生效。
+    sidebarContainerRef.value.addEventListener('wheel', handleSidebarWheel, { passive: false });
+  }
+});
+
+onUnmounted(() => {
+  if (sidebarContainerRef.value) {
+    sidebarContainerRef.value.removeEventListener('wheel', handleSidebarWheel);
+  }
+});
+</script>
+
+<style scoped>
+.meta-copy-layout :deep(.ant-layout-sider) {
+  background: #fff;
+}
+.meta-copy-layout :deep(.ant-layout-sider-children) {
+  overflow: hidden !important;
+}
+.meta-copy-layout {
+  width: 100%;
+}
+.sidebar-outer-container {
+  width: 100%;
+  max-height: calc(100vh - 220px);
+  overflow: auto !important;
+  background: #fff;
+  position: relative;
+  /* 确保这个容器可以水平滚动 */
+  display: block;
+}
+.sidebar-wrapper {
+  padding: 12px;
+  width: max-content; /* 关键：根据内容自动撑开宽度 */
+  min-width: 100%;
+  display: block;
+}
+
+.translation-block {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #fafafa;
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
+}
+.translation-block-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.translation-block-hd .loc-label {
+  font-weight: 600;
+  font-size: 13px;
+}
+.mb-3 {
+  margin-bottom: 12px;
+}
+.mb-2 {
+  margin-bottom: 8px;
+}
+.sidebar-wrapper :deep(.ant-spin-nested-loading),
+.sidebar-wrapper :deep(.ant-spin-container) {
+  display: block !important;
+  width: auto !important;
+}
+.library-tree {
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  padding: 6px 4px;
+  background: #fff;
+  width: max-content !important;
+  min-width: 100% !important;
+  display: block !important;
+}
+.library-tree :deep(.ant-tree-list) {
+  overflow: visible !important;
+  width: max-content !important;
+}
+.library-tree :deep(.ant-tree-list-holder) {
+  overflow: visible !important;
+  width: max-content !important;
+}
+.library-tree :deep(.ant-tree-list-holder-inner) {
+  display: block !important;
+  width: max-content !important;
+}
+.library-tree :deep(.ant-tree-treenode) {
+  width: max-content !important;
+  min-width: 100% !important;
+  display: flex !important;
+  white-space: nowrap !important;
+}
+.library-tree :deep(.ant-tree-node-content-wrapper) {
+  flex: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  width: auto !important;
+  overflow: visible !important;
+}
+.tree-node-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  width: max-content;
+  white-space: nowrap;
+}
+.tree-node-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  flex: none;
+}
+.tree-node-left :deep(.ant-tree-title) {
+  white-space: nowrap;
+}
+.tree-node-text-plain {
+  white-space: nowrap;
+}
+.tree-node-left .tree-node-text-plain {
+  white-space: nowrap;
+}
+.tree-node-icon {
+  font-size: 14px;
+}
+.library-icon {
+  color: #faad14;
+}
+.folder-icon {
+  color: #d48806;
+}
+.tree-node-text-plain {
+  color: #595959;
+  font-size: 13px;
+  font-weight: 500;
+}
+.tree-group-add-btn {
+  padding-inline: 4px;
+  height: 22px;
+  line-height: 22px;
+}
+
+.sidebar-node-op-btn {
+  padding: 0 4px;
+  height: 24px;
+  line-height: 24px;
+  flex: 0 0 auto;
+  margin-left: 6px;
+}
+.sidebar-node-op-btn :deep(svg) {
+  color: #8c8c8c;
+}
+
+.primary-text-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  width: 100%;
+}
+.table-folder-icon {
+  color: #d48806;
+  font-size: 14px;
+  flex: 0 0 auto;
+}
+.primary-text-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+/* 超宽屏适配：居中布局 + 增大左右留白 */
+@media (min-width: 1280px) {
+  .meta-copy-layout {
+    max-width: 1440px;
+    margin: 0 auto;
+  }
+  .meta-copy-layout :deep(.ant-layout-content) {
+    padding: 0 24px !important;
+  }
+}
+
+@media (min-width: 1440px) {
+  .meta-copy-layout {
+    max-width: 1920px;
+    margin: 0 auto;
+  }
+  .meta-copy-layout :deep(.ant-layout-content) {
+    padding: 0 32px !important;
+  }
+}
+
+@media (min-width: 1920px) {
+  .meta-copy-layout {
+    max-width: 1920px;
+    margin: 0 auto;
+  }
+  .meta-copy-layout :deep(.ant-layout-content) {
+    padding: 0 40px !important;
+  }
+}
+
+@media (min-width: 2560px) {
+  .meta-copy-layout {
+    max-width: 2560px;
+    margin: 0 auto;
+  }
+  .meta-copy-layout :deep(.ant-layout-content) {
+    padding: 0 48px !important;
+  }
+}
+</style>

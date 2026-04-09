@@ -55,3 +55,17 @@ sql操作日志@backend/sql/sql修改日志.txt
   - meta_scheduled_report_runs: 定时报表运行记录表（触发方式、运行状态、结果信息、附件地址等）
 - 用途说明: 支撑“定时报表”配置、邮件发送与执行记录追踪。
 
+2026-04-08 links 表结构更新
+- 迁移文件: database/migrations/2026_04_08_160000_add_language_fields_to_links_table.php
+- 数据表: links
+- 新增字段: default_locale, language_variants, import_source
+- 用途说明: 支持多语言 URL、导入来源跟踪，以及链接资产管理
+2026-04-08 links 独立标签表
+- 迁移文件: database/migrations/2026_04_08_170000_create_link_tags_table.php
+- 数据表: link_tags
+- 修改说明: links 模块不再复用通用 tags/taggables，改为使用独立 link_tags 表保存标签
+- 影响范围: 链接新增/编辑、链接标签维护、链接标签筛选与导入标签写入
+2026-04-08 link_tags 表注释补充
+- 迁移文件: database/migrations/2026_04_08_180000_add_comments_to_link_tags_table.php
+- 数据表: link_tags
+- 修改说明: 为 link_tags 表及字段补充中文注释，并将表引擎调整为 InnoDB

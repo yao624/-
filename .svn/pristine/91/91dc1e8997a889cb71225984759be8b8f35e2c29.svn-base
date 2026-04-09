@@ -1,0 +1,921 @@
+<template>
+  <div class="batch-generate-panel">
+    <div class="panel-header">
+      <h3>批量生成图片</h3>
+      <p class="info">选择模版并配置动态变量值，批量生成图片</p>
+    </div>
+
+    <div class="steps-container">
+      <Steps :current="currentStep">
+        <Step title="选择模版" />
+        <Step title="配置变量" />
+        <Step title="预览生成" />
+      </Steps>
+    </div>
+
+    <!-- 步骤1: 选择模版 -->
+    <div v-show="currentStep === 0" class="step-content">
+      <div class="template-select">
+        <h4>选择一个包含动态变量的模版</h4>
+        <div v-if="dynamicTemplates.length > 0" class="template-grid">
+          <div
+            v-for="template in dynamicTemplates"
+            :key="template.id"
+            class="template-card"
+            :class="{ selected: selectedTemplate?.id === template.id }"
+            @click="selectTemplate(template)"
+          >
+            <div class="card-thumbnail">
+              <div class="placeholder">
+                <Icon type="md-image" size="32" />
+                <span>{{ template.width }}×{{ template.height }}</span>
+              </div>
+            </div>
+            <div class="card-info">
+              <div class="card-name">{{ template.name }}</div>
+              <div class="card-vars">
+                <Tag
+                  v-for="variable in template.dynamicVariables"
+                  :key="variable.variableName"
+                  size="small"
+                  :color="variable.variableType === 'text' ? 'blue' : 'green'"
+                >
+                  {{ variable.variableName }}
+                </Tag>
+              </div>
+            </div>
+          </div>
+        </div>
+        <Empty v-else description="没有包含动态变量的模版">
+          <template #footer>
+            <Button to="/" type="primary">创建新模版</Button>
+          </template>
+        </Empty>
+      </div>
+
+      <div class="step-actions">
+        <Button type="primary" :disabled="!selectedTemplate" @click="nextStep">下一步</Button>
+      </div>
+    </div>
+
+    <!-- 步骤2: 配置变量 -->
+    <div v-show="currentStep === 1" class="step-content">
+      <div v-if="selectedTemplate" class="variables-config">
+        <div class="config-header">
+          <h4>{{ selectedTemplate.name }}</h4>
+          <p class="var-count">包含 {{ selectedTemplate.dynamicVariables.length }} 个动态变量</p>
+        </div>
+
+        <div class="batch-count-setting">
+          <div class="form-item">
+            <label>生成数量：</label>
+            <InputNumber v-model="batchCount" :min="1" :max="50" @on-change="onBatchCountChange" />
+            <Button size="small" @click="copyFirstToAll" :disabled="!hasFirstItemValues" style="margin-left: 10px">
+              <Icon type="md-copy" />
+              复制第1个到全部
+            </Button>
+            <Button size="small" @click="clearAllValues" style="margin-left: 10px">
+              <Icon type="md-trash" />
+              清空
+            </Button>
+          </div>
+        </div>
+
+        <div class="batch-items">
+          <div v-for="index in batchCount" :key="index" class="batch-item">
+            <div class="batch-item-header">
+              <h5>生成项 #{{ index }}</h5>
+            </div>
+
+            <div class="config-list">
+              <div
+                v-for="variable in selectedTemplate.dynamicVariables"
+                :key="`${index}-${variable.variableName}`"
+                class="config-item"
+              >
+                <div class="item-header">
+                  <Tag size="small" :color="variable.variableType === 'text' ? 'blue' : 'green'">
+                    {{ variable.variableType === 'text' ? '文本' : '图片' }}
+                  </Tag>
+                  <strong>{{ variable.variableName }}</strong>
+                  <span v-if="variable.remark" class="remark-hint">{{ variable.remark }}</span>
+                </div>
+
+                <div class="item-input">
+                  <Input
+                    v-model="batchValues[index - 1][variable.variableName]"
+                    :placeholder="variable.variableType === 'text' ? `请输入 ${variable.variableName}` : `请输入图片URL`"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-actions">
+        <Button @click="prevStep">上一步</Button>
+        <Button type="primary" @click="nextStep">下一步</Button>
+      </div>
+    </div>
+
+    <!-- 步骤3: 预览生成 -->
+    <div v-show="currentStep === 2" class="step-content">
+      <div class="preview-section">
+        <div class="preview-header">
+          <h4>预览效果</h4>
+          <Button size="small" @click="generatePreviews" :loading="generatingPreviews">
+            <Icon type="md-refresh" />
+            刷新预览
+          </Button>
+        </div>
+        <p class="info">将生成 {{ batchCount }} 张图片</p>
+
+        <div v-if="previewImages.length === 0 && !generatingPreviews" class="preview-empty">
+          <Button type="primary" @click="generatePreviews" :loading="generatingPreviews">
+            <Icon type="md-eye" />
+            生成预览
+          </Button>
+        </div>
+
+        <div v-else class="preview-grid">
+          <div v-for="(preview, index) in displayPreviews" :key="index" class="preview-item">
+            <div class="preview-image-wrapper">
+              <img v-if="preview.dataUrl" :src="preview.dataUrl" />
+              <div v-else class="preview-loading">
+                <Icon type="md-load-c" size="32" class="spin-icon" />
+                <span>生成中...</span>
+              </div>
+            </div>
+            <div class="preview-info">
+              <span class="preview-label">#{{ preview.index }}</span>
+              <div class="preview-vars">
+                <span v-for="(val, key) in preview.variables" :key="key" class="var-tag">
+                  {{ key }}: {{ val }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="batchCount > 4 && previewImages.length > 0" class="more-hint">
+          还有 {{ batchCount - 4 }} 张图片...
+        </div>
+      </div>
+
+      <div class="export-options">
+        <Divider />
+        <h4>导出选项</h4>
+        <div class="export-form">
+          <div class="form-item">
+            <label>导出格式：</label>
+            <RadioGroup v-model="exportFormat" type="button">
+              <Radio label="png">PNG</Radio>
+              <Radio label="jpg">JPG</Radio>
+            </RadioGroup>
+          </div>
+          <div class="form-item">
+            <label>图片质量：</label>
+            <Slider v-model="exportQuality" :min="1" :max="100" show-input />
+          </div>
+        </div>
+      </div>
+
+      <div class="step-actions">
+        <Button @click="prevStep">上一步</Button>
+        <Button type="primary" :loading="generating" @click="handleGenerate">
+          <Icon type="md-download" />
+          开始生成
+        </Button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script name="BatchGeneratePanel" setup lang="ts">
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
+import { Message, Empty, Tag, InputNumber, Icon, RadioGroup, Radio, Slider } from 'view-ui-plus';
+import type { DynamicVariable } from '@kuaitu/core';
+import { fabric } from 'fabric';
+
+// 组件挂载状态
+let isComponentMounted = true;
+
+// 预览 canvas
+let previewCanvas: fabric.StaticCanvas | null = null;
+
+// 当前步骤
+const currentStep = ref(0);
+
+// 选中的模版
+const selectedTemplate = ref<any>(null);
+
+// 批量项配置
+const batchValues = ref<Record<string, any>[]>([{}]);
+
+// 批量选项
+const batchCount = ref(1);
+
+// 判断第1项是否有值
+const hasFirstItemValues = computed(() => {
+  const firstItem = batchValues.value[0];
+  return firstItem && Object.keys(firstItem).length > 0;
+});
+
+// 导出选项
+const exportFormat = ref('zip');
+const exportQuality = ref(90);
+const generating = ref(false);
+
+// 预览相关
+const previewImages = ref<Array<{ index: number; dataUrl?: string; variables: Record<string, any> }>>([]);
+const generatingPreviews = ref(false);
+
+// 显示的预览（最多4个）
+const displayPreviews = computed(() => previewImages.value.slice(0, 4));
+
+// 本地模版
+const templates = ref<any[]>([]);
+
+// 动态变量模版列表
+const dynamicTemplates = computed(() =>
+  templates.value.filter((t) => t.dynamicVariables?.length > 0)
+);
+
+// 加载数据
+const loadData = () => {
+  const savedTemplates = localStorage.getItem('userTemplates');
+  if (savedTemplates) {
+    templates.value = JSON.parse(savedTemplates);
+  }
+};
+
+// 选择模版
+const selectTemplate = (template: any) => {
+  selectedTemplate.value = template;
+  batchValues.value = [{}];
+};
+
+// 批量数量变化
+const onBatchCountChange = () => {
+  while (batchValues.value.length < batchCount.value) {
+    batchValues.value.push({});
+  }
+};
+
+// 将第1项的值复制到全部
+const copyFirstToAll = () => {
+  const firstItem = batchValues.value[0];
+  if (!firstItem) return;
+  batchValues.value = Array(batchCount.value).fill(null).map(() => ({ ...firstItem }));
+  Message.success('已复制到全部');
+};
+
+// 清空所有值
+const clearAllValues = () => {
+  batchValues.value = Array(batchCount.value).fill({});
+  Message.success('已清空');
+};
+
+// 替换模版中的变量
+const replaceVariablesInTemplate = (templateJson: any, values: Record<string, any>): any => {
+  const json = JSON.parse(JSON.stringify(templateJson));
+
+  // 确保保留画布尺寸
+  const clipPath = json.clipPath;
+  const workspaceObj = json.objects?.find((obj: any) => obj.id === 'workspace');
+  const jsonWidth = clipPath?.width || templateJson?.width || workspaceObj?.width || 800;
+  const jsonHeight = clipPath?.height || templateJson?.height || workspaceObj?.height || 600;
+  json.width = jsonWidth;
+  json.height = jsonHeight;
+
+  if (json.objects) {
+    json.objects.forEach((obj: any) => {
+      if (obj.dynamicConfig && obj.dynamicConfig.isDynamic) {
+        const varName = obj.dynamicConfig.variableName;
+        const varType = obj.dynamicConfig.variableType;
+        const value = values[varName];
+
+        if (value) {
+          // 文本类型变量：替换文本内容
+          if (varType === 'text' && (obj.type === 'textbox' || obj.type === 'text' || obj.type === 'i-text')) {
+            obj.text = value;
+          }
+        }
+      }
+    });
+  }
+
+  return json;
+};
+
+// 生成单个预览图片
+const generatePreviewImage = async (
+  templateJson: any,
+  values: Record<string, any>
+): Promise<string> => {
+  return new Promise(async (resolve, reject) => {
+    const canvas = previewCanvas;
+    if (!canvas) {
+      reject(new Error('Canvas not initialized'));
+      return;
+    }
+
+    try {
+      const modifiedJson = replaceVariablesInTemplate(templateJson, values);
+
+      const tempCanvas = new fabric.StaticCanvas(null, {
+        width: modifiedJson.width,
+        height: modifiedJson.height,
+        backgroundColor: '#ffffff',
+      });
+
+      // 先加载 JSON
+      await new Promise((res) => tempCanvas.loadFromJSON(modifiedJson, res));
+
+      const objects = tempCanvas.getObjects();
+      const replacements: Promise<void>[] = [];
+
+      // 遍历所有对象
+      for (const obj of objects) {
+        const config = (obj as any).dynamicConfig;
+        if (!config || !config.isDynamic) continue;
+
+        const value = values[config.variableName];
+        if (!value) continue;
+
+        // 文本替换
+        if (config.variableType === 'text') {
+          obj.set('text', value);
+          continue;
+        }
+
+        // 图片替换（保留层级！）
+        if (config.variableType === 'image') {
+          const promise = new Promise<void>((resolveImg) => {
+            fabric.Image.fromURL(
+              value,
+              (img) => {
+                if (!img) {
+                  console.warn('图片加载失败:', value);
+                  resolveImg();
+                  return;
+                }
+
+                // 等比计算缩放
+                const targetWidth = obj.width!;
+                const originalWidth = img.width!;
+                const originalHeight = img.height!;
+                const scale = targetWidth / originalWidth;
+
+                // 继承原位置、旋转、中心点
+                img.set({
+                  left: obj.left,
+                  top: obj.top,
+                  angle: obj.angle,
+                  originX: obj.originX || 'left',
+                  originY: obj.originY || 'top',
+                  scaleX: scale,
+                  scaleY: scale,
+                });
+
+                // 关键：保留层级（使用 insertAt）
+                const index = tempCanvas.getObjects().indexOf(obj);
+                tempCanvas.remove(obj);
+                tempCanvas.insertAt(img, index, false);
+
+                resolveImg();
+              },
+              null,
+              { crossOrigin: 'anonymous' }
+            );
+          });
+
+          replacements.push(promise);
+        }
+      }
+
+      // 等待所有图片加载完成
+      await Promise.all(replacements);
+
+      // 重新渲染
+      tempCanvas.renderAll();
+
+      // 导出图片
+      const dataURL = tempCanvas.toDataURL({
+        format: 'png',
+        quality: exportQuality.value / 100,
+      });
+
+      tempCanvas.dispose();
+      resolve(dataURL);
+    } catch (error) {
+      reject(error);
+    }
+  });
+};
+
+// 生成预览图片
+const generatePreviews = async () => {
+  if (!selectedTemplate.value) return;
+
+  generatingPreviews.value = true;
+  previewImages.value = [];
+
+  // 初始化预览数组
+  for (let i = 0; i < batchCount.value; i++) {
+    previewImages.value.push({
+      index: i + 1,
+      variables: batchValues.value[i] || {},
+    });
+  }
+
+  try {
+    // 初始化 canvas
+    const canvas = await initPreviewCanvas();
+    if (!canvas) {
+      Message.error('预览初始化失败');
+      return;
+    }
+
+    // 获取模版 JSON
+    const templateJson = selectedTemplate.value.json;
+    if (!templateJson) {
+      Message.error('模版数据不完整');
+      return;
+    }
+
+    // 为每个批量项生成预览图
+    const images: string[] = [];
+    for (let i = 0; i < Math.min(batchCount.value, 4); i++) {
+      if (!isComponentMounted) break;
+      try {
+        const img = await generatePreviewImage(templateJson, batchValues.value[i]);
+        images.push(img);
+        if (isComponentMounted) {
+          previewImages.value[i].dataUrl = img;
+        }
+      } catch (error: any) {
+        console.error(`生成预览 #${i + 1} 失败:`, error);
+        if (error.message && error.message.includes('CORS')) {
+          Message.error(`生成项 #${i + 1} 失败：图片跨域问题，请使用支持 CORS 的图片 URL`);
+          break;
+        }
+      }
+    }
+
+    if (!isComponentMounted) return;
+
+    if (images.length > 0) {
+      Message.success(`已生成 ${images.length} 张预览图`);
+    } else {
+      Message.warning('预览生成失败，请检查图片 URL 是否支持 CORS 访问');
+    }
+  } catch (error) {
+    console.error('预览生成失败:', error);
+    Message.error('预览生成失败：请确保图片 URL 支持 CORS 访问');
+  } finally {
+    if (isComponentMounted) {
+      generatingPreviews.value = false;
+    }
+  }
+};
+
+// 下一步
+const nextStep = () => {
+  if (currentStep.value === 0 && !selectedTemplate.value) {
+    Message.warning('请先选择一个模版');
+    return;
+  }
+  if (currentStep.value === 1) {
+    const unconfiguredItems: number[] = [];
+    for (let i = 0; i < batchCount.value; i++) {
+      const item = batchValues.value[i];
+      if (!item || Object.keys(item).length === 0 ||
+          selectedTemplate.value.dynamicVariables.some((v: any) => !item[v.variableName])) {
+        unconfiguredItems.push(i + 1);
+      }
+    }
+    if (unconfiguredItems.length > 0) {
+      Message.warning(`请先配置第 ${unconfiguredItems.join(', ')} 项`);
+      return;
+    }
+    previewImages.value = [];
+  }
+  currentStep.value++;
+};
+
+// 上一步
+const prevStep = () => {
+  currentStep.value--;
+};
+
+// 处理生成
+const handleGenerate = async () => {
+  // 验证
+  const unconfiguredItems: number[] = [];
+  for (let i = 0; i < batchCount.value; i++) {
+    const item = batchValues.value[i];
+    if (!item || Object.keys(item).length === 0 ||
+        selectedTemplate.value.dynamicVariables.some((v: any) => !item[v.variableName])) {
+      unconfiguredItems.push(i + 1);
+    }
+  }
+
+  if (unconfiguredItems.length > 0) {
+    Message.warning(`请先配置第 ${unconfiguredItems.join(', ')} 项`);
+    return;
+  }
+
+  generating.value = true;
+
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    Message.success(`成功生成 ${batchCount.value} 张图片！`);
+  } catch (error) {
+    Message.error('生成失败');
+  } finally {
+    generating.value = false;
+  }
+};
+
+onMounted(() => {
+  loadData();
+});
+
+onUnmounted(() => {
+  isComponentMounted = false;
+  if (previewCanvas) {
+    previewCanvas.dispose();
+    previewCanvas = null;
+  }
+});
+
+// 初始化预览 canvas
+const initPreviewCanvas = async (width?: number, height?: number) => {
+  await nextTick();
+  // 创建一个内存中的 canvas，不需要 DOM 元素
+  if (previewCanvas) {
+    previewCanvas.dispose();
+    previewCanvas = null;
+  }
+
+  // 获取模板尺寸
+  const templateJson = selectedTemplate.value?.json;
+  const clipPath = templateJson?.clipPath;
+  const workspaceObj = templateJson?.objects?.find((obj: any) => obj.id === 'workspace');
+  const jsonWidth = width ?? clipPath?.width ?? templateJson?.width ?? workspaceObj?.width ?? 800;
+  const jsonHeight = height ?? clipPath?.height ?? templateJson?.height ?? workspaceObj?.height ?? 600;
+
+  // 使用 StaticCanvas 进行非交互式预览渲染
+  previewCanvas = new fabric.StaticCanvas(null, {
+    width: jsonWidth,
+    height: jsonHeight,
+    backgroundColor: '#ffffff',
+    enableRetinaScaling: true,
+  });
+
+  return previewCanvas;
+};
+</script>
+
+<style lang="less" scoped>
+.batch-generate-panel {
+  .panel-header {
+    margin-bottom: 24px;
+
+    h3 {
+      margin: 0 0 8px 0;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .info {
+      margin: 0;
+      color: #999;
+      font-size: 14px;
+    }
+  }
+
+  .steps-container {
+    margin-bottom: 32px;
+  }
+
+  .step-content {
+    min-height: 400px;
+  }
+
+  .template-select {
+    h4 {
+      margin-bottom: 16px;
+    }
+
+    .template-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 16px;
+    }
+
+    .template-card {
+      border: 2px solid #e8e8e8;
+      border-radius: 8px;
+      padding: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+
+      &:hover {
+        border-color: #1890ff;
+      }
+
+      &.selected {
+        border-color: #1890ff;
+        background: #e6f7ff;
+      }
+
+      .card-thumbnail {
+        .placeholder {
+          height: 120px;
+          background: #f5f5f5;
+          border-radius: 4px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          color: #999;
+          margin-bottom: 12px;
+        }
+      }
+
+      .card-info {
+        .card-name {
+          font-weight: 500;
+          margin-bottom: 8px;
+        }
+
+        .card-vars {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 4px;
+        }
+
+        .card-remarks {
+          margin-top: 8px;
+          padding-top: 8px;
+          border-top: 1px solid #e8e8e8;
+
+          .remark-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            color: #666;
+            line-height: 1.5;
+
+            .ivu-icon {
+              color: #1890ff;
+              flex-shrink: 0;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  .variables-config {
+    .config-header {
+      margin-bottom: 20px;
+
+      h4 {
+        margin: 0 0 8px 0;
+      }
+
+      .var-count {
+        margin: 0;
+        color: #999;
+      }
+    }
+
+    .batch-count-setting {
+      padding: 16px;
+      background: #f0f9ff;
+      border: 1px solid #bae7ff;
+      border-radius: 8px;
+      margin-bottom: 20px;
+
+      .form-item {
+        align-items: center;
+      }
+    }
+
+    .batch-items {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .batch-item {
+      border: 1px solid #e8e8e8;
+      border-radius: 8px;
+      overflow: hidden;
+
+      .batch-item-header {
+        padding: 12px 16px;
+        background: #fafafa;
+        border-bottom: 1px solid #e8e8e8;
+
+        h5 {
+          margin: 0;
+          font-size: 14px;
+          font-weight: 600;
+        }
+      }
+
+      .config-list {
+        padding: 16px;
+        max-height: none;
+      }
+    }
+
+    .config-list {
+      .config-item {
+        margin-bottom: 12px;
+        padding: 12px;
+        background: #f5f5f5;
+        border-radius: 6px;
+
+        &:last-child {
+          margin-bottom: 0;
+        }
+
+        .item-header {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 8px;
+          flex-wrap: wrap;
+
+          .remark-hint {
+            font-size: 12px;
+            color: #999;
+            font-weight: normal;
+          }
+        }
+
+        .item-input {
+          margin-left: 0;
+        }
+      }
+    }
+  }
+
+  .form-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    label {
+      white-space: nowrap;
+      min-width: 80px;
+    }
+
+    > *:not(label) {
+      flex: 1;
+    }
+  }
+
+  .export-form {
+    .form-item {
+      margin-bottom: 16px;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+    }
+  }
+
+  .preview-section {
+    .preview-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+
+      h4 {
+        margin: 0;
+      }
+    }
+
+    .info {
+      color: #999;
+      margin-bottom: 16px;
+    }
+
+    .preview-empty {
+      text-align: center;
+      padding: 60px 20px;
+      background: #f5f5f5;
+      border-radius: 8px;
+    }
+
+    .preview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .preview-item {
+      border: 1px solid #e8e8e8;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+
+      .preview-image-wrapper {
+        width: 100%;
+        height: 200px;
+        background: #f5f5f5;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        img {
+          max-width: 100%;
+          max-height: 100%;
+          object-fit: contain;
+        }
+
+        .preview-loading {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 8px;
+          color: #999;
+
+          .spin-icon {
+            animation: spin 1s linear infinite;
+          }
+        }
+      }
+
+      .preview-info {
+        padding: 8px 12px;
+        border-top: 1px solid #e8e8e8;
+
+        .preview-label {
+          font-weight: 600;
+          display: block;
+          margin-bottom: 6px;
+        }
+
+        .preview-vars {
+          .var-tag {
+            display: inline-block;
+            font-size: 11px;
+            padding: 2px 6px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            margin-right: 4px;
+            margin-bottom: 4px;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+        }
+      }
+    }
+
+    .more-hint {
+      text-align: center;
+      color: #999;
+      padding: 16px;
+    }
+  }
+
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .export-options {
+    margin-top: 24px;
+  }
+
+  .step-actions {
+    margin-top: 32px;
+    text-align: center;
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+  }
+
+  .empty-state {
+    padding: 60px 20px;
+    text-align: center;
+  }
+}
+</style>

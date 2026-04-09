@@ -1,0 +1,331 @@
+/*
+ * @Author: Claude
+ * @Date: 2024-04-07
+ * @Description: 动态变量插件 - 支持标记元素为可替换，用于批量生成
+ */
+
+import { fabric } from 'fabric';
+import type { IEditor, IPluginTempl, DynamicConfig, DynamicVariable } from '@kuaitu/core';
+
+type IPlugin = Pick<
+  DynamicVariablePlugin,
+  | 'setDynamic'
+  | 'removeDynamic'
+  | 'isDynamic'
+  | 'getDynamicConfig'
+  | 'getDynamicVariables'
+  | 'replaceVariable'
+  | 'getVariablesByType'
+>;
+
+declare module '@kuaitu/core' {
+  // eslint-disable-next-line @typescript-eslint/no-empty-interface
+  interface IEditor extends IPlugin {}
+}
+
+class DynamicVariablePlugin implements IPluginTempl {
+  static pluginName = 'DynamicVariablePlugin';
+  static apis = ['setDynamic', 'removeDynamic', 'isDynamic', 'getDynamicConfig', 'getDynamicVariables', 'replaceVariable', 'getVariablesByType'];
+  static events = ['dynamicAdded', 'dynamicRemoved', 'dynamicUpdated'];
+
+  constructor(public canvas: fabric.Canvas, public editor: IEditor) {
+    this.init();
+  }
+
+  init() {
+    // 监听对象添加事件，自动添加动态标识
+    this.canvas.on('object:added', (e) => {
+      const obj = e.target;
+      if (obj && !this.hasDynamicConfig(obj)) {
+        // 初始化为非动态
+        this.initDynamicConfig(obj);
+      } else if (obj && this.hasDynamicConfig(obj)) {
+        // 对象已有 dynamicConfig（从 JSON 加载），确保属性被正确设置
+        const config = this.getDynamicConfig(obj);
+        (obj as any).dynamicConfig = config;
+        console.log('从 JSON 恢复动态配置:', obj.type, config);
+        // 如果是动态变量，添加视觉标识
+        if (config?.isDynamic) {
+          this.addDynamicIndicator(obj);
+        }
+      }
+    });
+
+    // 监听对象选中事件，更新 UI
+    this.canvas.on('selection:created', (e) => this.onSelectionChanged(e));
+    this.canvas.on('selection:updated', (e) => this.onSelectionChanged(e));
+  }
+
+  /**
+   * 检查对象是否有动态配置
+   */
+  private hasDynamicConfig(obj: fabric.Object): boolean {
+    return obj.get('dynamicConfig') !== undefined;
+  }
+
+  /**
+   * 初始化对象的动态配置
+   */
+  private initDynamicConfig(obj: fabric.Object) {
+    obj.set('dynamicConfig', {
+      isDynamic: false,
+      variableName: '',
+      variableType: 'text',
+      categoryId: '',
+      defaultValue: '',
+      remark: '',
+    });
+  }
+
+  /**
+   * 选中对象变化时的处理
+   */
+  private onSelectionChanged(e: any) {
+    const selected = e.selected?.[0];
+    if (selected && this.isDynamic(selected)) {
+      this.editor.emit('dynamicSelected', this.getDynamicConfig(selected));
+    }
+  }
+
+  /**
+   * 设置对象为动态变量
+   * @param obj - Fabric 对象
+   * @param config - 动态配置
+   */
+  setDynamic(obj: fabric.Object, config: DynamicConfig): void {
+    if (!obj) {
+      console.warn('DynamicVariablePlugin: 对象不存在');
+      return;
+    }
+
+    const dynamicConfig: DynamicConfig = {
+      isDynamic: true,
+      variableName: config.variableName || this.generateVariableName(obj),
+      variableType: config.variableType || 'text',
+      categoryId: config.categoryId || '',
+      defaultValue: config.defaultValue || this.getDefaultValue(obj),
+      remark: config.remark || '',
+    };
+
+    console.log('设置动态变量:', dynamicConfig);
+
+    obj.set('dynamicConfig', dynamicConfig);
+    // 确保属性被设置到对象上，便于后续访问
+    (obj as any).dynamicConfig = dynamicConfig;
+
+    // 验证是否设置成功
+    const verify = this.getDynamicConfig(obj);
+    console.log('验证动态配置设置:', verify);
+
+    // 添加视觉标识
+    this.addDynamicIndicator(obj);
+
+    this.canvas.renderAll();
+    this.editor.emit('dynamicAdded', { object: obj, config: dynamicConfig });
+  }
+
+  /**
+   * 移除动态变量配置
+   * @param obj - Fabric 对象
+   */
+  removeDynamic(obj: fabric.Object): void {
+    if (!obj) return;
+
+    const config = this.getDynamicConfig(obj);
+    if (config?.isDynamic) {
+      const resetConfig: DynamicConfig = {
+        isDynamic: false,
+        variableName: '',
+        variableType: 'text',
+        categoryId: '',
+        defaultValue: '',
+        remark: '',
+      };
+      obj.set('dynamicConfig', resetConfig);
+      (obj as any).dynamicConfig = resetConfig;
+
+      // 移除视觉标识
+      this.removeDynamicIndicator(obj);
+
+      this.canvas.renderAll();
+      this.editor.emit('dynamicRemoved', { object: obj, config });
+    }
+  }
+
+  /**
+   * 检查对象是否为动态变量
+   * @param obj - Fabric 对象
+   */
+  isDynamic(obj: fabric.Object): boolean {
+    const config = this.getDynamicConfig(obj);
+    return config?.isDynamic === true;
+  }
+
+  /**
+   * 获取对象的动态配置
+   * @param obj - Fabric 对象
+   */
+  getDynamicConfig(obj: fabric.Object): DynamicConfig | undefined {
+    return obj.get('dynamicConfig') || (obj as any).dynamicConfig;
+  }
+
+  /**
+   * 获取画布中所有动态变量
+   */
+  getDynamicVariables(): DynamicVariable[] {
+    const variables: DynamicVariable[] = [];
+    const objects = this.canvas.getObjects();
+
+    console.log('获取画布对象数量:', objects.length);
+
+    objects.forEach((obj, index) => {
+      const config = this.getDynamicConfig(obj);
+      console.log(`对象 ${index} 类型: ${obj.type}, 动态配置:`, config);
+
+      if (this.isDynamic(obj)) {
+        variables.push({
+          id: obj.id || obj.data?.id || `obj_${index}`,
+          variableName: config.variableName || '',
+          variableType: config.variableType || 'text',
+          categoryId: config.categoryId,
+          defaultValue: config.defaultValue,
+          objectType: obj.type,
+          remark: config.remark,
+        });
+      }
+    });
+
+    console.log('找到的动态变量:', variables);
+    return variables;
+  }
+
+  /**
+   * 根据类型获取动态变量
+   * @param type - 变量类型
+   */
+  getVariablesByType(type: 'text' | 'image'): DynamicVariable[] {
+    return this.getDynamicVariables().filter((v) => v.variableType === type);
+  }
+
+  /**
+   * 替换动态变量的值
+   * @param variableName - 变量名
+   * @param value - 新值
+   */
+  replaceVariable(variableName: string, value: any): void {
+    const objects = this.canvas.getObjects();
+
+    objects.forEach((obj) => {
+      const config = this.getDynamicConfig(obj);
+      if (config?.isDynamic && config.variableName === variableName) {
+        if (config.variableType === 'text' && obj.type === 'textbox') {
+          // 替换文本
+          (obj as fabric.Textbox).set('text', value);
+        } else if (config.variableType === 'image' && obj.type === 'image') {
+          // 替换图片需要重新加载
+          if (typeof value === 'string') {
+            fabric.Image.fromURL(value, (img) => {
+              const current = obj as fabric.Image;
+              img.set({
+                left: current.left,
+                top: current.top,
+                scaleX: current.scaleX,
+                scaleY: current.scaleY,
+                angle: current.angle
+              });
+              this.canvas.remove(obj);
+              this.canvas.add(img);
+              this.canvas.renderAll();
+            });
+          }
+        }
+        this.canvas.renderAll();
+        this.editor.emit('dynamicUpdated', { variableName, value });
+      }
+    });
+  }
+
+  /**
+   * 批量替换动态变量
+   * @param values - 变量值映射
+   */
+  replaceVariables(values: Record<string, any>): void {
+    Object.entries(values).forEach(([variableName, value]) => {
+      this.replaceVariable(variableName, value);
+    });
+  }
+
+  /**
+   * 生成变量名
+   */
+  private generateVariableName(obj: fabric.Object): string {
+    const type = obj.type;
+    const count = this.getDynamicVariables().filter((v) => v.variableType === (type === 'textbox' ? 'text' : 'image')).length;
+    return `${type}_${count + 1}`;
+  }
+
+  /**
+   * 获取默认值
+   */
+  private getDefaultValue(obj: fabric.Object): any {
+    if (obj.type === 'textbox') {
+      return (obj as fabric.Textbox).text;
+    }
+    return '';
+  }
+
+  /**
+   * 添加动态标识（视觉效果）
+   */
+  private addDynamicIndicator(obj: fabric.Object): void {
+    // 可以通过边框颜色、角标等方式标识
+    // 这里使用自定义属性标记，渲染时处理
+    obj.set('isDynamicElement', true);
+  }
+
+  /**
+   * 移除动态标识
+   */
+  private removeDynamicIndicator(obj: fabric.Object): void {
+    obj.set('isDynamicElement', false);
+  }
+
+  /**
+   * 右键菜单
+   */
+  contextMenu() {
+    const activeObject = this.canvas.getActiveObject();
+    if (!activeObject) return [];
+
+    const isDynamic = this.isDynamic(activeObject);
+
+    return [
+      {
+        text: '动态变量',
+        hotkey: '❯',
+        subitems: [
+          {
+            text: isDynamic ? '取消动态标记' : '设为动态变量',
+            hotkey: '',
+            onclick: () => {
+              if (isDynamic) {
+                this.removeDynamic(activeObject);
+              } else {
+                this.setDynamic(activeObject, {
+                  isDynamic: true,
+                  variableType: activeObject.type === 'textbox' ? 'text' : 'image'
+                });
+              }
+            }
+          }
+        ]
+      }
+    ];
+  }
+
+  destroy() {
+    console.log('DynamicVariablePlugin destroyed');
+  }
+}
+
+export default DynamicVariablePlugin;

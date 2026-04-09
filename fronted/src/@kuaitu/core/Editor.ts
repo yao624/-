@@ -1,0 +1,272 @@
+import EventEmitter from 'events';
+import hotkeys from 'hotkeys-js';
+import ContextMenu from './ContextMenu.js';
+import ServersPlugin from './ServersPlugin';
+import { AsyncSeriesHook } from 'tapable';
+import type {
+  IPluginMenu,
+  IPluginClass,
+  IPluginOption,
+  IEditorHooksType,
+  IPluginTempl,
+} from './interface/Editor';
+
+import Utils from './utils/utils';
+
+class Editor extends EventEmitter {
+  private canvas: fabric.Canvas | null = null;
+  contextMenu: ContextMenu | null = null;
+  [key: string]: any;
+  private pluginMap: {
+    [propName: string]: IPluginTempl;
+  } = {};
+  // 自定义事件
+  private customEvents: string[] = [];
+  // 自定义API
+  private customApis: string[] = [];
+  // 生命周期函数名
+  private hooks: IEditorHooksType[] = [
+    'hookImportBefore',
+    'hookImportAfter',
+    'hookSaveBefore',
+    'hookSaveAfter',
+    'hookTransform',
+  ];
+  public hooksEntity: {
+    [propName: string]: AsyncSeriesHook<any, any>;
+  } = {};
+
+  init(canvas: fabric.Canvas) {
+    this.canvas = canvas;
+
+    // 添加全局 renderAll 错误处理，防止无效 clipPath 导致渲染失败
+    this._setupSafeRender();
+
+    this._initContextMenu();
+    this._bindContextMenu();
+    this._initActionHooks();
+    this._initServersPlugin();
+
+    this.Utils = Utils;
+  }
+
+  // 设置安全的渲染方法，自动清理无效的 clipPath
+  private _setupSafeRender() {
+    const originalRenderAll = this.canvas.renderAll.bind(this.canvas);
+
+    // 清理无效 clipPath 的辅助函数
+    const cleanupInvalidClipPaths = () => {
+      try {
+        const objects = this.canvas.getObjects();
+        objects.forEach((obj: any) => {
+          if (obj.clipPath) {
+            const clipPath = obj.clipPath as any;
+            const hasInvalidSize =
+              (clipPath.width !== undefined && clipPath.width <= 0) ||
+              (clipPath.height !== undefined && clipPath.height <= 0) ||
+              (clipPath.rx !== undefined && clipPath.ry !== undefined && (clipPath.rx <= 0 || clipPath.ry <= 0)) ||
+              (clipPath._element && (clipPath._element.width === 0 || clipPath._element.height === 0));
+
+            if (hasInvalidSize) {
+              console.warn('[Editor] 自动清理无效 clipPath:', {
+                objectType: obj.type,
+                clipPathType: clipPath.type
+              });
+              obj.set('clipPath', undefined);
+              obj.set('dirty', true);
+            }
+          }
+        });
+      } catch (e) {
+        console.error('[Editor] 清理 clipPath 失败:', e);
+      }
+    };
+
+    this.canvas.renderAll = function() {
+      try {
+        cleanupInvalidClipPaths();
+        return originalRenderAll();
+      } catch (error: any) {
+        console.error('[Editor] Canvas 渲染错误:', error);
+
+        // 尝试恢复
+        try {
+          if (this.isRendering) {
+            this.isRendering = false;
+          }
+
+          // 强制清理所有 clipPath
+          this.canvas.getObjects().forEach((obj: any) => {
+            if (obj.clipPath) {
+              obj.set('clipPath', undefined);
+              obj.set('dirty', true);
+            }
+          });
+
+          // 延迟重试渲染
+          setTimeout(() => {
+            try {
+              this.isRendering = false;
+              originalRenderAll();
+            } catch (e) {
+              console.error('[Editor] 重试渲染失败:', e);
+            }
+          }, 100);
+
+        } catch (retryError) {
+          console.error('[Editor] 恢复渲染失败:', retryError);
+        }
+      }
+      return this;
+    } as any;
+  }
+
+  get fabricCanvas() {
+    return this.canvas;
+  }
+
+  // 引入组件
+  use(plugin: IPluginTempl, options?: IPluginOption) {
+    if (this._checkPlugin(plugin) && this.canvas) {
+      this._saveCustomAttr(plugin);
+      const pluginRunTime = new (plugin as IPluginClass)(this.canvas, this, options || {});
+      // 添加插件名称
+      pluginRunTime.pluginName = plugin.pluginName;
+      this.pluginMap[plugin.pluginName] = pluginRunTime;
+      this._bindingHooks(pluginRunTime);
+      this._bindingHotkeys(pluginRunTime);
+      this._bindingApis(pluginRunTime);
+    }
+    return this;
+  }
+
+  destory() {
+    this.canvas = null;
+    this.contextMenu = null;
+    this.pluginMap = {};
+    this.customEvents = [];
+    this.customApis = [];
+    this.hooksEntity = {};
+  }
+  // 获取插件
+  getPlugin(name: string) {
+    if (this.pluginMap[name]) {
+      return this.pluginMap[name];
+    }
+  }
+
+  // 检查组件
+  private _checkPlugin(plugin: IPluginTempl) {
+    const { pluginName, events = [], apis = [] } = plugin;
+    //名称检查
+    if (this.pluginMap[pluginName]) {
+      throw new Error(pluginName + '插件重复初始化');
+    }
+    events.forEach((eventName: string) => {
+      if (this.customEvents.find((info) => info === eventName)) {
+        throw new Error(pluginName + '插件中' + eventName + '重复');
+      }
+    });
+
+    apis.forEach((apiName: string) => {
+      if (this.customApis.find((info) => info === apiName)) {
+        throw new Error(pluginName + '插件中' + apiName + '重复');
+      }
+    });
+    return true;
+  }
+
+  // 绑定hooks方法
+  private _bindingHooks(plugin: IPluginTempl) {
+    this.hooks.forEach((hookName) => {
+      const hook = plugin[hookName];
+      if (hook) {
+        this.hooksEntity[hookName].tapPromise(plugin.pluginName + hookName, function () {
+          // console.log(hookName, ...arguments);
+          // eslint-disable-next-line prefer-rest-params
+          const result = hook.apply(plugin, [...arguments]);
+          // hook 兼容非 Promise 返回值
+          return (result as any) instanceof Promise ? result : Promise.resolve(result);
+        });
+      }
+    });
+  }
+
+  // 绑定快捷键
+  private _bindingHotkeys(plugin: IPluginTempl) {
+    plugin?.hotkeys?.forEach((keyName: string) => {
+      // 支持 keyup
+      hotkeys(keyName, { keyup: true }, (e) => {
+        plugin.hotkeyEvent && plugin.hotkeyEvent(keyName, e);
+      });
+    });
+  }
+
+  // 保存组件自定义事件与API
+  private _saveCustomAttr(plugin: IPluginTempl) {
+    const { events = [], apis = [] } = plugin;
+    this.customApis = this.customApis.concat(apis);
+    this.customEvents = this.customEvents.concat(events);
+  }
+  // 代理API事件
+  private _bindingApis(pluginRunTime: IPluginTempl) {
+    const { apis = [] } = (pluginRunTime.constructor as any) || {};
+    apis.forEach((apiName: string) => {
+      this[apiName] = function () {
+        // eslint-disable-next-line prefer-rest-params
+        return pluginRunTime[apiName].apply(pluginRunTime, [...arguments]);
+      };
+    });
+  }
+
+  // 右键菜单
+  private _bindContextMenu() {
+    this.canvas &&
+      this.canvas.on('mouse:down', (opt) => {
+        if (opt.button === 3) {
+          let menu: IPluginMenu[] = [];
+          Object.keys(this.pluginMap).forEach((pluginName) => {
+            const pluginRunTime = this.pluginMap[pluginName];
+            const pluginMenu = pluginRunTime.contextMenu && pluginRunTime.contextMenu();
+            if (pluginMenu) {
+              menu = menu.concat(pluginMenu);
+            }
+          });
+          this._renderMenu(opt, menu);
+        }
+      });
+  }
+
+  // 渲染右键菜单
+  private _renderMenu(opt: { e: MouseEvent }, menu: IPluginMenu[]) {
+    if (menu.length !== 0 && this.contextMenu) {
+      this.contextMenu.hideAll();
+      this.contextMenu.setData(menu);
+      this.contextMenu.show(opt.e.clientX, opt.e.clientY);
+    }
+  }
+
+  // 生命周期事件
+  _initActionHooks() {
+    this.hooks.forEach((hookName) => {
+      this.hooksEntity[hookName] = new AsyncSeriesHook(['data']);
+    });
+  }
+
+  _initContextMenu() {
+    this.contextMenu = new ContextMenu(this.canvas!.wrapperEl, []);
+    this.contextMenu.install();
+  }
+
+  _initServersPlugin() {
+    this.use(ServersPlugin);
+  }
+
+  // 解决 listener 为 undefined 的时候卸载错误
+  off(eventName: string, listener: any): this {
+    // noinspection TypeScriptValidateTypes
+    return listener ? super.off(eventName, listener) : this;
+  }
+}
+
+export default Editor;

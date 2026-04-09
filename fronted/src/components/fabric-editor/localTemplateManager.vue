@@ -1,0 +1,2060 @@
+<!--
+ * @Author: Claude
+ * @Date: 2024-04-07
+ * @Description: 本地模版管理组件
+-->
+<template>
+  <div class="local-template-manager">
+    <div class="header">
+      <h3>我的模版</h3>
+      <Button type="primary" size="small" @click="createNewTemplate">
+        <Icon type="md-add" />
+        新建空白模版
+      </Button>
+    </div>
+
+    <div v-if="templates.length > 0" class="template-list">
+      <div
+        v-for="template in templates"
+        :key="template.id"
+        class="template-item"
+        :class="{ active: selectedTemplateId === template.id }"
+        @click="selectTemplate(template)"
+      >
+        <div class="template-thumbnail">
+          <div class="placeholder">
+            <Icon type="md-image" size="32" />
+            <span>{{ template.width }}×{{ template.height }}</span>
+          </div>
+        </div>
+
+        <div class="template-info">
+          <div class="template-name">{{ template.name }}</div>
+          <div class="template-meta">
+            <span>{{ template.width }}×{{ template.height }}</span>
+            <span v-if="template.dynamicVariables.length > 0" class="var-count">
+              {{ template.dynamicVariables.length }} 个变量
+            </span>
+          </div>
+        </div>
+
+        <div class="template-actions" @click.stop>
+          <Dropdown transfer>
+            <Button size="small" type="text">
+              <Icon type="md-more" :size="18" />
+            </Button>
+            <template #list>
+              <DropdownMenu>
+                <DropdownItem @click="handleAction('edit', template)">编辑</DropdownItem>
+                <DropdownItem @click="handleAction('copy', template)">复制</DropdownItem>
+                <DropdownItem @click="handleAction('rename', template)">重命名</DropdownItem>
+                <DropdownItem
+                  @click="handleAction('batch', template)"
+                  :disabled="template.dynamicVariables.length === 0"
+                >
+                  批量生成
+                </DropdownItem>
+                <DropdownItem divided>
+                  <div style="color: #ed4014" @click="handleAction('delete', template)">删除</div>
+                </DropdownItem>
+              </DropdownMenu>
+            </template>
+          </Dropdown>
+        </div>
+      </div>
+    </div>
+
+    <div v-else class="empty-state">
+      <Empty description="暂无本地模版">
+        <template #footer>
+          <Button type="primary" @click="createNewTemplate">创建第一个模版</Button>
+        </template>
+      </Empty>
+    </div>
+
+    <!-- 重命名对话框 -->
+    <Modal v-model="renameModalVisible" title="重命名模版" @on-ok="handleRename">
+      <Input v-model="renameForm.name" placeholder="请输入新名称" />
+    </Modal>
+
+    <!-- 批量生成对话框 -->
+    <Modal
+      v-model="batchModalVisible"
+      title="批量生成图片"
+      width="1200"
+      :mask-closable="false"
+      :styles="{ top: '20px' }"
+      class="batch-generate-modal"
+    >
+      <template #footer>
+        <div class="modal-footer-custom">
+          <div class="footer-left">
+            <Button @click="batchModalVisible = false">取消</Button>
+          </div>
+          <div class="footer-right">
+            <Button @click="previewBatch" :loading="previewLoading" :disabled="!canPreview">
+              <Icon type="md-eye" />
+              预览效果
+            </Button>
+            <Button type="primary" @click="handleBatchGenerate" :loading="generating" :disabled="!canGenerate">
+              <Icon type="md-download" />
+              开始生成
+            </Button>
+          </div>
+        </div>
+      </template>
+
+      <div v-if="selectedTemplate" class="batch-modal-content">
+        <!-- 步骤指示器 -->
+        <div class="steps-indicator">
+          <div class="step-item" :class="{ active: currentStep >= 1, completed: currentStep > 1 }">
+            <div class="step-number">1</div>
+            <div class="step-text">配置变量</div>
+          </div>
+          <div class="step-line" :class="{ active: currentStep > 1 }"></div>
+          <div class="step-item" :class="{ active: currentStep >= 2, completed: currentStep > 2 }">
+            <div class="step-number">2</div>
+            <div class="step-text">预览效果</div>
+          </div>
+          <div class="step-line" :class="{ active: currentStep > 2 }"></div>
+          <div class="step-item" :class="{ active: currentStep >= 3 }">
+            <div class="step-number">3</div>
+            <div class="step-text">导出图片</div>
+          </div>
+        </div>
+
+        <!-- 模板信息卡片 -->
+        <div class="template-info-card">
+          <div class="template-info-main">
+            <div class="template-icon">
+              <Icon type="md-document" size="36" color="#1890ff" />
+            </div>
+            <div class="template-details">
+              <h3 class="template-name">{{ selectedTemplate.name }}</h3>
+              <div class="template-meta">
+                <span class="meta-item">
+                  <Icon type="md-resize" size="14" />
+                  {{ selectedTemplate.width }}×{{ selectedTemplate.height }}
+                </span>
+                <span class="meta-divider">|</span>
+                <span class="meta-item">
+                  <Icon type="md-code-working" size="14" />
+                  {{ selectedTemplate.dynamicVariables?.length || 0 }} 个动态变量
+                </span>
+              </div>
+            </div>
+            <div class="template-actions">
+              <Poptip trigger="hover" placement="bottom" width="200">
+                <Button size="small" type="text">
+                  <Icon type="md-help-circle" size="18" />
+                </Button>
+                <template #content>
+                  <div class="help-content">
+                    <p>1. 为每个生成项配置变量值</p>
+                    <p>2. 点击"预览效果"查看结果</p>
+                    <p>3. 确认无误后点击"开始生成"</p>
+                  </div>
+                </template>
+              </Poptip>
+            </div>
+          </div>
+        </div>
+
+        <!-- 快捷操作栏 -->
+        <div class="quick-actions-bar">
+          <div class="actions-group">
+            <div class="action-item">
+              <span class="action-label">生成数量</span>
+              <InputNumber v-model="batchCount" :min="1" :max="50" size="small" @on-change="onBatchCountChange" />
+            </div>
+            <div class="action-item">
+              <span class="action-label">导出格式</span>
+              <RadioGroup v-model="exportFormat" size="small" type="button">
+                <Radio label="png">PNG</Radio>
+                <Radio label="jpg">JPG</Radio>
+              </RadioGroup>
+            </div>
+          </div>
+          <div class="actions-group">
+            <Button size="small" @click="copyFirstToAll" :disabled="!hasFirstItemValues">
+              <Icon type="md-copy" />
+              复制到全部
+            </Button>
+            <Button size="small" @click="clearAllValues">
+              <Icon type="md-trash" />
+              清空
+            </Button>
+          </div>
+        </div>
+
+        <!-- 变量配置区域 -->
+        <div class="variables-section">
+          <div class="section-header-with-progress">
+            <div class="header-left">
+              <h4>变量配置</h4>
+              <div class="progress-indicator">
+                <Progress
+                  :percent="getCompletionProgress()"
+                  :stroke-color="getProgressColor()"
+                  :show-info="false"
+                  size="small"
+                />
+                <span class="progress-text">{{ getCompletionText() }}</span>
+              </div>
+            </div>
+            <div class="header-right">
+              <Button type="primary" ghost size="small" @click="previewBatch" :loading="previewLoading">
+                <Icon type="md-eye" />
+                预览
+              </Button>
+            </div>
+          </div>
+
+          <!-- 使用 Tab 组织每个生成项的配置 -->
+          <Tabs v-model="activeBatchTab" type="card" class="batch-tabs">
+            <TabPane
+              v-for="index in batchCount"
+              :key="`batch-${index}`"
+              :label="getTabLabel(index)"
+              :name="`batch-${index}`"
+            >
+              <div class="batch-item-content">
+                <div v-if="selectedTemplate.dynamicVariables && selectedTemplate.dynamicVariables.length > 0" class="variables-grid">
+                  <div
+                    v-for="variable in selectedTemplate.dynamicVariables"
+                    :key="`${index}-${variable.variableName}`"
+                    class="variable-card"
+                    :class="{
+                      'has-value': batchValues[index - 1]?.[variable.variableName],
+                      'is-required': !batchValues[index - 1]?.[variable.variableName]
+                    }"
+                  >
+                    <div class="variable-header">
+                      <div class="variable-type-icon" :class="`type-${variable.variableType}`">
+                        <Icon :type="variable.variableType === 'text' ? 'md-text' : 'md-image'" size="18" />
+                      </div>
+                      <div class="variable-info">
+                        <span class="variable-name">{{ variable.variableName }}</span>
+                        <Tag size="small" :color="variable.variableType === 'text' ? 'blue' : 'green'">
+                          {{ variable.variableType === 'text' ? '文本' : '图片' }}
+                        </Tag>
+                      </div>
+                      <div class="variable-status">
+                        <Icon
+                          v-if="batchValues[index - 1]?.[variable.variableName]"
+                          type="md-checkmark-circle"
+                          color="#52c41a"
+                          size="20"
+                        />
+                        <Icon v-else type="md-radio-button-off" color="#d9d9d9" size="20" />
+                      </div>
+                    </div>
+
+                    <div v-if="variable.remark" class="variable-remark">
+                      <Icon type="md-information-circle-outline" size="12" />
+                      {{ variable.remark }}
+                    </div>
+
+                    <div class="variable-input-area">
+                      <!-- 文本变量 -->
+                      <Input
+                        v-if="variable.variableType === 'text'"
+                        v-model="batchValues[index - 1][variable.variableName]"
+                        :placeholder="`请输入 ${variable.variableName}`"
+                        size="small"
+                        clearable
+                        @on-change="onVariableChange(index - 1, variable.variableName)"
+                      >
+                        <template #prefix>
+                          <Icon type="md-create" size="14" color="#999" />
+                        </template>
+                      </Input>
+
+                      <!-- 图片变量 -->
+                      <div v-else class="image-input-area">
+                        <Upload
+                          :before-upload="(file) => handleImageUpload(index - 1, variable.variableName, file)"
+                          :show-upload-list="false"
+                          accept="image/*"
+                          action=""
+                        >
+                          <div
+                            class="upload-trigger"
+                            :class="{ 'has-image': batchValues[index - 1]?.[variable.variableName] }"
+                          >
+                            <div v-if="!batchValues[index - 1]?.[variable.variableName]" class="upload-placeholder">
+                              <Icon type="md-cloud-upload" size="32" />
+                              <span>点击上传图片</span>
+                            </div>
+                            <div v-else class="upload-preview">
+                              <img :src="batchValues[index - 1][variable.variableName]" alt="预览" />
+                              <div class="upload-overlay">
+                                <Icon type="md-refresh" size="20" />
+                                <span>更换</span>
+                              </div>
+                            </div>
+                          </div>
+                        </Upload>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div v-else class="empty-variables">
+                  <div class="empty-icon">
+                    <Icon type="md-alert" size="64" color="#ffec3d" />
+                  </div>
+                  <h4>此模板没有动态变量</h4>
+                  <p>请先在编辑器中为元素添加动态变量标记</p>
+                  <Button type="primary" @click="batchModalVisible = false">去编辑模板</Button>
+                </div>
+              </div>
+            </TabPane>
+          </Tabs>
+        </div>
+
+        <!-- 预览区域 -->
+        <div class="preview-section">
+          <div class="section-header-with-actions">
+            <h4>预览效果</h4>
+            <div class="header-actions">
+              <Tag v-if="previewImages.length > 0" color="success">
+                <Icon type="md-checkmark" />
+                已生成 {{ previewImages.length }} 张
+              </Tag>
+              <Button v-if="previewImages.length > 0" size="small" @click="downloadAllImages">
+                <Icon type="md-download" />
+                全部下载
+              </Button>
+            </div>
+          </div>
+
+          <div v-if="previewImages.length > 0" class="preview-grid-modern">
+            <div
+              v-for="(previewImg, idx) in previewImages"
+              :key="`preview-${idx}`"
+              class="preview-card"
+            >
+              <div class="preview-image-wrapper" @click="openImagePreview(previewImg, idx)">
+                <img :src="previewImg" :alt="`预览 ${idx + 1}`" class="preview-image" />
+                <div class="preview-overlay">
+                  <div class="preview-number">#{{ idx + 1 }}</div>
+                  <div class="preview-actions">
+                    <Button type="primary" size="small" ghost @click.stop="downloadImage(previewImg, idx)">
+                      <Icon type="md-download" />
+                      下载
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              <div class="preview-footer">
+                <span class="preview-name">{{ selectedTemplate.name }}_{{ idx + 1 }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div v-else class="preview-empty-modern">
+            <div class="empty-illustration">
+              <div class="empty-icon-circle">
+                <Icon type="md-images" size="48" color="#d9d9d9" />
+              </div>
+            </div>
+            <h4>暂无预览</h4>
+            <p>配置完成后点击"预览"按钮生成预览图</p>
+          </div>
+        </div>
+      </div>
+    </Modal>
+
+    <!-- 图片预览大图 -->
+    <Modal v-model="imagePreviewVisible" title="图片预览" :footer-hide="true" class="image-preview-modal">
+      <div class="image-preview-container">
+        <img :src="previewImageUrl" alt="预览" class="preview-large-image" />
+      </div>
+    </Modal>
+
+    <!-- 隐藏的 Canvas 用于预览渲染 -->
+    <div style="display: none">
+      <canvas id="preview-canvas"></canvas>
+    </div>
+  </div>
+</template>
+
+<script name="LocalTemplateManager" setup lang="ts">
+import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue';
+import { useRouter } from 'vue-router';
+import { fabric } from 'fabric';
+import { debounce } from 'lodash-es';
+import {
+  Modal,
+  Message,
+  Empty,
+  Tag,
+  Divider,
+  InputNumber,
+  Select,
+  Option,
+  Form,
+  FormItem,
+  Row,
+  Col,
+  Tabs,
+  TabPane,
+  Spin,
+  Dropdown,
+  DropdownMenu,
+  DropdownItem,
+  Upload,
+  Button,
+  Icon,
+  RadioGroup,
+  Radio,
+  Poptip,
+  Progress,
+} from 'view-ui-plus';
+import { log } from 'console';
+
+const router = useRouter();
+
+// 模版列表
+const templates = ref<any[]>([]);
+const selectedTemplateId = ref<string | null>(null);
+const selectedTemplate = computed(() =>
+  templates.value.find((t) => t.id === selectedTemplateId.value)
+);
+
+// 保存功能
+const cbMap = {
+  async clipboard() {
+    if (previewImages.value.length === 0) {
+      Message.warning('没有可复制的图片');
+      return;
+    }
+    try {
+      const blob = await fetch(previewImages.value[0]).then(r => r.blob());
+      await navigator.clipboard.write([
+        new ClipboardItem({ [blob.type]: blob })
+      ]);
+      Message.success('复制成功');
+    } catch (error) {
+      Message.error('复制失败');
+    }
+  },
+  saveImg() {
+    if (previewImages.value.length === 0) {
+      Message.warning('没有可保存的图片');
+      return;
+    }
+    const link = document.createElement('a');
+    link.download = `preview_${Date.now()}.png`;
+    link.href = previewImages.value[0];
+    link.click();
+  },
+};
+
+const saveWith = debounce(function (type: string) {
+  cbMap[type] && typeof cbMap[type] === 'function' && cbMap[type]();
+}, 300);
+
+// 重命名
+const renameModalVisible = ref(false);
+const renameForm = ref({ id: '', name: '' });
+
+// 批量生成
+const batchModalVisible = ref(false);
+const batchCount = ref(1);
+const filenamePattern = ref('{index}_{name}');
+const activeBatchTab = ref('batch-1');
+const exportFormat = ref('png');
+const currentStep = ref(1);
+const generating = ref(false);
+
+// 批量值数据结构：数组，每个元素是一组变量值
+const batchValues = ref<Record<string, any>[]>([{}]);
+
+// 预览相关
+const previewImages = ref<string[]>([]);
+const previewLoading = ref(false);
+const imagePreviewVisible = ref(false);
+const previewImageUrl = ref('');
+let previewCanvas: fabric.Canvas | null = null;
+let isComponentMounted = true;
+
+// 模拟素材数据
+const mockAssets = [
+  {
+    id: 'asset1',
+    name: '商品图片1',
+    url: 'https://via.placeholder.com/300',
+    categoryId: 'cat_products',
+  },
+  {
+    id: 'asset2',
+    name: '商品图片2',
+    url: 'https://via.placeholder.com/300',
+    categoryId: 'cat_products',
+  },
+  {
+    id: 'asset3',
+    name: 'Logo1',
+    url: 'https://via.placeholder.com/150',
+    categoryId: 'cat_logos',
+  },
+  {
+    id: 'asset4',
+    name: 'Logo2',
+    url: 'https://via.placeholder.com/150',
+    categoryId: 'cat_logos',
+  },
+];
+
+// 初始化批量值数组
+const initBatchValues = () => {
+  const values: Record<string, any>[] = [];
+  for (let i = 0; i < batchCount.value; i++) {
+    values.push({});
+  }
+  batchValues.value = values;
+  previewImages.value = []; // 清空预览图片
+};
+
+// 生成数量变化时重新初始化
+const onBatchCountChange = () => {
+  // 保留已有数据
+  const oldValues = [...batchValues.value];
+  const newValues: Record<string, any>[] = [];
+  for (let i = 0; i < batchCount.value; i++) {
+    newValues.push(oldValues[i] || {});
+  }
+  batchValues.value = newValues;
+  previewImages.value = []; // 清空预览图片
+};
+
+// 加载本地模版
+const loadTemplates = () => {
+  const saved = localStorage.getItem('userTemplates');
+  if (saved) {
+    templates.value = JSON.parse(saved);
+  }
+};
+
+// 保存模版列表
+const saveTemplates = () => {
+  localStorage.setItem('userTemplates', JSON.stringify(templates.value));
+};
+
+// 创建新模版
+const createNewTemplate = () => {
+  window.open('/', '_blank');
+};
+
+// 选择模版
+const selectTemplate = (template: any) => {
+  selectedTemplateId.value = template.id;
+};
+
+// 处理操作
+const handleAction = (action: string, template: any) => {
+  // 关闭下拉菜单后再执行操作，避免组件卸载错误
+  setTimeout(() => {
+    switch (action) {
+      case 'edit': {
+        // 使用路由跳转到编辑器页面
+        router.push({
+          path: '/',
+          query: { templateId: template.id },
+        });
+        break;
+      }
+      case 'copy':
+        copyTemplate(template);
+        break;
+      case 'rename':
+        showRenameDialog(template);
+        break;
+      case 'batch':
+        showBatchDialog(template);
+        break;
+      case 'delete':
+        deleteTemplate(template);
+        break;
+    }
+  }, 100);
+};
+
+// 复制模版 - 跳转到编辑器，标记为复制模式
+const copyTemplate = (template: any) => {
+  router.push({
+    path: '/',
+    query: { templateId: template.id, mode: 'copy' },
+  });
+};
+
+// 显示重命名对话框
+const showRenameDialog = (template: any) => {
+  renameForm.value = { id: template.id, name: template.name };
+  renameModalVisible.value = true;
+};
+
+// 处理重命名
+const handleRename = () => {
+  const template = templates.value.find((t) => t.id === renameForm.value.id);
+  if (template) {
+    template.name = renameForm.value.name;
+    template.updatedAt = new Date().toISOString();
+    saveTemplates();
+    Message.success('重命名成功');
+  }
+  return Promise.resolve();
+};
+
+// 删除模版
+const deleteTemplate = (template: any) => {
+  Modal.confirm({
+    title: '确认删除',
+    content: `确定要删除模版"${template.name}"吗？`,
+    onOk: () => {
+      templates.value = templates.value.filter((t) => t.id !== template.id);
+      saveTemplates();
+      if (selectedTemplateId.value === template.id) {
+        selectedTemplateId.value = null;
+      }
+      Message.success('删除成功');
+    },
+  });
+};
+
+// 显示批量生成对话框
+const showBatchDialog = (template: any) => {
+  console.log(template);
+  selectedTemplateId.value = template.id;
+  batchCount.value = 1;
+
+  initBatchValues();
+  activeBatchTab.value = 'batch-1';
+  batchModalVisible.value = true;
+};
+
+// 根据分类获取素材
+const getAssetsByCategory = (categoryId?: string) => {
+  if (!categoryId) return mockAssets;
+  return mockAssets.filter((a) => a.categoryId === categoryId);
+};
+
+// 处理图片上传
+const handleImageUpload = (index: number, varName: string, file: File) => {
+  // 检查文件类型
+  if (!file.type.startsWith('image/')) {
+    Message.error('请上传图片文件');
+    return false;
+  }
+
+  // 检查文件大小（限制 10MB）
+  if (file.size > 10 * 1024 * 1024) {
+    Message.error('图片大小不能超过 10MB');
+    return false;
+  }
+
+  // 读取文件并转换为 DataURL
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const dataUrl = e.target?.result as string;
+    batchValues.value[index] = {
+      ...batchValues.value[index],
+      [varName]: dataUrl,
+    };
+    Message.success('图片上传成功');
+  };
+  reader.onerror = () => {
+    Message.error('图片读取失败');
+  };
+  reader.readAsDataURL(file);
+
+  // 返回 false 阻止自动上传
+  return false;
+};
+
+// 计算第一项是否有值
+const hasFirstItemValues = computed(() => {
+  if (!batchValues.value[0]) return false;
+  const values = batchValues.value[0];
+  return selectedTemplate.value?.dynamicVariables?.some((v: any) => values[v.variableName]);
+});
+
+// 复制第一项到全部
+const copyFirstToAll = () => {
+  if (!hasFirstItemValues.value) {
+    Message.warning('第一项没有可复制的值');
+    return;
+  }
+
+  const firstValues = batchValues.value[0];
+  for (let i = 1; i < batchCount.value; i++) {
+    batchValues.value[i] = { ...firstValues };
+  }
+
+  Message.success('已复制第一项配置到全部生成项');
+};
+
+// 清空全部值
+const clearAllValues = () => {
+  Modal.confirm({
+    title: '确认清空',
+    content: '确定要清空所有生成项的配置吗？',
+    onOk: () => {
+      initBatchValues();
+      Message.success('已清空全部配置');
+    },
+  });
+};
+
+// 渲染 Tab 标签
+const getTabLabel = (index: number) => {
+  const values = batchValues.value[index - 1];
+  const filledCount = selectedTemplate.value?.dynamicVariables?.filter((v: any) => values?.[v.variableName]).length || 0;
+  const totalCount = selectedTemplate.value?.dynamicVariables?.length || 0;
+
+  if (filledCount > 0) {
+    return `生成项 ${index} (${filledCount}/${totalCount})`;
+  }
+  return `生成项 ${index}`;
+};
+
+// 计算属性：是否可以预览
+const canPreview = computed(() => {
+  for (let i = 0; i < batchCount.value; i++) {
+    const values = batchValues.value[i];
+    const hasEmpty = selectedTemplate.value?.dynamicVariables?.some((v: any) => !values?.[v.variableName]);
+    if (hasEmpty) return false;
+  }
+  return true;
+});
+
+// 计算属性：是否可以生成
+const canGenerate = computed(() => {
+  return previewImages.value.length > 0;
+});
+
+// 获取完成进度
+const getCompletionProgress = () => {
+  let totalVariables = 0;
+  let filledVariables = 0;
+
+  for (let i = 0; i < batchCount.value; i++) {
+    const values = batchValues.value[i];
+    selectedTemplate.value?.dynamicVariables?.forEach((v: any) => {
+      totalVariables++;
+      if (values?.[v.variableName]) {
+        filledVariables++;
+      }
+    });
+  }
+
+  return totalVariables > 0 ? Math.round((filledVariables / totalVariables) * 100) : 0;
+};
+
+// 获取进度颜色
+const getProgressColor = () => {
+  const progress = getCompletionProgress();
+  if (progress === 100) return '#52c41a';
+  if (progress >= 50) return '#1890ff';
+  return '#ffec3d';
+};
+
+// 获取完成文本
+const getCompletionText = () => {
+  const progress = getCompletionProgress();
+  if (progress === 100) return '全部完成';
+  if (progress >= 50) return '进行中';
+  return '待填写';
+};
+
+// 变量变化处理
+const onVariableChange = (index: number, varName: string) => {
+  // 可以在这里添加自动保存或其他逻辑
+};
+
+// 打开图片预览
+const openImagePreview = (imageUrl: string, index: number) => {
+  previewImageUrl.value = imageUrl;
+  imagePreviewVisible.value = true;
+};
+
+// 下载全部图片
+const downloadAllImages = () => {
+  previewImages.value.forEach((img, index) => {
+    setTimeout(() => {
+      downloadImage(img, index);
+    }, index * 300);
+  });
+  Message.success(`开始下载 ${previewImages.value.length} 张图片`);
+};
+
+// 获取输入框占位符
+const getPlaceholder = (variable: any) => {
+  if (variable.variableType === 'text') {
+    return `请输入 ${variable.variableName}`;
+  } else {
+    return '点击上传图片';
+  }
+};
+
+// 预览单张图片
+const previewImage = (imageUrl: string, index: number) => {
+  // 可以打开一个大图预览
+  Message.info(`预览第 ${index + 1} 张图片`);
+};
+
+// 下载单张图片
+const downloadImage = (imageUrl: string, index: number) => {
+  const link = document.createElement('a');
+  link.download = `batch_${selectedTemplate.value?.name}_${index + 1}.${exportFormat.value}`;
+  link.href = imageUrl;
+  link.click();
+};
+
+// 监听值变化
+const onValueChange = (index: number, varName: string, value: any) => {
+  batchValues.value[index] = {
+    ...batchValues.value[index],
+    [varName]: value,
+  };
+};
+
+// 获取预览值显示
+const getPreviewValue = (variable: any, value: any) => {
+  if (!value) return '(未设置)';
+
+  if (variable.variableType === 'text') {
+    return value;
+  } else {
+    // 图片类型，显示图片名称
+    const asset = mockAssets.find((a) => a.url === value);
+    return asset ? asset.name : value;
+  }
+};
+
+// 初始化预览 Canvas
+const initPreviewCanvas = async (width?: number, height?: number) => {
+  await nextTick();
+  const canvasEl = document.getElementById('preview-canvas') as HTMLCanvasElement | null;
+  if (!canvasEl) return null;
+
+  // 获取模板尺寸
+  // 优先级：传入参数 > selectedTemplate尺寸 > clipPath尺寸 > JSON顶层尺寸 > workspace对象尺寸 > 默认800×600
+  const templateJson = selectedTemplate.value?.json;
+  const clipPath = templateJson?.clipPath;
+  // console.log("clippath");
+  // console.log(clipPath);
+  
+  
+  const workspaceObj = templateJson?.objects?.find((obj: any) => obj.id === 'workspace');
+  const jsonWidth = width ?? clipPath?.width ?? templateJson?.width ?? workspaceObj?.width ?? 800;
+  const jsonHeight = height ?? clipPath?.height ?? templateJson?.height ?? workspaceObj?.height ?? 600;
+
+  if (previewCanvas) {
+    previewCanvas.dispose();
+    previewCanvas = null;
+  }
+
+  // 确保 DOM Canvas 尺寸正确
+  canvasEl.width = jsonWidth;
+  canvasEl.height = jsonHeight;
+
+  // 使用 StaticCanvas 进行非交互式预览渲染
+  previewCanvas = new fabric.StaticCanvas(canvasEl, {
+    backgroundColor: '#ffffff',
+    enableRetinaScaling: true,
+  });
+
+  // 再次设置 Fabric 维度以匹配模板尺寸
+  previewCanvas.setDimensions({ width: jsonWidth, height: jsonHeight });
+
+  return previewCanvas;
+};
+
+// 替换模版中的动态变量
+const replaceVariablesInTemplate = (templateJson: any, values: Record<string, any>): any => {
+  const json = JSON.parse(JSON.stringify(templateJson));
+
+  // 确保保留画布尺寸
+  // 优先级：selectedTemplate尺寸 > clipPath尺寸 > JSON顶层尺寸 > workspace对象尺寸 > 默认800×600
+  const clipPath = json.clipPath;
+  const workspaceObj = json.objects?.find((obj: any) => obj.id === 'workspace');
+  const jsonWidth = clipPath?.width || templateJson?.width || (workspaceObj?.width);
+  const jsonHeight = clipPath?.height || templateJson?.height || (workspaceObj?.height);
+  json.width = jsonWidth || 800;
+  json.height = jsonHeight || 600;
+
+  if (json.objects) {
+    json.objects.forEach((obj: any) => {
+      if (obj.dynamicConfig && obj.dynamicConfig.isDynamic) {
+        const varName = obj.dynamicConfig.variableName;
+        const varType = obj.dynamicConfig.variableType;
+        const value = values[varName];
+
+        console.log('处理动态变量:', { varName, varType, objType: obj.type, value });
+
+        if (value) {
+          // 文本类型变量：替换文本内容
+          if (varType === 'text' && (obj.type === 'textbox' || obj.type === 'text' || obj.type === 'i-text')) {
+            obj.text = value;
+            console.log('替换文本:', varName, '=', value);
+          }
+          // 图片类型变量：在 loadFromJSON 后处理
+          // 这里不做任何处理，保留原对象
+        }
+      }
+    });
+  }
+
+  return json;
+};
+
+// 生成单个预览图片
+const generatePreviewImage = async (
+  templateJson: any,
+  values: Record<string, any>
+): Promise<string> => {
+  return new Promise(async (resolve, reject) => {
+    const canvas = previewCanvas;
+    if (!canvas) {
+      reject(new Error('Canvas not initialized'));
+      return;
+    }
+
+    try {
+      const modifiedJson = replaceVariablesInTemplate(templateJson, values);
+
+      const tempCanvas = new fabric.StaticCanvas(null, {
+        width: modifiedJson.width,
+        height: modifiedJson.height,
+        backgroundColor: '#ffffff',
+      });
+
+      // 先加载 JSON
+      await new Promise((res) => tempCanvas.loadFromJSON(modifiedJson, res));
+
+      const objects = tempCanvas.getObjects();
+      const replacements: Promise<void>[] = [];
+
+      // 遍历所有对象
+      for (const obj of objects) {
+        const config = (obj as any).dynamicConfig;
+        if (!config || !config.isDynamic) continue;
+
+        const value = values[config.variableName];
+        if (!value) continue;
+
+        // 文本替换
+        if (config.variableType === 'text') {
+          obj.set('text', value);
+          continue;
+        }
+
+        // 图片替换（保留层级！）
+        if (config.variableType === 'image') {
+          const promise = new Promise<void>((resolveImg) => {
+            fabric.Image.fromURL(
+              value,
+              (img) => {
+                if (!img) {
+                  console.warn('图片加载失败:', value);
+                  resolveImg();
+                  return;
+                }
+
+                // 等比计算缩放
+                const targetWidth = obj.width!;
+                const originalWidth = img.width!;
+                const originalHeight = img.height!;
+                const scale = targetWidth / originalWidth;
+
+                // 继承原位置、旋转、中心点
+                img.set({
+                  left: obj.left,
+                  top: obj.top,
+                  angle: obj.angle,
+                  originX: obj.originX || 'left',
+                  originY: obj.originY || 'top',
+                  scaleX: scale,
+                  scaleY: scale,
+                });
+
+                // ==========================================
+                // ✅ 关键：保留层级（不是 add，是 insertAt）
+                // ==========================================
+                const index = tempCanvas.getObjects().indexOf(obj);
+                tempCanvas.remove(obj);
+                tempCanvas.insertAt(img, index, false); // 插入到原来的层级位置
+
+                resolveImg();
+              },
+              null,
+              { crossOrigin: 'anonymous' }
+            );
+          });
+
+          replacements.push(promise);
+        }
+      }
+
+      // 等待所有图片加载完成
+      await Promise.all(replacements);
+
+      // 重新渲染
+      tempCanvas.renderAll();
+
+      // 导出图片
+      const dataURL = tempCanvas.toDataURL({
+        format: 'png',
+        quality: 0.8,
+        multiplier: 1,
+      });
+
+      tempCanvas.dispose();
+      resolve(dataURL);
+
+    } catch (error) {
+      console.error('生成预览失败：', error);
+      reject(error);
+    }
+  });
+};
+
+// 等待图片加载完成
+const waitForImagesToLoad = (canvas: fabric.Canvas): Promise<void> => {
+  return new Promise((resolve) => {
+    const images = canvas.getObjects().filter((obj) => obj.type === 'image') as fabric.Image[];
+    if (images.length === 0) {
+      resolve();
+      return;
+    }
+
+    let loadedCount = 0;
+    const checkLoaded = () => {
+      loadedCount++;
+      if (loadedCount >= images.length) {
+        canvas.renderAll();
+        resolve();
+      }
+    };
+
+    images.forEach((img) => {
+      if (img.getElement && img.getElement()) {
+        const imgEl = img.getElement() as HTMLImageElement;
+        if (imgEl.complete) {
+          checkLoaded();
+        } else {
+          imgEl.onload = checkLoaded;
+          imgEl.onerror = checkLoaded; // 即使出错也继续
+        }
+      } else {
+        checkLoaded();
+      }
+    });
+  });
+};
+
+// 预览批量生成
+const previewBatch = async () => {
+  if (!selectedTemplate.value) return;
+
+  // 检查是否所有变量都已填写
+  for (let i = 0; i < batchCount.value; i++) {
+    const values = batchValues.value[i];
+    const hasEmpty = selectedTemplate.value.dynamicVariables.some((v: any) => !values[v.variableName]);
+
+    if (hasEmpty) {
+      Message.warning(`生成项 #${i + 1} 还有未填写的变量，请先填写`);
+      activeBatchTab.value = `batch-${i + 1}`;
+      return;
+    }
+  }
+
+  previewLoading.value = true;
+  currentStep.value = 2;
+  previewImages.value = [];
+
+  try {
+    // 初始化 canvas，让函数自动从模板 JSON 中获取尺寸
+    const canvas = await initPreviewCanvas();
+    if (!canvas) {
+      Message.error('预览初始化失败');
+      currentStep.value = 1;
+      return;
+    }
+
+    // 为每个生成项生成预览图
+    const images: string[] = [];
+    for (let i = 0; i < batchCount.value; i++) {
+      if (!isComponentMounted) break;
+      try {
+        const img = await generatePreviewImage(selectedTemplate.value.json, batchValues.value[i]);
+        images.push(img);
+        if (isComponentMounted) {
+          previewImages.value = images;
+        }
+      } catch (error: any) {
+        console.error(`生成预览 #${i + 1} 失败:`, error);
+        if (error.message && error.message.includes('CORS')) {
+          Message.error(`生成项 #${i + 1} 失败：图片跨域问题，请使用支持 CORS 的图片 URL`);
+          break;
+        }
+      }
+    }
+
+    if (!isComponentMounted) return;
+
+    if (images.length > 0) {
+      Message.success(`已生成 ${images.length} 张预览图`);
+      currentStep.value = 2;
+    } else {
+      Message.warning('预览生成失败，请检查图片 URL 是否支持 CORS 访问');
+    }
+  } catch (error) {
+    console.error('预览生成失败:', error);
+    if (isComponentMounted) {
+      Message.error('预览生成失败：请确保图片 URL 支持 CORS 访问');
+    }
+  } finally {
+    if (isComponentMounted) {
+      previewLoading.value = false;
+    }
+  }
+};
+
+// 处理批量生成
+const handleBatchGenerate = async () => {
+  if (!selectedTemplate.value) return;
+
+  // 验证所有生成项都有值
+  for (let i = 0; i < batchCount.value; i++) {
+    const values = batchValues.value[i];
+    const hasEmpty = selectedTemplate.value.dynamicVariables.some((v: any) => !values[v.variableName]);
+
+    if (hasEmpty) {
+      Message.warning(`生成项 #${i + 1} 还有未填写的变量`);
+      activeBatchTab.value = `batch-${i + 1}`;
+      return;
+    }
+  }
+
+  // 如果还没有预览，先生成预览
+  if (previewImages.value.length === 0) {
+    await previewBatch();
+  }
+
+  // 开始下载所有图片
+  currentStep.value = 3;
+  generating.value = true;
+
+  try {
+    for (let i = 0; i < previewImages.value.length; i++) {
+      downloadImage(previewImages.value[i], i);
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+
+    Message.success(`已成功生成并下载 ${batchCount.value} 张图片！`);
+
+    setTimeout(() => {
+      batchModalVisible.value = false;
+      currentStep.value = 1;
+      previewImages.value = [];
+    }, 1500);
+  } catch (error) {
+    Message.error('生成图片失败');
+  } finally {
+    generating.value = false;
+  }
+};
+
+onMounted(() => {
+  loadTemplates();
+});
+
+onUnmounted(() => {
+  isComponentMounted = false;
+  if (previewCanvas) {
+    previewCanvas.dispose();
+    previewCanvas = null;
+  }
+});
+
+// 暴露方法供外部调用
+defineExpose({
+  loadTemplates,
+  templates,
+});
+</script>
+
+<style lang="less" scoped>
+.local-template-manager {
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding: 0 16px;
+
+    h3 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+  }
+
+  .template-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .template-item {
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    background: #f5f5f5;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+      background: #e8e8e8;
+    }
+
+    &.active {
+      background: #e6f7ff;
+      border: 1px solid #1890ff;
+    }
+  }
+
+  .template-thumbnail {
+    width: 60px;
+    height: 60px;
+    margin-right: 12px;
+
+    .placeholder {
+      width: 100%;
+      height: 100%;
+      background: #ddd;
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #666;
+      font-size: 10px;
+    }
+  }
+
+  .template-info {
+    flex: 1;
+
+    .template-name {
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    .template-meta {
+      font-size: 12px;
+      color: #999;
+      display: flex;
+      gap: 8px;
+
+      .var-count {
+        color: #1890ff;
+      }
+    }
+  }
+
+  .template-actions {
+    margin-left: 8px;
+  }
+
+  .empty-state {
+    padding: 40px 20px;
+    text-align: center;
+  }
+
+  .setup-count {
+    margin-bottom: 16px;
+  }
+
+  .batch-item-config {
+    h5 {
+      margin: 0 0 16px 0;
+      color: #666;
+      font-size: 14px;
+    }
+  }
+
+  .no-variables-hint {
+    padding: 40px 20px;
+    text-align: center;
+    color: #999;
+    background: #f5f5f5;
+    border-radius: 8px;
+
+    p {
+      margin: 0;
+    }
+  }
+
+  .variables-config {
+    max-height: 300px;
+    overflow-y: auto;
+    padding-right: 4px;
+
+    .variable-config-item {
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 10px;
+      padding: 10px 12px;
+      background: #fafafa;
+      border: 1px solid #f0f0f0;
+      border-radius: 6px;
+      transition: border-color 0.2s;
+
+      &:hover {
+        border-color: #d9d9d9;
+      }
+
+      .var-label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 100px;
+
+        .var-name {
+          font-size: 13px;
+          color: #333;
+        }
+      }
+
+      .var-remark {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin: 6px 0 0 0;
+        padding: 4px 8px;
+        background: #fffbe6;
+        border: 1px solid #ffe58f;
+        border-radius: 4px;
+        font-size: 11px;
+        color: #ad8b00;
+
+        .ivu-icon {
+          flex-shrink: 0;
+        }
+      }
+
+      .var-input {
+        flex: 1;
+        margin-top: 8px;
+
+        .image-upload-wrapper {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .uploaded-hint {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          font-size: 12px;
+          color: #52c41a;
+        }
+      }
+    }
+  }
+
+  .preview-section {
+    margin-top: 16px;
+
+    .preview-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+
+      h5 {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 500;
+      }
+
+      .preview-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+    }
+
+    .preview-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      max-height: 400px;
+      overflow-y: auto;
+      padding: 8px;
+      background: #fafafa;
+      border-radius: 8px;
+      justify-content: flex-start;
+      align-items: flex-start;
+    }
+
+    .preview-item {
+      border: 1px solid #e8e8e8;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+      transition: all 0.2s;
+
+      &:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+        transform: translateY(-2px);
+
+        .preview-overlay {
+          opacity: 1;
+        }
+      }
+
+      .preview-image-wrapper {
+        position: relative;
+        display: block;
+        background: #f5f5f5;
+
+        .preview-image {
+          display: block;
+          max-width: 100%;
+          height: auto;
+        }
+
+        .preview-overlay {
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          padding: 8px 12px;
+          background: linear-gradient(transparent, rgba(0, 0, 0, 0.6));
+          opacity: 0;
+          transition: opacity 0.2s;
+
+          .preview-number {
+            font-size: 12px;
+            font-weight: 600;
+            color: #fff;
+          }
+        }
+      }
+    }
+
+    .preview-empty {
+      padding: 48px 20px;
+      text-align: center;
+      color: #999;
+      background: #fafafa;
+      border-radius: 8px;
+      border: 2px dashed #e8e8e8;
+
+      p {
+        margin: 12px 0 0;
+        font-size: 13px;
+      }
+    }
+  }
+
+  .info {
+    color: #999;
+    margin: 8px 0 16px;
+  }
+}
+</style>
+
+<!-- Non-scoped styles for Modal content (teleported to body) -->
+<style lang="less">
+// 批量生成 Modal 内容样式（非 scoped）
+.batch-modal-content {
+  // 步骤指示器
+  .steps-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 32px;
+    padding: 20px;
+
+    .step-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+
+      .step-number {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #f0f0f0;
+        color: #999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 16px;
+        transition: all 0.3s ease;
+      }
+
+      .step-text {
+        font-size: 13px;
+        color: #999;
+        transition: all 0.3s ease;
+      }
+
+      &.active {
+        .step-number {
+          background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+          color: white;
+          box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3);
+        }
+
+        .step-text {
+          color: #1890ff;
+          font-weight: 500;
+        }
+      }
+
+      &.completed {
+        .step-number {
+          background: #52c41a;
+          color: white;
+        }
+
+        .step-text {
+          color: #52c41a;
+        }
+      }
+    }
+
+    .step-line {
+      width: 80px;
+      height: 2px;
+      background: #f0f0f0;
+      margin: 0 8px 32px 8px;
+      transition: all 0.3s ease;
+
+      &.active {
+        background: linear-gradient(90deg, #52c41a 0%, #1890ff 100%);
+      }
+    }
+  }
+
+  // 模板信息卡片
+  .template-info-card {
+    background: linear-gradient(135deg, #f6f9fc 0%, #ffffff 100%);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 1px solid #e8f4ff;
+
+    .template-info-main {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+
+      .template-icon {
+        width: 56px;
+        height: 56px;
+        background: linear-gradient(135deg, #e6f3ff 0%, #f0f9ff 100%);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .template-details {
+        flex: 1;
+
+        .template-name {
+          margin: 0 0 8px 0;
+          font-size: 18px;
+          font-weight: 600;
+          color: #1a1a1a;
+        }
+
+        .template-meta {
+          display: flex;
+          gap: 16px;
+
+          .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 13px;
+            color: #666;
+          }
+
+          .meta-divider {
+            color: #d9d9d9;
+          }
+        }
+      }
+
+      .template-actions {
+        display: flex;
+        align-items: center;
+      }
+    }
+  }
+
+  // 快捷操作栏
+  .quick-actions-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    background: linear-gradient(135deg, #f6f9fc 0%, #ffffff 100%);
+    border-radius: 12px;
+    margin-bottom: 24px;
+    border: 1px solid #e8f4ff;
+
+    .actions-group {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+
+      .action-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+
+        .action-label {
+          font-size: 14px;
+          color: #666;
+          font-weight: 500;
+        }
+      }
+    }
+  }
+
+  // 变量配置区域
+  .variables-section {
+    margin-bottom: 24px;
+
+    .section-header-with-progress {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+
+      .header-left {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex: 1;
+
+        h4 {
+          margin: 0;
+          font-size: 16px;
+          font-weight: 600;
+          color: #1a1a1a;
+        }
+
+        .progress-indicator {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex: 1;
+          max-width: 300px;
+
+          .ivu-progress {
+            flex: 1;
+          }
+
+          .progress-text {
+            font-size: 13px;
+            color: #666;
+            white-space: nowrap;
+          }
+        }
+      }
+
+      .header-right {
+        display: flex;
+        gap: 8px;
+      }
+    }
+
+    .section-header-with-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+
+      h4 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+        color: #1a1a1a;
+      }
+
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+    }
+
+    .batch-tabs {
+      .ivu-tabs-bar {
+        margin-bottom: 16px;
+      }
+    }
+
+    .batch-item-content {
+      min-height: 300px;
+
+      .variables-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 16px;
+
+        .variable-card {
+          background: white;
+          border: 2px solid #e8f4ff;
+          border-radius: 12px;
+          padding: 16px;
+          transition: all 0.3s ease;
+
+          &:hover {
+            border-color: #1890ff;
+            box-shadow: 0 4px 16px rgba(24, 144, 255, 0.1);
+          }
+
+          &.has-value {
+            border-color: #b7eb8f;
+            background: #f6ffed;
+
+            &:hover {
+              border-color: #52c41a;
+            }
+          }
+
+          &.is-required {
+            border-color: #ff7875;
+          }
+
+          .variable-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+
+            .variable-type-icon {
+              width: 36px;
+              height: 36px;
+              border-radius: 8px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+
+              &.type-text {
+                background: linear-gradient(135deg, #e6f7ff 0%, #bae7ff 100%);
+                color: #1890ff;
+              }
+
+              &.type-image {
+                background: linear-gradient(135deg, #f6ffed 0%, #d9f7be 100%);
+                color: #52c41a;
+              }
+            }
+
+            .variable-info {
+              flex: 1;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+
+              .variable-name {
+                font-size: 14px;
+                font-weight: 600;
+                color: #1a1a1a;
+              }
+            }
+
+            .variable-status {
+              flex-shrink: 0;
+            }
+          }
+
+          .variable-remark {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            background: #fffbe6;
+            border-radius: 6px;
+            font-size: 12px;
+            color: #ad8b00;
+            margin-bottom: 12px;
+          }
+
+          .variable-input-area {
+            .image-input-area {
+              .upload-trigger {
+                border: 2px dashed #d9d9d9;
+                border-radius: 8px;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                overflow: hidden;
+
+                &:hover {
+                  border-color: #1890ff;
+                  background: #f0f9ff;
+                }
+
+                &.has-image {
+                  border-style: solid;
+                  border-color: #52c41a;
+                }
+
+                .upload-placeholder {
+                  padding: 24px;
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  gap: 8px;
+                  color: #999;
+
+                  span {
+                    font-size: 13px;
+                  }
+                }
+
+                .upload-preview {
+                  position: relative;
+
+                  img {
+                    width: 100%;
+                    height: 120px;
+                    object-fit: cover;
+                    display: block;
+                  }
+
+                  .upload-overlay {
+                    position: absolute;
+                    inset: 0;
+                    background: rgba(0, 0, 0, 0.6);
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 4px;
+                    color: white;
+                    opacity: 0;
+                    transition: opacity 0.3s ease;
+
+                    span {
+                      font-size: 12px;
+                    }
+                  }
+
+                  &:hover .upload-overlay {
+                    opacity: 1;
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        .empty-variables {
+          text-align: center;
+          padding: 60px 20px;
+          background: linear-gradient(135deg, #fffbe6 0%, #fff7cc 100%);
+          border-radius: 12px;
+          border: 2px dashed #ffe58f;
+
+          .empty-icon {
+            margin-bottom: 16px;
+          }
+
+          h4 {
+            margin: 0 0 8px 0;
+            font-size: 16px;
+            color: #ad8b00;
+          }
+
+          p {
+            margin: 0 0 16px 0;
+            font-size: 14px;
+            color: #ad8b00;
+          }
+        }
+      }
+    }
+  }
+
+  // 预览区域
+  .preview-section {
+    margin-top: 24px;
+
+    .preview-grid-modern {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 16px;
+
+      .preview-card {
+        border-radius: 12px;
+        overflow: hidden;
+        transition: all 0.3s ease;
+        border: 1px solid #e8e8e8;
+        background: white;
+
+        &:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        }
+
+        .preview-image-wrapper {
+          position: relative;
+          aspect-ratio: 1;
+          overflow: hidden;
+          cursor: pointer;
+
+          .preview-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+          }
+
+          .preview-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+            padding: 16px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+
+            .preview-number {
+              position: absolute;
+              top: 12px;
+              left: 12px;
+              background: rgba(0, 0, 0, 0.6);
+              color: white;
+              padding: 6px 12px;
+              border-radius: 16px;
+              font-size: 12px;
+              font-weight: 600;
+            }
+
+            .preview-actions {
+              display: flex;
+              gap: 8px;
+            }
+          }
+
+          &:hover .preview-overlay {
+            opacity: 1;
+          }
+        }
+
+        .preview-footer {
+          padding: 12px;
+          border-top: 1px solid #f0f0f0;
+          text-align: center;
+
+          .preview-name {
+            font-size: 12px;
+            color: #666;
+          }
+        }
+      }
+    }
+
+    .preview-empty-modern {
+      text-align: center;
+      padding: 60px 20px;
+      background: linear-gradient(135deg, #fafbfc 0%, #f5f5f5 100%);
+      border-radius: 12px;
+      border: 2px dashed #e8e8e8;
+
+      .empty-illustration {
+        margin-bottom: 20px;
+
+        .empty-icon-circle {
+          width: 100px;
+          height: 100px;
+          margin: 0 auto;
+          background: white;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        }
+      }
+
+      h4 {
+        margin: 0 0 8px 0;
+        font-size: 16px;
+        color: #333;
+      }
+
+      p {
+        margin: 0;
+        font-size: 14px;
+        color: #999;
+      }
+    }
+  }
+}
+
+// 自定义 Modal 样式
+.batch-generate-modal {
+  .modal-footer-custom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+
+    .footer-left,
+    .footer-right {
+      display: flex;
+      gap: 12px;
+    }
+  }
+}
+
+// 图片预览 Modal
+.image-preview-modal {
+  .image-preview-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 400px;
+    background: #f5f5f5;
+    border-radius: 8px;
+
+    .preview-large-image {
+      max-width: 100%;
+      max-height: 600px;
+      object-fit: contain;
+    }
+  }
+}
+
+// 帮助内容样式
+.help-content {
+  p {
+    margin: 8px 0;
+    font-size: 13px;
+    color: #666;
+    line-height: 1.6;
+  }
+}
+</style>
