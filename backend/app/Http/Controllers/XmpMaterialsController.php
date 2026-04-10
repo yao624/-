@@ -126,6 +126,23 @@ class XmpMaterialsController extends Controller
         return $out;
     }
 
+    private function extractMaterialDisplayName(string $originalName, int $fallbackIndex = 1): string
+    {
+        $baseName = trim((string) pathinfo($originalName, PATHINFO_FILENAME));
+        if ($baseName === '') {
+            return 'material_' . $fallbackIndex;
+        }
+
+        $firstPart = preg_split('/_+/', $baseName, 2)[0] ?? '';
+        $displayName = trim((string) $firstPart);
+
+        if ($displayName === '') {
+            $displayName = $baseName;
+        }
+
+        return $displayName !== '' ? $displayName : ('material_' . $fallbackIndex);
+    }
+
     /**
      * material_type: regular/playable/0/1 or list.
      *
@@ -392,8 +409,22 @@ class XmpMaterialsController extends Controller
             $sortField = 'create_time';
         }
 
-        if ($folderId === null || $folderId === '') {
-            return response()->json(['data' => [], 'totalCount' => 0]);
+        \Illuminate\Support\Facades\Log::debug('Picker Query Debug:', [
+            'ownerId' => $ownerId,
+            'folderId' => $folderId,
+            'globalSearch' => $globalSearch,
+            'material_type' => $request->query('material_type'),
+            'authUserId' => $this->authUserId(),
+        ]);
+
+        // 如果没有传 folderId，且没有进行全局搜索，以前是直接返回空。
+        // 现在修改为：如果没有 folderId，则尝试返回该 owner 下的所有素材（支持“全部素材”视图）
+        if (($folderId === null || $folderId === '') && $globalSearch === '') {
+            // 如果确实需要强制传 folderId 的逻辑，可以保留。
+            // 但为了支持“我的素材库”根节点看到数据，我们允许不传 folderId 时按 ownerId 过滤。
+            if ($ownerId === null || $ownerId === '') {
+                return response()->json(['data' => [], 'totalCount' => 0]);
+            }
         }
 
         // favorites 虚拟入口：前端传 folder_id='favorites'
@@ -494,10 +525,10 @@ class XmpMaterialsController extends Controller
         if ($includeSubfolders) {
             if ($hasDescendantScope && !$descendantFolderIds->isEmpty()) {
                 $baseQuery->whereIn('m.folder_id', $descendantFolderIds->all());
-            } else {
+            } elseif ($folderId !== null && $folderId !== '') {
                 $baseQuery->where('m.folder_id', $folderId);
             }
-        } else {
+        } elseif ($folderId !== null && $folderId !== '') {
             $baseQuery->where('m.folder_id', $folderId);
         }
 
@@ -654,19 +685,40 @@ class XmpMaterialsController extends Controller
         $materialIds = $rows->pluck('id');
 
         $tagsMap = [];
+        $tagsLabelMap = [];
         if (!$materialIds->isEmpty()) {
+            // 约定：mt.tag_id 存的是“标签选项ID”（前端筛选参数 tag_ids 也是该 ID 列表）
             $tagRows = DB::table('meta_material_tags as mt')
-                ->join('meta_tags as t', 't.id', '=', 'mt.tag_id')
                 ->whereIn('mt.material_id', $materialIds->all())
-                ->select(['mt.material_id', 't.name as tag_name'])
+                ->select(['mt.material_id', 'mt.tag_id'])
                 ->get();
 
+            $allOptionIds = [];
             foreach ($tagRows as $tr) {
                 $mid = (string) $tr->material_id;
-                if (!isset($tagsMap[$mid])) {
-                    $tagsMap[$mid] = [];
+                $oid = (int) $tr->tag_id;
+                if (!isset($tagsMap[$mid])) $tagsMap[$mid] = [];
+                $tagsMap[$mid][] = $oid;
+                $allOptionIds[] = $oid;
+            }
+
+            $allOptionIds = array_values(array_unique(array_filter($allOptionIds, fn ($x) => $x > 0)));
+            $optionNameById = [];
+            if (!empty($allOptionIds)) {
+                // meta_tag_options：标签选项表，字段至少包含 id/name
+                $optionNameById = DB::table('meta_tag_options')
+                    ->whereIn('id', $allOptionIds)
+                    ->pluck('name', 'id')
+                    ->toArray();
+            }
+
+            foreach ($tagsMap as $mid => $ids) {
+                $labels = [];
+                foreach ($ids as $id) {
+                    $name = $optionNameById[$id] ?? null;
+                    if ($name) $labels[] = $name;
                 }
-                $tagsMap[$mid][] = $tr->tag_name;
+                $tagsLabelMap[(string) $mid] = $labels;
             }
         }
 
@@ -722,7 +774,10 @@ class XmpMaterialsController extends Controller
                 'type' => $type,
                 'name' => $m->material_name,
                 'localId' => $m->local_id,
+                // tags：保留旧字段名，但其语义在素材库里是“标签选项ID列表”
                 'tags' => $tagsMap[(string) $m->id] ?? [],
+                // tags_label：直接返回标签名 label（前端列表展示用）
+                'tags_label' => $tagsLabelMap[(string) $m->id] ?? [],
                 'thumbnail' => $m->thumbnail_url ?: $m->file_url,
                 'width' => $m->width !== null && $m->width !== '' ? (int) $m->width : null,
                 'height' => $m->height !== null && $m->height !== '' ? (int) $m->height : null,
@@ -1054,19 +1109,39 @@ class XmpMaterialsController extends Controller
 
         $materialIds = $rows->pluck('id');
         $tagsMap = [];
+        $tagsLabelMap = [];
         if (!$materialIds->isEmpty()) {
+            // 约定：mt.tag_id 存的是“标签选项ID”（前端筛选参数 tag_ids 也是该 ID 列表）
             $tagRows = DB::table('meta_material_tags as mt')
-                ->join('meta_tags as t', 't.id', '=', 'mt.tag_id')
                 ->whereIn('mt.material_id', $materialIds->all())
-                ->select(['mt.material_id', 't.name as tag_name'])
+                ->select(['mt.material_id', 'mt.tag_id'])
                 ->get();
 
+            $allOptionIds = [];
             foreach ($tagRows as $tr) {
                 $mid = (string) $tr->material_id;
-                if (!isset($tagsMap[$mid])) {
-                    $tagsMap[$mid] = [];
+                $oid = (int) $tr->tag_id;
+                if (!isset($tagsMap[$mid])) $tagsMap[$mid] = [];
+                $tagsMap[$mid][] = $oid;
+                $allOptionIds[] = $oid;
+            }
+
+            $allOptionIds = array_values(array_unique(array_filter($allOptionIds, fn ($x) => $x > 0)));
+            $optionNameById = [];
+            if (!empty($allOptionIds)) {
+                $optionNameById = DB::table('meta_tag_options')
+                    ->whereIn('id', $allOptionIds)
+                    ->pluck('name', 'id')
+                    ->toArray();
+            }
+
+            foreach ($tagsMap as $mid => $ids) {
+                $labels = [];
+                foreach ($ids as $id) {
+                    $name = $optionNameById[$id] ?? null;
+                    if ($name) $labels[] = $name;
                 }
-                $tagsMap[$mid][] = $tr->tag_name;
+                $tagsLabelMap[(string) $mid] = $labels;
             }
         }
 
@@ -1123,6 +1198,7 @@ class XmpMaterialsController extends Controller
                 'name' => $m->material_name,
                 'localId' => $m->local_id,
                 'tags' => $tagsMap[(string) $m->id] ?? [],
+                'tags_label' => $tagsLabelMap[(string) $m->id] ?? [],
                 'thumbnail' => $m->thumbnail_url ?: $m->file_url,
                 'width' => $m->width !== null && $m->width !== '' ? (int) $m->width : null,
                 'height' => $m->height !== null && $m->height !== '' ? (int) $m->height : null,
@@ -1376,8 +1452,7 @@ class XmpMaterialsController extends Controller
                 $ext = strtolower($file->getClientOriginalExtension() ?: '');
                 $fileFormat = $ext !== '' ? $ext : null;
 
-                $materialNameBase = pathinfo($originalName, PATHINFO_FILENAME);
-                $materialName = $materialNameBase !== '' ? $materialNameBase : ('material_' . ($idx + 1));
+                $materialName = $this->extractMaterialDisplayName($originalName, $idx + 1);
 
                 // local_id 批次内唯一：支持单次上传多文件（图/视频）稳定落库
                 $localId = $sanitizeCode($batchCode . '_' . str_pad((string) ($idx + 1), 3, '0', STR_PAD_LEFT));
@@ -1835,12 +1910,45 @@ class XmpMaterialsController extends Controller
             return response()->json(['message' => 'unauthorized'], 403);
         }
 
+        $requestTagModeRaw = $request->input('tag_mode', null);
+        $effectiveTagMode = (int) $session->tag_mode;
+        if ($requestTagModeRaw !== null) {
+            $requestTagMode = strtolower(trim((string) $requestTagModeRaw));
+            if ($requestTagMode === 'smart') {
+                $effectiveTagMode = 1;
+            } elseif ($requestTagMode === 'unified') {
+                $effectiveTagMode = 0;
+            }
+        }
+
         $tagIds = [];
         if (!empty($session->tag_ids_json)) {
             $decoded = json_decode((string) $session->tag_ids_json, true);
             if (is_array($decoded)) $tagIds = $decoded;
         }
         $tagIds = array_values(array_filter(array_map(static fn($v) => is_numeric($v) ? (int) $v : null, $tagIds), static fn($v) => $v !== null));
+
+        if ($request->has('tag_ids')) {
+            $requestTagIds = $request->input('tag_ids', []);
+            if (!is_array($requestTagIds)) {
+                $requestTagIds = [$requestTagIds];
+            }
+            $tagIds = array_values(array_filter(array_map(static fn($v) => is_numeric($v) ? (int) $v : null, $requestTagIds), static fn($v) => $v !== null));
+        }
+
+        $smartTagMappings = [];
+        $smartTagMappingsRaw = $request->input('smart_tag_mappings', []);
+        if (is_array($smartTagMappingsRaw)) {
+            foreach ($smartTagMappingsRaw as $mapping) {
+                if (!is_array($mapping)) continue;
+                $fileKey = trim((string) ($mapping['file_key'] ?? ''));
+                if ($fileKey === '') continue;
+                $mappingTagIds = $mapping['tag_ids'] ?? [];
+                if (!is_array($mappingTagIds)) $mappingTagIds = [$mappingTagIds];
+                $mappingTagIds = array_values(array_filter(array_map(static fn($v) => is_numeric($v) ? (int) $v : null, $mappingTagIds), static fn($v) => $v !== null));
+                $smartTagMappings[$fileKey] = $mappingTagIds;
+            }
+        }
 
         $publicDisk = Storage::disk('public');
         $diskDirDate = now()->format('Y-m-d');
@@ -1931,8 +2039,7 @@ class XmpMaterialsController extends Controller
                 $ext = $ext !== '' ? $ext : null;
                 $fileFormat = $ext !== null ? $ext : null;
 
-                $materialNameBase = pathinfo($fileName, PATHINFO_FILENAME);
-                $materialName = $materialNameBase !== '' ? $materialNameBase : ('material_' . ((int) $fileIndex + 1));
+                $materialName = $this->extractMaterialDisplayName($fileName, ((int) $fileIndex + 1));
 
                 $localId = $sanitizeCode($batchCode . '_' . str_pad((string) ($fileIndex + 1), 3, '0', STR_PAD_LEFT));
 
@@ -2074,14 +2181,21 @@ class XmpMaterialsController extends Controller
                     'deleted_at' => null,
                 ]);
 
-                if (!empty($tagIds)) {
+                $effectiveTagIds = $tagIds;
+                if (array_key_exists($fileKey, $smartTagMappings)) {
+                    $effectiveTagIds = $smartTagMappings[$fileKey] ?? [];
+                } elseif ($effectiveTagMode === 1) {
+                    $effectiveTagIds = [];
+                }
+
+                if (!empty($effectiveTagIds)) {
                     $rows = array_map(static function ($tagId) use ($materialId, $now) {
                         return [
                             'material_id' => (string) $materialId,
                             'tag_id' => (int) $tagId,
                             'create_time' => $now,
                         ];
-                    }, $tagIds);
+                    }, $effectiveTagIds);
                     if (!empty($rows)) {
                         DB::table('meta_material_tags')->insert($rows);
                     }
@@ -2517,27 +2631,30 @@ class XmpMaterialsController extends Controller
             $tagNames = array_values(array_unique(array_filter($tagNames, static fn($v) => $v !== null && $v !== '')));
 
             if (!empty($tagNames)) {
+                // 1) 先查已有标签（根据当前 schema: meta_tags.name）
                 $existing = DB::table('meta_tags')
                     ->whereIn('name', $tagNames)
-                    ->select(['id', 'name as tag_name'])
+                    ->select(['id', 'name'])
                     ->get();
 
                 $existingByName = [];
                 foreach ($existing as $row) {
-                    $existingByName[(string) $row->tag_name] = (int) $row->id;
+                    $existingByName[(string) $row->name] = (int) $row->id;
                 }
 
+                // 2) 计算缺失的标签名，按当前表结构插入
                 $missing = array_values(array_diff($tagNames, array_keys($existingByName)));
                 if (!empty($missing)) {
-                    $insertRows = array_map(static function ($name) use ($now) {
+                    $insertRows = array_map(static function ($name) {
                         return [
                             'name' => (string) $name,
                             'remark' => null,
-                            'folder_id' => null,
+                            // 按照提供的 meta_tags 结构：folder_id NOT NULL
+                            // 这里用 0 作为“无文件夹”的占位值，避免违反非空约束
+                            'folder_id' => 0,
                             'tag_object' => null,
                             'tag_object_level1' => null,
                             'sort' => 0,
-                            'create_time' => $now,
                         ];
                     }, $missing);
 
@@ -2545,9 +2662,10 @@ class XmpMaterialsController extends Controller
                     DB::table('meta_tags')->insertOrIgnore($insertRows);
                 }
 
+                // 3) 再次查询，获取所有对应 id
                 $existing = DB::table('meta_tags')
                     ->whereIn('name', $tagNames)
-                    ->select(['id', 'name as tag_name'])
+                    ->select(['id', 'name'])
                     ->get();
 
                 foreach ($existing as $row) {
@@ -3010,7 +3128,7 @@ class XmpMaterialsController extends Controller
             $tagRows = DB::table('meta_material_tags as mt')
                 ->join('meta_tags as t', 't.id', '=', 'mt.tag_id')
                 ->whereIn('mt.material_id', $materialIds)
-                ->select(['mt.material_id', 't.name as tag_name'])
+                ->select(['mt.material_id', DB::raw('t.`name` as tag_name')])
                 ->get();
 
             foreach ($tagRows as $tr) {
@@ -3544,6 +3662,100 @@ class XmpMaterialsController extends Controller
         return response()->json([
             'data' => $data,
             'totalCount' => count($data),
+        ]);
+    }
+
+    /**
+     * 快速上传素材（测试专用，由 Meta 广告创建链路按需触发）
+     * POST /material-library/materials/quick-upload
+     */
+    public function quickUpload(Request $request)
+    {
+        $file = $request->file('file');
+        if (!$file) {
+            return response()->json(['message' => 'No file uploaded'], 422);
+        }
+
+        $ownerId = $this->authUserId();
+        if (!$ownerId) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        // 默认文件夹处理：查找或创建名为“快速上传”的文件夹
+        $folder = DB::table('meta_folders')
+            ->where('owner_id', $ownerId)
+            ->where('folder_name', '快速上传')
+            ->whereNull('deleted_at')
+            ->first();
+
+        if (!$folder) {
+            // 找到或创建一个库根节点
+            $rootFolder = DB::table('meta_folders')
+                ->where('owner_id', $ownerId)
+                ->where('parent_id', 0)
+                ->whereNull('deleted_at')
+                ->first();
+            
+            $parentId = $rootFolder ? $rootFolder->id : 0;
+            $path = $rootFolder ? ($rootFolder->folder_path . '/快速上传') : '/快速上传';
+
+            $folderId = DB::table('meta_folders')->insertGetId([
+                'folder_name' => '快速上传',
+                'parent_id' => $parentId,
+                'folder_path' => $path,
+                'library_type' => $rootFolder ? $rootFolder->library_type : 'my',
+                'owner_id' => $ownerId,
+                'level' => $rootFolder ? ($rootFolder->level + 1) : 1,
+                'sort_order' => 99,
+                'create_time' => now(),
+            ]);
+        } else {
+            $folderId = $folder->id;
+        }
+
+        // 文件处理逻辑
+        $now = now();
+        $originalName = $file->getClientOriginalName();
+        $ext = strtolower($file->getClientOriginalExtension() ?: '');
+        $fileFormat = $ext !== '' ? $ext : null;
+        $materialName = $this->extractMaterialDisplayName($originalName, (int) $now->timestamp);
+        
+        $diskDir = 'xmp_materials/' . $now->format('Y-m-d');
+        $hashName = $file->hashName();
+        $publicDisk = Storage::disk('public');
+        if (!$publicDisk->exists($diskDir)) {
+            $publicDisk->makeDirectory($diskDir);
+        }
+        $path = $file->storeAs($diskDir, $hashName, 'public');
+        $fileUrl = Storage::url($path);
+        
+        // 类型判断
+        $videoExts = ['mp4', 'mov', 'webm', 'm4v', 'avi', 'mkv'];
+        $materialType = in_array($ext, $videoExts, true) ? 1 : 0;
+        
+        $id = DB::table('meta_materials')->insertGetId([
+            'local_id' => 'QUICK_' . $now->format('Hisv'),
+            'material_name' => $materialName,
+            'file_url' => $fileUrl,
+            'thumbnail_url' => $materialType === 0 ? $fileUrl : null,
+            'file_format' => $fileFormat,
+            'file_size' => $file->getSize(),
+            'material_type' => $materialType,
+            'folder_id' => $folderId,
+            'upload_status' => 1,
+            'audit_status' => 0,
+            'source' => 'quick_test',
+            'create_time' => $now,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'id' => (string)$id,
+                'name' => $materialName,
+                'url' => $fileUrl,
+                'type' => $materialType === 1 ? 'video' : 'image',
+            ]
         ]);
     }
 }

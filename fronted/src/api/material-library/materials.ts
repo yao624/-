@@ -54,8 +54,8 @@ export async function uploadTempSessionFilesStatus(sessionId: number | string) {
   });
 }
 
-export async function uploadTempSessionCommit(sessionId: number | string) {
-  return request.post<any, any>(`/material-library/materials/upload-temp/session/${sessionId}/commit`, {}, {
+export async function uploadTempSessionCommit(sessionId: number | string, payload?: Record<string, any>) {
+  return request.post<any, any>(`/material-library/materials/upload-temp/session/${sessionId}/commit`, payload || {}, {
     baseURL: getMaterialLibraryBaseURL(),
   });
 }
@@ -155,4 +155,3 @@ export async function getMaterialUsages(materialId: number | string) {
     baseURL: getMaterialLibraryBaseURL(),
   });
 }
-

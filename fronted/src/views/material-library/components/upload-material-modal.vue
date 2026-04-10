@@ -95,7 +95,7 @@
         <div v-if="fileUploads.length" class="upload-progress-list">
           <div v-for="f in fileUploads" :key="f.fileKey" class="upload-progress-item">
             <div class="upload-progress-top">
-              <span class="upload-progress-filename" :title="f.fileName">{{ f.fileName }}</span>
+              <span class="upload-progress-filename" :title="f.fileName">{{ f.displayName }}</span>
               <span class="upload-progress-percent">{{ f.progress }}%</span>
             </div>
             <a-progress
@@ -104,6 +104,52 @@
             />
             <div v-if="f.status === 'error'" class="upload-progress-error">
               {{ f.errorMessage || t('上传失败') }}
+            </div>
+          </div>
+        </div>
+        <div v-if="formData.tagMode === 'smart' && fileUploads.length" class="smart-tag-panel">
+          <div class="smart-tag-panel-head">
+            <div class="smart-tag-panel-title">{{ t('标签智能识别') }}</div>
+            <div class="smart-tag-panel-desc">{{ t('按文件名中的 tag[...] 规则识别，每个素材单独确认标签') }}</div>
+          </div>
+          <div class="smart-tag-list">
+            <div v-for="f in fileUploads" :key="`smart-${f.fileKey}`" class="smart-tag-item">
+              <div class="smart-tag-item-head">
+                <div class="smart-tag-file-name" :title="f.fileName">{{ f.displayName }}</div>
+                <div class="smart-tag-status" :class="{ empty: !f.smartTagSelectedIds.length }">
+                  {{ f.smartTagSelectedIds.length ? `${t('已选')} ${f.smartTagSelectedIds.length} ${t('个标签')}` : t('暂无标签') }}
+                </div>
+              </div>
+              <div class="smart-tag-meta-row">
+                <span class="smart-tag-meta-label">{{ t('自动识别') }}:</span>
+                <span class="smart-tag-meta-value">{{ getSmartTagSummaryText(f) }}</span>
+              </div>
+              <div v-if="getDuplicateFileNameHint(f)" class="smart-tag-meta-row warning">
+                <span class="smart-tag-meta-label">{{ t('同名提示') }}:</span>
+                <span class="smart-tag-meta-value">{{ getDuplicateFileNameHint(f) }}</span>
+              </div>
+              <div v-if="f.smartTagUnmatchedNames.length" class="smart-tag-meta-row warning">
+                <span class="smart-tag-meta-label">{{ t('未匹配') }}:</span>
+                <span class="smart-tag-meta-value">{{ f.smartTagUnmatchedNames.join('、') }}</span>
+              </div>
+              <div v-if="f.smartTagAmbiguousNames.length" class="smart-tag-meta-row warning">
+                <span class="smart-tag-meta-label">{{ t('重名待确认') }}:</span>
+                <span class="smart-tag-meta-value">{{ f.smartTagAmbiguousNames.join('、') }}</span>
+              </div>
+              <div v-if="f.smartTagParseWarnings.length" class="smart-tag-meta-row warning">
+                <span class="smart-tag-meta-label">{{ t('规则提示') }}:</span>
+                <span class="smart-tag-meta-value">{{ f.smartTagParseWarnings.join('；') }}</span>
+              </div>
+              <TagSelect
+                :model-value="f.smartTagSelectedIds"
+                :tag-folders="metaTagFolders"
+                :tags="metaTags"
+                :tag-options="metaTagOptions"
+                :creatable="true"
+                :create-option-api="handleCreateMetaTagOption"
+                :placeholder="t('请选择标签')"
+                @update:modelValue="(vals) => handleSmartTagSelectionChange(f.fileKey, vals)"
+              />
             </div>
           </div>
         </div>
@@ -122,16 +168,17 @@
             <a-radio-button value="smart">{{ t('智能识别') }}</a-radio-button>
           </a-radio-group>
         </div>
-        <a-select
-          v-model:value="formData.tags"
-          mode="multiple"
+        <TagSelect
+          v-if="formData.tagMode === 'unified'"
+          v-model="metaTagOptionSelectedIds"
+          :tag-folders="metaTagFolders"
+          :tags="metaTags"
+          :tag-options="metaTagOptions"
+          :creatable="true"
+          :create-option-api="handleCreateMetaTagOption"
           :placeholder="t('请选择')"
           style="width: 100%; margin-top: 8px"
-        >
-          <a-select-option v-for="tag in tags" :key="tag.id" :value="tag.id">
-            {{ tag.name }}
-          </a-select-option>
-        </a-select>
+        />
       </a-form-item>
 
       <!-- 设计师 -->
@@ -268,7 +315,9 @@ import {
   UserOutlined,
   BankOutlined,
 } from '@ant-design/icons-vue';
+import TagSelect from '@/components/tag-select/index.vue';
 import { useUserStore } from '@/store/user';
+import { getMetaTagsTree, createTagOption } from '@/api/promotion';
 import {
   getMaterialLibraryFolders,
   getMaterialLibraryFolderChildren,
@@ -353,6 +402,7 @@ type UploadFileItem = {
   fileKey: string;
   fileIndex: number;
   fileName: string;
+  displayName: string;
   fileSize: number;
   relativePath: string | null;
   chunkTotal: number;
@@ -361,6 +411,13 @@ type UploadFileItem = {
   status: 'pending' | 'uploading' | 'done' | 'error';
   errorMessage?: string;
   rawFile: File;
+  smartTagParsedNames: string[];
+  smartTagMatchedIds: number[];
+  smartTagSelectedIds: number[];
+  smartTagUnmatchedNames: string[];
+  smartTagAmbiguousNames: string[];
+  smartTagParseWarnings: string[];
+  smartTagTouched: boolean;
 };
 
 const fileUploads = ref<UploadFileItem[]>([]);
@@ -406,6 +463,190 @@ const getFolderDisplayName = (folder: any): string => {
 const tags = ref<any[]>([]);
 const designers = ref<any[]>([]);
 const creators = ref<any[]>([]);
+const metaTagFolders = ref<Array<{ id: number; name: string }>>([]);
+const metaTags = ref<Array<{ id: number; folder_id: number; name: string }>>([]);
+const metaTagOptions = ref<any[]>([]);
+const metaTagOptionSelectedIds = computed<number[]>({
+  get() {
+    const v = formData.value.tags;
+    return Array.isArray(v) ? v.map((x: any) => Number(x)).filter((x: number) => Number.isFinite(x)) : [];
+  },
+  set(vals) {
+    formData.value.tags = Array.isArray(vals) ? vals : [];
+  },
+});
+
+const metaTagOptionNameMap = computed(() => {
+  const map = new Map<number, string>();
+  const walk = (options: any[]) => {
+    (options || []).forEach((option: any) => {
+      const id = Number(option?.id);
+      if (Number.isFinite(id)) {
+        map.set(id, String(option?.name ?? id));
+      }
+      if (Array.isArray(option?.children) && option.children.length) {
+        walk(option.children);
+      }
+    });
+  };
+  walk(metaTagOptions.value || []);
+  return map;
+});
+
+const normalizeSmartTagToken = (value: string) =>
+  String(value || '')
+    .trim()
+    .replace(/[，]/g, ',')
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+
+const normalizeSmartTagLookupToken = (value: string) =>
+  normalizeSmartTagToken(value)
+    .replace(/[，、；;]/g, ',')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const normalizedMetaTagOptionMap = computed(() => {
+  const map = new Map<string, Array<{ id: number; name: string }>>();
+  const walk = (options: any[]) => {
+    (options || []).forEach((option: any) => {
+      const id = Number(option?.id);
+      const name = String(option?.name ?? '').trim();
+      const normalized = normalizeSmartTagLookupToken(name);
+      if (Number.isFinite(id) && normalized) {
+        const current = map.get(normalized) || [];
+        current.push({ id, name });
+        map.set(normalized, current);
+      }
+      if (Array.isArray(option?.children) && option.children.length) {
+        walk(option.children);
+      }
+    });
+  };
+  walk(metaTagOptions.value || []);
+  return map;
+});
+
+const duplicateFileNameCountMap = computed(() => {
+  const map = new Map<string, number>();
+  fileUploads.value.forEach((item) => {
+    const fileName = String(item?.fileName || '').trim();
+    if (!fileName) return;
+    map.set(fileName, (map.get(fileName) || 0) + 1);
+  });
+  return map;
+});
+
+const getDuplicateFileNameHint = (item: UploadFileItem) => {
+  const count = duplicateFileNameCountMap.value.get(String(item?.fileName || '').trim()) || 0;
+  if (count <= 1) return '';
+  return `当前批次中有 ${count} 个同名文件，系统会按 file_key 区分，不会串到一起`;
+};
+
+const extractMaterialDisplayName = (fileName: string) => {
+  const baseName = String(fileName || '').replace(/\.[^.]+$/, '').trim();
+  if (!baseName) return '未命名素材';
+  const firstPart = baseName.split(/_+/)[0]?.trim() || '';
+  return firstPart || baseName;
+};
+
+const parseSmartTagInfoFromFileName = (fileName: string) => {
+  const baseName = String(fileName || '').replace(/\.[^.]+$/, '');
+  const matches = [...baseName.matchAll(/tag\[(.*?)\]/gi)];
+  const warnings: string[] = [];
+  const sawTagBlock = /tag\[/i.test(baseName);
+
+  if (sawTagBlock && !matches.length) {
+    warnings.push('检测到 tag[ 但格式不完整，请检查是否缺少 ]');
+  }
+
+  const results: string[] = [];
+  const seen = new Set<string>();
+  matches.forEach((match) => {
+    const content = String(match?.[1] || '');
+    if (/[，、；;]/.test(content)) {
+      warnings.push('已兼容中文分隔符，建议统一使用英文逗号 ,');
+    }
+    content
+      .split(/[,\uff0c\u3001;\uff1b]/)
+      .map((item) => String(item || '').trim())
+      .filter(Boolean)
+      .forEach((item) => {
+        const normalized = normalizeSmartTagLookupToken(item);
+        if (!normalized || seen.has(normalized)) return;
+        seen.add(normalized);
+        results.push(item);
+      });
+  });
+
+  if (sawTagBlock && results.length === 0 && !warnings.length) {
+    warnings.push('已检测到标签规则，但没有解析出有效标签');
+  }
+
+  return {
+    names: results,
+    warnings: Array.from(new Set(warnings)),
+  };
+};
+
+const resolveSmartTagResult = (names: string[]) => {
+  const matchedIds: number[] = [];
+  const unmatchedNames: string[] = [];
+  const ambiguousNames: string[] = [];
+
+  names.forEach((name) => {
+    const normalized = normalizeSmartTagLookupToken(name);
+    const candidates = normalizedMetaTagOptionMap.value.get(normalized) || [];
+    if (candidates.length === 1) {
+      matchedIds.push(candidates[0].id);
+      return;
+    }
+    if (candidates.length > 1) {
+      ambiguousNames.push(name);
+      return;
+    }
+    unmatchedNames.push(name);
+  });
+
+  return {
+    matchedIds: Array.from(new Set(matchedIds)),
+    unmatchedNames,
+    ambiguousNames,
+  };
+};
+
+const applySmartTagRecognition = (item: UploadFileItem) => {
+  const parsed = parseSmartTagInfoFromFileName(item.fileName);
+  const resolved = resolveSmartTagResult(parsed.names);
+  item.smartTagParsedNames = parsed.names;
+  item.smartTagMatchedIds = resolved.matchedIds;
+  item.smartTagUnmatchedNames = resolved.unmatchedNames;
+  item.smartTagAmbiguousNames = resolved.ambiguousNames;
+  item.smartTagParseWarnings = parsed.warnings;
+  if (!item.smartTagTouched) {
+    item.smartTagSelectedIds = [...resolved.matchedIds];
+  }
+};
+
+const refreshSmartTagRecognition = () => {
+  fileUploads.value.forEach((item) => applySmartTagRecognition(item));
+};
+
+const handleSmartTagSelectionChange = (fileKey: string, values: number[]) => {
+  const target = fileUploads.value.find((item) => item.fileKey === fileKey);
+  if (!target) return;
+  target.smartTagTouched = true;
+  target.smartTagSelectedIds = Array.isArray(values) ? values : [];
+};
+
+const getSmartTagSummaryText = (item: UploadFileItem) => {
+  const labels = item.smartTagMatchedIds
+    .map((id) => metaTagOptionNameMap.value.get(id) || String(id))
+    .filter(Boolean);
+  if (labels.length) return labels.join('、');
+  if (item.smartTagParsedNames.length) return item.smartTagParsedNames.join('、');
+  return t('文件名中未识别到 tag[...] 规则');
+};
 
 // 素材组
 const materialGroups = ref<any[]>([]);
@@ -714,6 +955,7 @@ const loadData = async () => {
     tags.value = tRes.data || [];
     designers.value = dRes.data || [];
     creators.value = cRes.data || [];
+    await loadMetaTagsTree();
     await loadMaterialGroups(groupKeyword.value);
   } catch (error) {
     console.error('加载数据失败:', error);
@@ -730,6 +972,29 @@ const loadMaterialGroups = async (keyword = '') => {
   } finally {
     groupLoading.value = false;
   }
+};
+
+const loadMetaTagsTree = async () => {
+  try {
+    const res = await getMetaTagsTree();
+    const { tagFolders = [], tags = [], tagOptions = [] } = res?.data ?? {};
+    metaTagFolders.value = Array.isArray(tagFolders) ? tagFolders : [];
+    metaTags.value = Array.isArray(tags) ? tags : [];
+    metaTagOptions.value = Array.isArray(tagOptions) ? tagOptions : [];
+  } catch (error) {
+    console.error('加载标签树失败:', error);
+    metaTagFolders.value = [];
+    metaTags.value = [];
+    metaTagOptions.value = [];
+  }
+};
+
+const handleCreateMetaTagOption = async (tagId: number, name: string, parentId: number, isTagLevel: boolean) => {
+  const payload = isTagLevel
+    ? { tag_id: tagId, name, parent_id: 0 }
+    : { name, parent_id: parentId };
+  await createTagOption(payload);
+  await loadMetaTagsTree();
 };
 
 const handleGroupSearch = (value: string) => {
@@ -900,13 +1165,13 @@ const calcChunkTotal = (size: number) => {
   return Math.max(1, Math.ceil(s / CHUNK_SIZE));
 };
 
-const makeFileKey = (rawFile: File, relativePath: string | null) => {
+const makeFileKey = (rawFile: File, relativePath: string | null, sequence: number) => {
   const size = Number(rawFile.size || 0);
   const lastModified = Number((rawFile as any).lastModified || 0);
   if (relativePath) {
-    return `p:${relativePath}|s:${size}|t:${lastModified}`;
+    return `p:${relativePath}|s:${size}|t:${lastModified}|n:${sequence}`;
   }
-  return `f:${rawFile.name}|s:${size}|t:${lastModified}`;
+  return `f:${rawFile.name}|s:${size}|t:${lastModified}|n:${sequence}`;
 };
 
 const validateAndGetFolderIdOrError = async (): Promise<string | null> => {
@@ -974,23 +1239,19 @@ const computeResumeKey = (normalizedFolderId: string) => {
 };
 
 const buildFilesManifest = () => {
-  const rawFiles = (fileList.value || [])
-    .map((item: any) => getUploadRawFile(item))
-    .filter((f: File | null): f is File => !!f);
-
   const uploadModeValue = uploadMode.value;
-  return rawFiles.map((rawFile, idx) => {
-    const relativePathRaw = uploadModeValue === 'folder' ? String((rawFile as any).webkitRelativePath || '') : '';
-    const relativePath = relativePathRaw ? relativePathRaw : null;
-    const fileKey = makeFileKey(rawFile, relativePath);
-    const chunkTotal = calcChunkTotal(rawFile.size || 0);
+  return fileUploads.value.map((item, idx) => {
     return {
-      file_key: fileKey,
-      file_name: rawFile.name,
-      file_size: rawFile.size || 0,
+      file_key: item.fileKey,
+      file_name: item.fileName,
+      file_size: item.fileSize || 0,
       file_index: idx,
-      chunk_total: chunkTotal,
-      relative_path: uploadModeValue === 'folder' ? relativePath : null,
+      chunk_total: item.chunkTotal,
+      relative_path: uploadModeValue === 'folder' ? item.relativePath : null,
+      smart_tag_ids:
+        formData.value.tagMode === 'smart'
+          ? (item.smartTagSelectedIds || [])
+          : [],
     };
   });
 };
@@ -1121,6 +1382,8 @@ const ensureSessionInitAndStart = async () => {
     folder_id: folderId,
     upload_mode: uploadMode.value,
     material_type: formData.value.materialType === 'playable' ? 'playable' : 'regular',
+    // 过滤重复素材：由后端在入库/提交阶段做最终判定（前端也会做一层批次内去重）
+    filter_duplicate: !!formData.value.filterDuplicate,
     tag_mode: formData.value.tagMode,
     designer_mode: formData.value.designerMode,
     creator_mode: formData.value.creatorMode,
@@ -1180,7 +1443,81 @@ const handleFileChange = async (info: any) => {
     message.warning(t(`单次最多上传 ${MAX_UPLOAD_COUNT} 条素材`));
   }
 
-  fileList.value = next;
+  const dedupeFileListIfNeeded = (items: any[]) => {
+    // 业务要求：
+    // - 场景1：同一批选择内去重后再上传
+    // - 场景2：未提交时再次选择“同名素材”要提示并跳过上传
+    // - 文件名不同则允许上传（不按内容/文件大小做去重）
+    if (!formData.value.filterDuplicate) return { items, removed: 0, removedKeys: [] as string[] };
+    const uploadModeValue = uploadMode.value;
+    const getDedupeKey = (it: any) => {
+      const rawFile = getUploadRawFile(it);
+      if (!rawFile) return '';
+      // 文件夹上传时：用相对路径区分同名文件（不同目录允许）
+      if (uploadModeValue === 'folder') {
+        const p = String((rawFile as any).webkitRelativePath || '').trim();
+        return p || String(rawFile.name || '').trim();
+      }
+      // 普通上传：仅按文件名去重（同名视为重复）
+      return String(rawFile.name || '').trim();
+    };
+
+    const kept: any[] = [];
+    const removedKeys: string[] = [];
+    const seen = new Set<string>();
+    let removed = 0;
+
+    for (const it of items || []) {
+      const key = getDedupeKey(it);
+      if (!key) continue;
+      if (seen.has(key)) {
+        removed += 1;
+        removedKeys.push(key);
+        continue;
+      }
+      seen.add(key);
+      kept.push(it);
+    }
+    return { items: kept, removed, removedKeys };
+  };
+
+  const prevList = fileList.value || [];
+  const prevDeduped = dedupeFileListIfNeeded(prevList);
+  const prevKeyHash = prevDeduped.items
+    .map((x: any) => {
+      const raw = getUploadRawFile(x);
+      if (!raw) return '';
+      if (uploadMode.value === 'folder') return String((raw as any).webkitRelativePath || raw.name || '').trim();
+      return String(raw.name || '').trim();
+    })
+    .filter(Boolean)
+    .sort()
+    .join('|');
+
+  const deduped = dedupeFileListIfNeeded(next);
+  const nextKeyHash = deduped.items
+    .map((x: any) => {
+      const raw = getUploadRawFile(x);
+      if (!raw) return '';
+      if (uploadMode.value === 'folder') return String((raw as any).webkitRelativePath || raw.name || '').trim();
+      return String(raw.name || '').trim();
+    })
+    .filter(Boolean)
+    .sort()
+    .join('|');
+
+  // 如果用户只是又选了一次已存在的素材（去重后集合不变），提示并不触发后续上传流程
+  if (deduped.removed > 0 && nextKeyHash === prevKeyHash) {
+    message.warning(t(`检测到重复素材，已跳过本次上传（${deduped.removed} 个）`));
+    // 关键：Ant Upload 可能已把重复项写入 v-model，这里把 UI 列表回滚到“去重后的旧列表”
+    fileList.value = prevDeduped.items;
+    return;
+  }
+
+  fileList.value = deduped.items;
+  if (deduped.removed > 0) {
+    message.warning(t(`检测到重复素材，已跳过（${deduped.removed} 个）`));
+  }
   sessionState.cancelRequested = false;
   sessionState.committed = false;
 
@@ -1196,12 +1533,13 @@ const handleFileChange = async (info: any) => {
   fileUploads.value = rawFiles.map((rawFile, idx) => {
     const relativePathRaw = uploadModeValue === 'folder' ? String((rawFile as any).webkitRelativePath || '') : '';
     const relativePath = relativePathRaw ? relativePathRaw : null;
-    const fileKey = makeFileKey(rawFile, relativePath);
+    const fileKey = makeFileKey(rawFile, relativePath, idx + 1);
     const chunkTotal = calcChunkTotal(rawFile.size || 0);
     return {
       fileKey,
       fileIndex: idx,
       fileName: rawFile.name,
+      displayName: extractMaterialDisplayName(rawFile.name),
       fileSize: rawFile.size || 0,
       relativePath,
       chunkTotal,
@@ -1210,8 +1548,16 @@ const handleFileChange = async (info: any) => {
       status: 'pending',
       errorMessage: undefined,
       rawFile,
+      smartTagParsedNames: [],
+      smartTagMatchedIds: [],
+      smartTagSelectedIds: [],
+      smartTagUnmatchedNames: [],
+      smartTagAmbiguousNames: [],
+      smartTagParseWarnings: [],
+      smartTagTouched: false,
     };
   });
+  refreshSmartTagRecognition();
 
   const folderId = await validateAndGetFolderIdOrError();
   if (!folderId) return;
@@ -1281,7 +1627,20 @@ const handleSubmit = async () => {
 
   uploading.value = true;
   try {
-    await uploadTempSessionCommit(sessionState.sessionId);
+    const commitPayload: Record<string, any> = {
+      tag_mode: formData.value.tagMode,
+    };
+
+    if (formData.value.tagMode === 'smart') {
+      commitPayload.smart_tag_mappings = fileUploads.value.map((item) => ({
+        file_key: item.fileKey,
+        tag_ids: item.smartTagSelectedIds,
+      }));
+    } else {
+      commitPayload.tag_ids = (formData.value.tags || []).map((id: any) => Number(id)).filter((id: number) => Number.isFinite(id));
+    }
+
+    await uploadTempSessionCommit(sessionState.sessionId, commitPayload);
     message.success(t('上传成功'));
     emit('success');
     sessionState.committed = true;
@@ -1350,6 +1709,28 @@ watch(
   },
   { immediate: false },
 );
+
+watch(
+  [metaTagOptions, () => formData.value.tagMode],
+  ([, mode]) => {
+    if (mode !== 'smart') return;
+    if (!fileUploads.value.length) return;
+    refreshSmartTagRecognition();
+  },
+  { immediate: false },
+);
+
+// 当用户在“已选文件”之后开启过滤重复：对当前批次做一次去重（不影响已在上传中的任务）
+watch(
+  () => formData.value.filterDuplicate,
+  (enabled) => {
+    if (!enabled) return;
+    if (sessionState.uploadingChunks) return;
+    if (!fileList.value.length) return;
+    // 复用 handleFileChange 的去重逻辑：用当前 fileList 触发一次重建
+    handleFileChange({ fileList: fileList.value } as any);
+  },
+);
 </script>
 
 <style lang="less" scoped>
@@ -1396,6 +1777,97 @@ watch(
 
 .upload-progress-list {
   margin-top: 12px;
+}
+
+.smart-tag-panel {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid #e8edf5;
+  border-radius: 8px;
+  background: #fafcff;
+}
+
+.smart-tag-panel-head {
+  margin-bottom: 10px;
+}
+
+.smart-tag-panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #22324a;
+}
+
+.smart-tag-panel-desc {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #7b8794;
+}
+
+.smart-tag-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 380px;
+  overflow: auto;
+}
+
+.smart-tag-item {
+  padding: 12px;
+  border: 1px solid #e6ebf2;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.smart-tag-item-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.smart-tag-file-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.smart-tag-status {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #1677ff;
+}
+
+.smart-tag-status.empty {
+  color: #8c8c8c;
+}
+
+.smart-tag-meta-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.smart-tag-meta-row.warning .smart-tag-meta-label,
+.smart-tag-meta-row.warning .smart-tag-meta-value {
+  color: #d46b08;
+}
+
+.smart-tag-meta-label {
+  flex-shrink: 0;
+  color: #64748b;
+}
+
+.smart-tag-meta-value {
+  color: #334155;
+  word-break: break-all;
 }
 
 .upload-progress-item {
@@ -1567,4 +2039,3 @@ watch(
   width: 100%;
 }
 </style>
-

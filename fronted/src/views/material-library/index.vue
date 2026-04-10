@@ -118,14 +118,17 @@
                   {{ g.name }}
                 </a-select-option>
               </a-select>
-              <AdvancedSearchSelect
+              <TagSelect
                 v-if="showFilterField('tags')"
-                v-model="tagSelectedValues"
-                :categories="tagCategories"
-                :items="tagItems"
+                v-model="metaTagOptionSelectedIds"
+                :tag-folders="metaTagFolders"
+                :tags="metaTags"
+                :tag-options="metaTagOptions"
+                :creatable="true"
+                :create-option-api="handleCreateMetaTagOption"
                 :placeholder="t('标签')"
                 class="filter-field"
-                @change="handleFilterChange"
+                @update:modelValue="handleFilterChange"
               />
               <AdvancedSearchSelect
                 v-if="showFilterField('designer')"
@@ -394,23 +397,84 @@
               <template v-else-if="column.dataIndex === 'tags'">
                 <template v-if="record.type === 'folder'">
                   <div>
-                    <template v-if="Array.isArray(record.tags) && record.tags.length">
-                      <a-tag v-for="tag in record.tags" :key="tag" size="small">{{ tag }}</a-tag>
+                    <template v-if="getRecordTagLabels(record).length">
+                      <a-space size="small" :wrap="true" class="tag-cell-wrap">
+                        <a-tag v-for="tag in getTagPreview(record).visible" :key="tag" size="small">
+                          <span class="tag-cell-ellipsis" :title="tag">{{ tag }}</span>
+                        </a-tag>
+                        <a-popover v-if="getTagPreview(record).moreCount > 0" trigger="hover" placement="top">
+                          <template #content>
+                            <a-space size="small" :wrap="true" class="tag-cell-popover">
+                              <a-tag v-for="tag in getRecordTagLabels(record)" :key="tag" size="small">
+                                <span class="tag-cell-ellipsis tag-cell-ellipsis--popover" :title="tag">{{ tag }}</span>
+                              </a-tag>
+                            </a-space>
+                          </template>
+                          <a-tag size="small" class="tag-cell-more">+{{ getTagPreview(record).moreCount }}</a-tag>
+                        </a-popover>
+                      </a-space>
                     </template>
                     <span v-else>-</span>
                   </div>
                 </template>
                 <template v-else>
-                  <div
-                    class="editable-cell"
-                    :class="{ 'editable-cell--disabled': !isCellEditableRecord(record) }"
-                    @click.stop="openCellEditor('tags', record)"
+                  <a-popover
+                    :open="isInlineTagEditorOpen(record)"
+                    trigger="click"
+                    placement="topLeft"
+                    :overlayStyle="{ width: '720px' }"
+                    @openChange="(open) => handleInlineTagEditorOpenChange(record, open)"
                   >
-                    <template v-if="Array.isArray(record.tags) && record.tags.length">
-                      <a-tag v-for="tag in record.tags" :key="tag" size="small">{{ tag }}</a-tag>
+                    <template #content>
+                      <div class="tag-inline-editor" @click.stop>
+                        <TagSelect
+                          v-model="inlineTagEditorSelectedIds"
+                          :tag-folders="metaTagFolders"
+                          :tags="metaTags"
+                          :tag-options="metaTagOptions"
+                          :creatable="true"
+                          :create-option-api="handleCreateMetaTagOption"
+                          :placeholder="t('请选择标签')"
+                        />
+                        <div class="tag-inline-editor-actions">
+                          <a-button size="small" @click="closeInlineTagEditor">{{ t('取消') }}</a-button>
+                          <a-button
+                            type="primary"
+                            size="small"
+                            :loading="inlineTagEditorSaving"
+                            @click="saveInlineTagEditor"
+                          >
+                            {{ t('保存') }}
+                          </a-button>
+                        </div>
+                      </div>
                     </template>
-                    <span v-else class="editable-cell-placeholder">{{ t('点击编辑') }}</span>
-                  </div>
+
+                    <div
+                      class="editable-cell"
+                      :class="{ 'editable-cell--disabled': !isCellEditableRecord(record) }"
+                      @click.stop="openInlineTagEditor(record)"
+                    >
+                      <template v-if="getRecordTagLabels(record).length">
+                        <a-space size="small" :wrap="true" class="tag-cell-wrap">
+                          <a-tag v-for="tag in getTagPreview(record).visible" :key="tag" size="small">
+                            <span class="tag-cell-ellipsis" :title="tag">{{ tag }}</span>
+                          </a-tag>
+                          <a-popover v-if="getTagPreview(record).moreCount > 0" trigger="hover" placement="top">
+                            <template #content>
+                              <a-space size="small" :wrap="true" class="tag-cell-popover">
+                                <a-tag v-for="tag in getRecordTagLabels(record)" :key="tag" size="small">
+                                  <span class="tag-cell-ellipsis tag-cell-ellipsis--popover" :title="tag">{{ tag }}</span>
+                                </a-tag>
+                              </a-space>
+                            </template>
+                            <a-tag size="small" class="tag-cell-more">+{{ getTagPreview(record).moreCount }}</a-tag>
+                          </a-popover>
+                        </a-space>
+                      </template>
+                      <span v-else class="editable-cell-placeholder">{{ t('点击编辑') }}</span>
+                    </div>
+                  </a-popover>
                 </template>
               </template>
               <template v-else-if="column.dataIndex === 'folderId'">
@@ -457,7 +521,7 @@
                 <span>{{ formatMaterialType(record.type) }}</span>
               </template>
               <template v-else-if="column.dataIndex === 'sizeLevel'">
-                <span>{{ formatSizeLevel(record.width, record.height) }}</span>
+                <span>{{ formatSize(record.width, record.height) }}</span>
               </template>
               <template v-else-if="column.dataIndex === 'duration'">
                 <span>{{ formatDurationSeconds(record.duration) }}</span>
@@ -786,24 +850,16 @@
 
       <template v-else-if="cellEditType === 'tags'">
         <div class="cell-edit-selector">
-          <a-input v-model:value="cellEditTagKeyword" :placeholder="t('搜索标签')" allow-clear />
-          <div class="cell-edit-selector-body">
-            <div class="cell-edit-selector-left">
-              <tree checkable :tree-data="cellEditTagTreeData" :expanded-keys="['tag-root']"
-                :checked-keys="cellEditTagCheckedIds" @check="handleCellEditTagCheck" />
-            </div>
-            <div class="cell-edit-selector-right">
-              <div class="cell-edit-selected-header">
-                <span>{{ t('已选') }} {{ cellEditTagCheckedIds.length }} {{ t('个') }}</span>
-                <a @click="clearCellEditTagSelection">{{ t('清除') }}</a>
-              </div>
-              <div class="cell-edit-selected-list">
-                <a-tag v-for="id in cellEditTagCheckedIds" :key="id">{{ getTagNameById(id) }}</a-tag>
-                <span v-if="!cellEditTagCheckedIds.length" class="cell-edit-empty">{{ t('暂无选中') }}</span>
-              </div>
-              <div class="cell-edit-hint">{{ t('仅保存当前素材标签，不影响其他素材') }}</div>
-            </div>
-          </div>
+          <TagSelect
+            v-model="cellEditMetaTagOptionIds"
+            :tag-folders="metaTagFolders"
+            :tags="metaTags"
+            :tag-options="metaTagOptions"
+            :creatable="true"
+            :create-option-api="handleCreateMetaTagOption"
+            :placeholder="t('请选择标签')"
+          />
+          <div class="cell-edit-hint">{{ t('仅保存当前素材标签，不影响其他素材') }}</div>
         </div>
       </template>
 
@@ -1066,6 +1122,7 @@ import {
 import UploadMaterialModal from './components/upload-material-modal.vue';
 import CreateFolderModal from './components/create-folder-modal.vue';
 import CreateLibraryModal from './components/create-library-modal.vue';
+import TagSelect from '@/components/tag-select/index.vue';
 import AdvancedSearchSelect, {
   type AdvancedSelectCategory,
   type AdvancedSelectItem,
@@ -1107,6 +1164,7 @@ import {
   getMaterialLibraryMaterialGroups,
   getMaterialLibrarySystemTags,
 } from '@/api/material-library/options';
+import { getMetaTagsTree, createTagOption } from '@/api/promotion';
 
 const { t } = useI18n();
 const userStore = useUserStore();
@@ -1714,6 +1772,158 @@ const tags = ref<any[]>([]);
 const creators = ref<any[]>([]);
 const materialGroups = ref<any[]>([]);
 
+// TagSelect（meta-tags/tree）数据：用于素材库标签筛选 & 单元格标签编辑
+const metaTagFolders = ref<Array<{ id: number; name: string }>>([]);
+const metaTags = ref<Array<{ id: number; folder_id: number; name: string }>>([]);
+const metaTagOptions = ref<any[]>([]);
+
+const metaTagOptionNameById = computed<Map<number, string>>(() => {
+  const map = new Map<number, string>();
+  const walk = (opts: any[]) => {
+    (opts || []).forEach((o: any) => {
+      const id = Number(o?.id);
+      const name = String(o?.name ?? '').trim();
+      if (Number.isFinite(id) && name) map.set(id, name);
+      if (Array.isArray(o?.children) && o.children.length) walk(o.children);
+    });
+  };
+  walk(metaTagOptions.value || []);
+  return map;
+});
+
+const getRecordTagOptionIds = (record: any): number[] => {
+  // 兼容不同字段命名：tag_ids / tagIds / tags(若后端直接回传 id 数组)
+  const raw =
+    record?.tag_ids ??
+    record?.tagIds ??
+    record?.tagIdsList ??
+    (Array.isArray(record?.tags) && record.tags.length && typeof record.tags[0] !== 'string' ? record.tags : null);
+  const arr = Array.isArray(raw) ? raw : [];
+  return arr.map((x: any) => Number(x)).filter((x: number) => Number.isFinite(x));
+};
+
+const getRecordTagLabels = (record: any): string[] => {
+  // 0) 新协议：后端直接返回标签名 label（数组或分隔字符串）
+  if (Array.isArray(record?.tags_label) && record.tags_label.length) {
+    return record.tags_label.map((x: any) => String(x)).filter(Boolean);
+  }
+  if (typeof record?.tags_label === 'string' && record.tags_label.trim()) {
+    return record.tags_label
+      .split(/[;,，、]/)
+      .map((x: string) => x.trim())
+      .filter(Boolean);
+  }
+
+  // 1) 后端直接回传标签名数组（旧逻辑）
+  if (Array.isArray(record?.tags) && record.tags.length && typeof record.tags[0] === 'string') {
+    return record.tags.map((x: any) => String(x)).filter(Boolean);
+  }
+  // 2) 根据 tag_ids(=标签选项ID) 映射为名称展示
+  const ids = getRecordTagOptionIds(record);
+  if (!ids.length) return [];
+  const map = metaTagOptionNameById.value;
+  return ids.map((id) => map.get(id) || String(id)).filter(Boolean);
+};
+
+const TAG_CELL_MAX_COUNT = 3;
+const getTagPreview = (record: any) => {
+  const labels = getRecordTagLabels(record);
+  const visible = labels.slice(0, TAG_CELL_MAX_COUNT);
+  const moreCount = Math.max(0, labels.length - visible.length);
+  return { visible, moreCount };
+};
+
+const inlineTagEditorMaterialId = ref<string | null>(null);
+const inlineTagEditorSelectedIds = ref<number[]>([]);
+const inlineTagEditorSaving = ref(false);
+
+const isInlineTagEditorOpen = (record: any) => {
+  return String(record?.id || '') !== '' && String(inlineTagEditorMaterialId.value || '') === String(record?.id || '');
+};
+
+const openInlineTagEditor = (record: any) => {
+  if (!isCellEditableRecord(record)) return;
+  inlineTagEditorMaterialId.value = String(record.id);
+  inlineTagEditorSelectedIds.value = getRecordTagOptionIds(record);
+};
+
+const handleInlineTagEditorOpenChange = (record: any, open: boolean) => {
+  if (!open) {
+    if (isInlineTagEditorOpen(record)) inlineTagEditorMaterialId.value = null;
+    return;
+  }
+  openInlineTagEditor(record);
+};
+
+const closeInlineTagEditor = () => {
+  inlineTagEditorMaterialId.value = null;
+  inlineTagEditorSelectedIds.value = [];
+  inlineTagEditorSaving.value = false;
+};
+
+const saveInlineTagEditor = async () => {
+  if (!inlineTagEditorMaterialId.value) return;
+  inlineTagEditorSaving.value = true;
+  try {
+    const materialId = inlineTagEditorMaterialId.value;
+    if (!inlineTagEditorSelectedIds.value.length) {
+      await batchMaterialActions({
+        action_type: 'CLEAR_TAGS',
+        resource_ids: [materialId],
+        payload: {},
+      });
+    } else {
+      await batchMaterialActions({
+        action_type: 'SET_TAGS',
+        resource_ids: [materialId],
+        payload: { tags: inlineTagEditorSelectedIds.value },
+      });
+    }
+
+    const labels = inlineTagEditorSelectedIds.value
+      .map((id) => metaTagOptionNameById.value.get(id) || String(id))
+      .filter(Boolean);
+    const idx = (tableData.value || []).findIndex((x: any) => String(x?.id) === String(materialId));
+    if (idx >= 0) {
+      const prev = tableData.value[idx];
+      tableData.value[idx] = {
+        ...prev,
+        tag_ids: [...inlineTagEditorSelectedIds.value],
+        tags_label: labels,
+      };
+    }
+
+    closeInlineTagEditor();
+  } catch (error) {
+    console.error('行内标签编辑保存失败:', error);
+  } finally {
+    inlineTagEditorSaving.value = false;
+  }
+};
+
+const loadMetaTagsTree = async () => {
+  try {
+    const res = await getMetaTagsTree();
+    const { tagFolders = [], tags = [], tagOptions = [] } = res?.data ?? {};
+    metaTagFolders.value = Array.isArray(tagFolders) ? tagFolders : [];
+    metaTags.value = Array.isArray(tags) ? tags : [];
+    metaTagOptions.value = Array.isArray(tagOptions) ? tagOptions : [];
+  } catch (error) {
+    console.error('加载标签树失败:', error);
+    metaTagFolders.value = [];
+    metaTags.value = [];
+    metaTagOptions.value = [];
+  }
+};
+
+const handleCreateMetaTagOption = async (tagId: number, name: string, parentId: number, isTagLevel: boolean) => {
+  const payload = isTagLevel
+    ? { tag_id: tagId, name, parent_id: 0 }
+    : { name, parent_id: parentId };
+  await createTagOption(payload);
+  await loadMetaTagsTree();
+};
+
 const makeMultiFilterModel = (key: string) => computed<ValueLike[]>({
   get() {
     const v = (filters.value as any)?.[key];
@@ -1729,15 +1939,16 @@ const makeMultiFilterModel = (key: string) => computed<ValueLike[]>({
 });
 
 
-const tagCategories = computed<AdvancedSelectCategory[]>(() => [{ key: 'tags', label: t('未分类') }]);
-const tagItems = computed<AdvancedSelectItem[]>(() =>
-  (tags.value || []).map((x: any) => ({
-    categoryKey: 'tags',
-    value: (x?.id ?? '') as ValueLike,
-    label: String(x?.name ?? ''),
-  })),
-);
-const tagSelectedValues = makeMultiFilterModel('tags');
+// TagSelect 绑定：filters.tags 直接存放 meta tag option ids（number[]）
+const metaTagOptionSelectedIds = computed<number[]>({
+  get() {
+    const v = (filters.value as any)?.tags;
+    return Array.isArray(v) ? v.map((x: any) => Number(x)).filter((x: number) => Number.isFinite(x)) : [];
+  },
+  set(vals) {
+    (filters.value as any).tags = Array.isArray(vals) ? vals : [];
+  },
+});
 
 const designerCategories = computed<AdvancedSelectCategory[]>(() => [{ key: 'designer', label: t('未分类') }]);
 const designerItems = computed<AdvancedSelectItem[]>(() =>
@@ -1768,9 +1979,10 @@ const materialTypeSelectedValues = makeMultiFilterModel('materialType');
 
 const sizeLevelCategories = computed<AdvancedSelectCategory[]>(() => [{ key: 'sizeLevel', label: t('未分类') }]);
 const sizeLevelItems = computed<AdvancedSelectItem[]>(() => [
-  { categoryKey: 'sizeLevel', value: 'small', label: t('小图') },
-  { categoryKey: 'sizeLevel', value: 'medium', label: t('中图') },
-  { categoryKey: 'sizeLevel', value: 'large', label: t('大图') },
+  // 保持 value 与后端筛选枚举一致，仅调整 UI 文案：不再显示“大/中/小图”
+  { categoryKey: 'sizeLevel', value: 'small', label: '≤ 720×720' },
+  { categoryKey: 'sizeLevel', value: 'medium', label: '721×721–1920×1920' },
+  { categoryKey: 'sizeLevel', value: 'large', label: '> 1920×1920' },
 ]);
 const sizeLevelSelectedValues = makeMultiFilterModel('sizeLevel');
 
@@ -2270,19 +2482,6 @@ const getCreatorName = (creatorId: any) => {
   return creatorNameById.value.get(String(creatorId)) || '-';
 };
 
-const getTagId = (tag: any) => String(tag?.id ?? tag?.value ?? '');
-const getTagName = (tag: any) => String(tag?.name ?? tag?.label ?? '');
-const getTagParentId = (tag: any) => {
-  const raw = tag?.parent_id ?? tag?.parentId ?? tag?.pid ?? null;
-  if (raw === null || raw === undefined || raw === '') return null;
-  return String(raw);
-};
-
-const tagNameById = computed<Map<string, string>>(
-  () => new Map<string, string>((tags.value || []).map((tag: any) => [getTagId(tag), getTagName(tag)])),
-);
-
-const getTagNameById = (id: string) => tagNameById.value.get(String(id)) || String(id);
 
 const formatEditableProductionCost = (value: any) => {
   if (value === null || value === undefined || value === '') return t('点击编辑');
@@ -2296,16 +2495,6 @@ const formatSize = (w: any, h: any) => {
   const height = h !== null && h !== undefined && h !== '' ? Number(h) : null;
   if (width === null || height === null || !Number.isFinite(width) || !Number.isFinite(height)) return '-';
   return `${width}x${height}`;
-};
-
-const formatSizeLevel = (w: any, h: any) => {
-  const width = w !== null && w !== undefined && w !== '' ? Number(w) : null;
-  const height = h !== null && h !== undefined && h !== '' ? Number(h) : null;
-  if (width === null || height === null || !Number.isFinite(width) || !Number.isFinite(height)) return '-';
-  const maxSide = Math.max(width, height);
-  if (maxSide <= 720) return t('小图');
-  if (maxSide <= 1920) return t('中图');
-  return t('大图');
 };
 
 const formatMaterialType = (type: any) => {
@@ -2497,8 +2686,7 @@ const cellEditCostValue = ref('');
 const cellEditRemarkValue = ref('');
 const cellEditPersonKeyword = ref('');
 const cellEditPersonSelectedId = ref<string>('');
-const cellEditTagKeyword = ref('');
-const cellEditTagCheckedIds = ref<string[]>([]);
+// 原 Tree 版标签编辑状态已弃用（保留结构会产生未使用告警）
 
 const cellEditModalTitle = computed(() => {
   if (cellEditType.value === 'productionCost') return t('编辑制作费用');
@@ -3242,6 +3430,7 @@ const loadTableData = async () => {
       pageSize,
       designer_id: showFilterField('designer') ? filters.value.designer : undefined,
       creator_id: showFilterField('creator') ? filters.value.creator : undefined,
+      // TagSelect 输出的是“标签选项ID”（你的后端用 tag_ids 来筛选该 ID 列表）
       tag_ids: showFilterField('tags') ? filters.value.tags : undefined,
       global_search: globalSearchText.value,
       include_subfolders: showSubfolders.value ? 1 : 0,
@@ -3352,38 +3541,7 @@ const cellEditPersonTreeData = computed(() => {
   return [{ key: 'person-root', title: t('Admin'), children }];
 });
 
-const cellEditTagTreeData = computed(() => {
-  const keyword = cellEditTagKeyword.value.trim().toLowerCase();
-  const allTags = (tags.value || [])
-    .map((tag: any) => ({
-      id: getTagId(tag),
-      name: getTagName(tag),
-      parentId: getTagParentId(tag),
-    }))
-    .filter((tag: any) => !!tag.id && !!tag.name);
-  const idSet = new Set(allTags.map((tag: any) => tag.id));
-  const nodesByParent = new Map<string | null, any[]>();
-  allTags.forEach((tag: any) => {
-    const parentKey = tag.parentId && idSet.has(tag.parentId) ? tag.parentId : null;
-    if (!nodesByParent.has(parentKey)) nodesByParent.set(parentKey, []);
-    nodesByParent.get(parentKey)?.push(tag);
-  });
-  const build = (parentId: string | null): any[] =>
-    (nodesByParent.get(parentId) || [])
-      .map((tag: any) => {
-        const children = build(tag.id);
-        const hit = !keyword || tag.name.toLowerCase().includes(keyword);
-        const hasHitChild = children.length > 0;
-        if (!hit && !hasHitChild) return null;
-        return {
-          key: tag.id,
-          title: tag.name,
-          children,
-        };
-      })
-      .filter(Boolean);
-  return [{ key: 'tag-root', title: t('全部标签'), children: build(null) }];
-});
+// cellEditTagTreeData：原 Tree 版标签编辑使用，已弃用
 
 const openCellEditor = (type: CellEditType, record: any) => {
   if (!isCellEditableRecord(record)) return;
@@ -3397,22 +3555,16 @@ const openCellEditor = (type: CellEditType, record: any) => {
       : String(record.productionCost);
   cellEditRemarkValue.value = String(record.remarks || '');
   cellEditPersonKeyword.value = '';
-  cellEditTagKeyword.value = '';
   cellEditPersonSelectedId.value = '';
-  cellEditTagCheckedIds.value = [];
+  cellEditMetaTagOptionIds.value = [];
 
   if (type === 'designerId') {
     cellEditPersonSelectedId.value = record.designerId ? String(record.designerId) : '';
   } else if (type === 'creatorId') {
     cellEditPersonSelectedId.value = record.creatorId ? String(record.creatorId) : '';
   } else if (type === 'tags') {
-    const nameToId = new Map<string, string>();
-    (tags.value || []).forEach((tag: any) => {
-      nameToId.set(getTagName(tag), getTagId(tag));
-    });
-    cellEditTagCheckedIds.value = (record.tags || [])
-      .map((tagName: string) => nameToId.get(String(tagName)))
-      .filter(Boolean);
+    // 统一兼容：tag_ids / tagIds / tag_option_ids / tags(数字数组)
+    cellEditMetaTagOptionIds.value = getRecordTagOptionIds(record);
   }
 
   cellEditModalVisible.value = true;
@@ -3434,16 +3586,9 @@ const clearCellEditPersonSelection = () => {
   cellEditPersonSelectedId.value = '';
 };
 
-const handleCellEditTagCheck = (checkedKeys: any) => {
-  const keys = Array.isArray(checkedKeys) ? checkedKeys : checkedKeys?.checked;
-  cellEditTagCheckedIds.value = (Array.isArray(keys) ? keys : [])
-    .map((key: any) => String(key))
-    .filter((key: string) => key !== 'tag-root');
-};
+const cellEditMetaTagOptionIds = ref<number[]>([]);
 
-const clearCellEditTagSelection = () => {
-  cellEditTagCheckedIds.value = [];
-};
+// clearCellEditTagSelection：当前 UI 由 TagSelect 自带清除能力，无需额外按钮
 
 const parseAndValidateProductionCost = () => {
   const raw = cellEditCostValue.value.trim();
@@ -3473,7 +3618,7 @@ const handleCellEditConfirm = async () => {
     } else if (cellEditType.value === 'remarks') {
       await updateMaterial(materialId, { remarks: cellEditRemarkValue.value.trim() || null });
     } else if (cellEditType.value === 'tags') {
-      if (!cellEditTagCheckedIds.value.length) {
+      if (!cellEditMetaTagOptionIds.value.length) {
         await batchMaterialActions({
           action_type: 'CLEAR_TAGS',
           resource_ids: [materialId],
@@ -3483,8 +3628,23 @@ const handleCellEditConfirm = async () => {
         await batchMaterialActions({
           action_type: 'SET_TAGS',
           resource_ids: [materialId],
-          payload: { tags: cellEditTagCheckedIds.value },
+          // 这里传 meta tag option ids；后端需按该 ID 列表保存并在列表接口返回 tags/tag_option_ids
+          payload: { tags: cellEditMetaTagOptionIds.value },
         });
+      }
+
+      // 让 UI 立刻可见：后端若暂未回传 tags 文本数组，仍可通过 tag_ids 映射展示
+      try {
+        const idx = (tableData.value || []).findIndex((x: any) => String(x?.id) === String(materialId));
+        if (idx >= 0) {
+          const prev = tableData.value[idx];
+          tableData.value[idx] = {
+            ...prev,
+            tag_ids: cellEditMetaTagOptionIds.value,
+          };
+        }
+      } catch {
+        // ignore
       }
     }
     closeCellEditModal();
@@ -3897,6 +4057,7 @@ onMounted(() => {
     loadFilterTemplates();
     loadTableData();
     loadFilterOptions();
+    void loadMetaTagsTree();
   });
 });
 
@@ -3913,7 +4074,44 @@ watch(globalSearchText, (newVal, oldVal) => {
 .material-library-container {
   display: flex;
   height: calc(100vh - 120px);
+  min-height: 0;
   gap: 16px;
+  overflow: hidden;
+
+  .tag-cell-wrap {
+    line-height: 1;
+  }
+
+  .tag-cell-more {
+    cursor: default;
+    user-select: none;
+  }
+
+  .tag-cell-ellipsis {
+    display: inline-block;
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+  }
+
+  .tag-cell-ellipsis--popover {
+    max-width: 220px;
+  }
+
+  .tag-inline-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 680px;
+  }
+
+  .tag-inline-editor-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
 
   .folder-sidebar {
     width: 280px;
@@ -3923,6 +4121,7 @@ watch(globalSearchText, (newVal, oldVal) => {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    min-height: 0;
 
     .folder-search {
       margin-bottom: 16px;
@@ -4222,7 +4421,9 @@ watch(globalSearchText, (newVal, oldVal) => {
     padding: 16px;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
+    min-height: 0;
 
     .breadcrumb-bar {
       display: flex;

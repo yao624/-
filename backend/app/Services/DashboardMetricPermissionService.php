@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\MetaReportMetricDict;
 use App\Models\Permission;
 
 class DashboardMetricPermissionService
@@ -53,7 +54,7 @@ class DashboardMetricPermissionService
             $metricGroup->save();
         }
 
-        foreach (self::METRICS as $index => $metric) {
+        foreach (self::metricDefinitions() as $index => $metric) {
             Permission::query()->firstOrCreate(
                 ['slug' => self::metricSlug($metric['key'])],
                 [
@@ -71,5 +72,37 @@ class DashboardMetricPermissionService
     public static function metricSlug(string $metricKey): string
     {
         return 'promotion-dashboard:metric:' . $metricKey;
+    }
+
+    /**
+     * 优先从看板指标字典读取，避免后续新增指标时反复改代码。
+     * 如果字典表尚未建好或没有数据，则回退到当前内置默认指标。
+     */
+    private static function metricDefinitions(): array
+    {
+        if (!class_exists(MetaReportMetricDict::class)) {
+            return self::METRICS;
+        }
+
+        try {
+            $rows = MetaReportMetricDict::query()
+                ->where('status', 'active')
+                ->where('is_permission_controlled', true)
+                ->orderBy('sort_order')
+                ->get(['metric_key', 'metric_name']);
+
+            if ($rows->isEmpty()) {
+                return self::METRICS;
+            }
+
+            return $rows->map(function (MetaReportMetricDict $metric) {
+                return [
+                    'key' => $metric->metric_key,
+                    'name' => $metric->metric_name,
+                ];
+            })->values()->all();
+        } catch (\Throwable $e) {
+            return self::METRICS;
+        }
     }
 }

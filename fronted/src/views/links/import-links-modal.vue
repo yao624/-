@@ -10,7 +10,7 @@
     <a-alert
       type="info"
       show-icon
-      message="支持两种方式：粘贴多行，或上传 CSV。CSV 支持表头：link, notes, tags"
+      message="支持两种方式：粘贴多行文本，或者上传 CSV 文件。CSV 支持表头：link, notes, tags"
       style="margin-bottom: 16px"
     />
     <a-form :label-col="{ span: 4 }">
@@ -28,12 +28,13 @@
         <div v-if="file" style="margin-top: 8px; color: #64748b">{{ file.name }}</div>
       </a-form-item>
       <a-form-item label="默认标签">
-        <a-select
-          v-model:value="defaultTags"
-          mode="tags"
-          :options="tagOptions"
+        <tag-select
+          v-model:modelValue="defaultTagOptionIds"
+          :tag-folders="metaTagTree.tagFolders"
+          :tags="metaTagTree.tags"
+          :tag-options="metaTagTree.tagOptions"
           placeholder="导入到所有链接的默认标签"
-          style="width: 100%"
+          :creatable="false"
         />
       </a-form-item>
       <a-form-item label="默认备注">
@@ -47,14 +48,22 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch } from 'vue';
+import { defineComponent, reactive, ref, watch } from 'vue';
 import { message } from 'ant-design-vue';
-import { getLinksValidTags, importLinksApi } from '@/api/links';
-
-type TagOption = { label: string; value: string };
+import TagSelect from '@/components/tag-select/index.vue';
+import { getMetaTagsTree } from '@/api/promotion';
+import { importLinksApi } from '@/api/links';
+import {
+  normalizeMetaTagTreePayload,
+  resolveNamesByOptionIds,
+  type LinkMetaTagTreePayload,
+} from './tag-select-utils';
 
 export default defineComponent({
   name: 'ImportLinksModal',
+  components: {
+    TagSelect,
+  },
   props: {
     open: { type: Boolean, required: true },
   },
@@ -63,28 +72,30 @@ export default defineComponent({
     const loading = ref(false);
     const rawText = ref('');
     const file = ref<File | null>(null);
-    const defaultTags = ref<string[]>([]);
+    const defaultTagOptionIds = ref<number[]>([]);
     const defaultNotes = ref('');
     const defaultLocale = ref('');
-    const tagOptions = ref<TagOption[]>([]);
+    const metaTagTree = reactive<LinkMetaTagTreePayload>({
+      tagFolders: [],
+      tags: [],
+      tagOptions: [],
+    });
 
-    const loadTags = async () => {
-      const res: any = await getLinksValidTags();
-      const list = Array.isArray(res?.data) ? res.data : [];
-      tagOptions.value = list.map((tag: any) => ({
-        label: tag.user_name ? `${tag.name} - ${tag.user_name}` : tag.name,
-        value: tag.name,
-      }));
+    const loadMetaTags = async () => {
+      const res: any = await getMetaTagsTree();
+      const payload = normalizeMetaTagTreePayload(res?.data);
+      metaTagTree.tagFolders = payload.tagFolders;
+      metaTagTree.tags = payload.tags;
+      metaTagTree.tagOptions = payload.tagOptions;
     };
 
     watch(
       () => props.open,
-      (value) => {
-        if (value) {
-          loadTags();
-        }
+      async (value) => {
+        if (!value) return;
+        await loadMetaTags();
       },
-      { immediate: true }
+      { immediate: true },
     );
 
     const beforeUpload = (selected: File) => {
@@ -100,7 +111,8 @@ export default defineComponent({
 
       const formData = new FormData();
       formData.append('raw_text', rawText.value);
-      defaultTags.value.forEach((tag) => formData.append('default_tags[]', tag));
+      resolveNamesByOptionIds(defaultTagOptionIds.value, metaTagTree.tagOptions)
+        .forEach((tag) => formData.append('default_tags[]', tag));
       if (defaultNotes.value) formData.append('default_notes', defaultNotes.value);
       if (defaultLocale.value) formData.append('default_locale', defaultLocale.value);
       if (file.value) formData.append('file', file.value);
@@ -109,12 +121,10 @@ export default defineComponent({
         loading.value = true;
         const res: any = await importLinksApi(formData);
         const summary = res?.summary || {};
-        message.success(
-          `导入完成：新增 ${summary.created || 0}，更新 ${summary.updated || 0}，跳过 ${summary.skipped || 0}`
-        );
+        message.success(`导入完成：新增${summary.created || 0}，更新${summary.updated || 0}，跳过${summary.skipped || 0}`);
         rawText.value = '';
         file.value = null;
-        defaultTags.value = [];
+        defaultTagOptionIds.value = [];
         defaultNotes.value = '';
         defaultLocale.value = '';
         emit('ok');
@@ -129,10 +139,10 @@ export default defineComponent({
       loading,
       rawText,
       file,
-      defaultTags,
+      defaultTagOptionIds,
       defaultNotes,
       defaultLocale,
-      tagOptions,
+      metaTagTree,
       beforeUpload,
       handleSubmit,
     };

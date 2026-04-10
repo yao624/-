@@ -15,12 +15,13 @@
         <a-textarea v-model:value="formState.notes" :auto-size="{ minRows: 2, maxRows: 4 }" />
       </a-form-item>
       <a-form-item :label="t('pages.tag')">
-        <a-select
-          v-model:value="formState.tags"
-          mode="tags"
-          :options="tagOptions"
+        <tag-select
+          v-model:modelValue="selectedTagOptionIds"
+          :tag-folders="metaTagTree.tagFolders"
+          :tags="metaTagTree.tags"
+          :tag-options="metaTagTree.tagOptions"
           :placeholder="t('pages.plsSelect')"
-          style="width: 100%"
+          :creatable="false"
         />
       </a-form-item>
       <a-form-item label="默认语言">
@@ -46,10 +47,16 @@ import type { PropType } from 'vue';
 import { defineComponent, reactive, ref, watch } from 'vue';
 import { message } from 'ant-design-vue';
 import { useI18n } from 'vue-i18n';
-import { addLinksOneApi, getLinksValidTags } from '@/api/links';
+import TagSelect from '@/components/tag-select/index.vue';
+import { getMetaTagsTree } from '@/api/promotion';
+import { addLinksOneApi } from '@/api/links';
 import type { LinkModel } from '@/utils/fb-interfaces';
-
-type TagOption = { label: string; value: string };
+import {
+  normalizeMetaTagTreePayload,
+  resolveNamesByOptionIds,
+  resolveOptionIdsByNames,
+  type LinkMetaTagTreePayload,
+} from './tag-select-utils';
 
 const createEmptyVariant = () => ({
   locale: '',
@@ -59,6 +66,9 @@ const createEmptyVariant = () => ({
 
 export default defineComponent({
   name: 'LinkFormModal',
+  components: {
+    TagSelect,
+  },
   props: {
     open: { type: Boolean, required: true },
     title: { type: String, required: true },
@@ -72,7 +82,13 @@ export default defineComponent({
     const { t } = useI18n();
     const formRef = ref();
     const loading = ref(false);
-    const tagOptions = ref<TagOption[]>([]);
+    const selectedTagOptionIds = ref<number[]>([]);
+    const unmatchedTagNames = ref<string[]>([]);
+    const metaTagTree = reactive<LinkMetaTagTreePayload>({
+      tagFolders: [],
+      tags: [],
+      tagOptions: [],
+    });
     const formState = reactive<any>({
       id: '',
       link: '',
@@ -91,20 +107,19 @@ export default defineComponent({
       },
     ];
 
-    const loadTags = async () => {
-      const res: any = await getLinksValidTags();
-      const list = Array.isArray(res?.data) ? res.data : [];
-      tagOptions.value = list.map((tag: any) => ({
-        label: tag.user_name ? `${tag.name} - ${tag.user_name}` : tag.name,
-        value: tag.name,
-      }));
+    const loadMetaTags = async () => {
+      const res: any = await getMetaTagsTree();
+      const payload = normalizeMetaTagTreePayload(res?.data);
+      metaTagTree.tagFolders = payload.tagFolders;
+      metaTagTree.tags = payload.tags;
+      metaTagTree.tagOptions = payload.tagOptions;
     };
 
     watch(
       () => props.open,
-      (value) => {
+      async (value) => {
         if (!value) return;
-        loadTags();
+        await loadMetaTags();
         const model = props.model;
         formState.id = model?.id || '';
         formState.link = model?.link || '';
@@ -114,6 +129,9 @@ export default defineComponent({
         formState.language_variants = Array.isArray(model?.language_variants)
           ? model.language_variants.map((item) => ({ ...item }))
           : [];
+        selectedTagOptionIds.value = resolveOptionIdsByNames(formState.tags, metaTagTree.tagOptions);
+        const matchedNames = new Set(resolveNamesByOptionIds(selectedTagOptionIds.value, metaTagTree.tagOptions));
+        unmatchedTagNames.value = formState.tags.filter((name: string) => !matchedNames.has(String(name)));
       },
       { immediate: true }
     );
@@ -132,6 +150,12 @@ export default defineComponent({
         loading.value = true;
         const payload = {
           ...formState,
+          tags: Array.from(
+            new Set([
+              ...resolveNamesByOptionIds(selectedTagOptionIds.value, metaTagTree.tagOptions),
+              ...unmatchedTagNames.value,
+            ]),
+          ),
           language_variants: formState.language_variants.filter(
             (item: any) => item.locale?.trim() && item.url?.trim()
           ),
@@ -151,8 +175,9 @@ export default defineComponent({
       t,
       formRef,
       formState,
+      metaTagTree,
       loading,
-      tagOptions,
+      selectedTagOptionIds,
       urlRules,
       addVariant,
       removeVariant,

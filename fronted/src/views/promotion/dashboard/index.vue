@@ -1532,7 +1532,7 @@
         </div>
 
         <a-drawer
-          :visible="showAddCardDrawer"
+          :open="showAddCardDrawer"
           :title="addCardDrawerTitle"
           placement="right"
           width="720"
@@ -1653,15 +1653,9 @@
                   style="width: 100%"
                 >
                   <template #suffixIcon><filter-outlined /></template>
-                  <a-select-option value="date">{{ t('日期') }}</a-select-option>
-                  <a-select-option value="department">{{ t('部门') }}</a-select-option>
-                  <a-select-option value="optimizer">{{ t('优化师') }}</a-select-option>
-                  <a-select-option value="channel">{{ t('渠道') }}</a-select-option>
-                  <a-select-option value="ad_account">{{ t('广告账户') }}</a-select-option>
-                  <a-select-option value="campaign">{{ t('系列') }}</a-select-option>
-                  <a-select-option value="ad_group">{{ t('广告组') }}</a-select-option>
-                  <a-select-option value="creative">{{ t('创意') }}</a-select-option>
-                  <a-select-option value="region">{{ t('地区') }}</a-select-option>
+                  <a-select-option v-for="option in addCardDimensionOptions" :key="option.value" :value="option.value">
+                    {{ option.label }}
+                  </a-select-option>
                 </a-select>
               </a-form-item>
               <a-form-item
@@ -1754,15 +1748,9 @@
                   style="width: 100%"
                 >
                   <template #suffixIcon><filter-outlined /></template>
-                  <a-select-option value="date">{{ t('日期') }}</a-select-option>
-                  <a-select-option value="department">{{ t('部门') }}</a-select-option>
-                  <a-select-option value="optimizer">{{ t('优化师') }}</a-select-option>
-                  <a-select-option value="channel">{{ t('渠道') }}</a-select-option>
-                  <a-select-option value="ad_account">{{ t('广告账户') }}</a-select-option>
-                  <a-select-option value="campaign">{{ t('系列') }}</a-select-option>
-                  <a-select-option value="ad_group">{{ t('广告组') }}</a-select-option>
-                  <a-select-option value="creative">{{ t('创意') }}</a-select-option>
-                  <a-select-option value="region">{{ t('地区') }}</a-select-option>
+                  <a-select-option v-for="option in addCardDimensionOptions" :key="option.value" :value="option.value">
+                    {{ option.label }}
+                  </a-select-option>
                 </a-select>
               </a-form-item>
               <a-form-item
@@ -1881,15 +1869,9 @@
                   style="width: 100%"
                 >
                   <template #suffixIcon><filter-outlined /></template>
-                  <a-select-option value="date">{{ t('日期') }}</a-select-option>
-                  <a-select-option value="department">{{ t('部门') }}</a-select-option>
-                  <a-select-option value="optimizer">{{ t('优化师') }}</a-select-option>
-                  <a-select-option value="channel">{{ t('渠道') }}</a-select-option>
-                  <a-select-option value="ad_account">{{ t('广告账户') }}</a-select-option>
-                  <a-select-option value="campaign">{{ t('系列') }}</a-select-option>
-                  <a-select-option value="ad_group">{{ t('广告组') }}</a-select-option>
-                  <a-select-option value="creative">{{ t('创意') }}</a-select-option>
-                  <a-select-option value="region">{{ t('地区') }}</a-select-option>
+                  <a-select-option v-for="option in addCardDimensionOptions" :key="option.value" :value="option.value">
+                    {{ option.label }}
+                  </a-select-option>
                 </a-select>
               </a-form-item>
               <a-form-item
@@ -1975,15 +1957,9 @@
                   style="width: 100%"
                 >
                   <template #suffixIcon><filter-outlined /></template>
-                  <a-select-option value="date">{{ t('日期') }}</a-select-option>
-                  <a-select-option value="department">{{ t('部门') }}</a-select-option>
-                  <a-select-option value="optimizer">{{ t('优化师') }}</a-select-option>
-                  <a-select-option value="channel">{{ t('渠道') }}</a-select-option>
-                  <a-select-option value="ad_account">{{ t('广告账户') }}</a-select-option>
-                  <a-select-option value="campaign">{{ t('系列') }}</a-select-option>
-                  <a-select-option value="ad_group">{{ t('广告组') }}</a-select-option>
-                  <a-select-option value="creative">{{ t('创意') }}</a-select-option>
-                  <a-select-option value="region">{{ t('地区') }}</a-select-option>
+                  <a-select-option v-for="option in addCardDimensionOptions" :key="option.value" :value="option.value">
+                    {{ option.label }}
+                  </a-select-option>
                 </a-select>
               </a-form-item>
               <a-form-item
@@ -2215,15 +2191,9 @@
                   style="width: 100%"
                 >
                   <template #suffixIcon><filter-outlined /></template>
-                  <a-select-option value="date">{{ t('日期') }}</a-select-option>
-                  <a-select-option value="department">{{ t('部门') }}</a-select-option>
-                  <a-select-option value="optimizer">{{ t('优化师') }}</a-select-option>
-                  <a-select-option value="channel">{{ t('渠道') }}</a-select-option>
-                  <a-select-option value="ad_account">{{ t('广告账户') }}</a-select-option>
-                  <a-select-option value="campaign">{{ t('系列') }}</a-select-option>
-                  <a-select-option value="ad_group">{{ t('广告组') }}</a-select-option>
-                  <a-select-option value="creative">{{ t('创意') }}</a-select-option>
-                  <a-select-option value="region">{{ t('地区') }}</a-select-option>
+                  <a-select-option v-for="option in addCardDimensionOptions" :key="option.value" :value="option.value">
+                    {{ option.label }}
+                  </a-select-option>
                 </a-select>
               </a-form-item>
               <a-form-item :label="t('筛选')">
@@ -2307,7 +2277,7 @@
         </a-drawer>
 
         <a-modal
-          v-model:visible="showMetricSettingModal"
+          v-model:open="showMetricSettingModal"
           :title="t('指标设置')"
           width="820px"
           @cancel="showMetricSettingModal = false"
@@ -2382,7 +2352,7 @@
         </a-modal>
 
         <a-modal
-          v-model:visible="showCardManagerModal"
+          v-model:open="showCardManagerModal"
           :title="t('卡片管理')"
           width="820px"
           wrap-class-name="card-manager-modal"
@@ -2446,7 +2416,7 @@
         </a-modal>
 
         <a-modal
-          v-model:visible="cardFilterModalVisible"
+          v-model:open="cardFilterModalVisible"
           title="筛选设置"
           width="900px"
           @ok="handleCardFilterModalOk"
@@ -2486,7 +2456,7 @@
         </a-modal>
 
         <a-modal
-          v-model:visible="showCreateDashboardModal"
+          v-model:open="showCreateDashboardModal"
           :title="t('新建看板')"
           width="480px"
           @ok="submitCreateDashboard"
@@ -2537,7 +2507,7 @@
         </a-modal>
 
         <a-modal
-          v-model:visible="showCreateFolderModal"
+          v-model:open="showCreateFolderModal"
           :title="t('新建文件夹')"
           width="480px"
           @ok="submitCreateFolder"
@@ -2556,7 +2526,7 @@
         </a-modal>
 
         <a-modal
-          v-model:visible="showRenameFolderModal"
+          v-model:open="showRenameFolderModal"
           :title="t('重命名文件夹')"
           width="480px"
           @ok="submitRenameFolder"
@@ -2575,7 +2545,7 @@
         </a-modal>
 
         <a-modal
-          v-model:visible="showDeleteFolderModal"
+          v-model:open="showDeleteFolderModal"
           :title="t('删除文件夹')"
           width="520px"
           :confirm-loading="folderDeleteLoading"
@@ -2588,7 +2558,7 @@
         </a-modal>
 
         <a-modal
-          v-model:visible="showDeleteDashboardModal"
+          v-model:open="showDeleteDashboardModal"
           :title="t('删除看板')"
           width="520px"
           :confirm-loading="dashboardDeleteLoading"
@@ -2601,7 +2571,7 @@
         </a-modal>
 
         <a-modal
-          v-model:visible="showRenameDashboardModal"
+          v-model:open="showRenameDashboardModal"
           :title="t('重命名看板')"
           width="480px"
           @ok="submitRenameDashboard"
@@ -2620,7 +2590,7 @@
         </a-modal>
 
         <a-modal
-          v-model:visible="showSaveAsDashboardModal"
+          v-model:open="showSaveAsDashboardModal"
           :title="t('看板另存为')"
           width="560px"
           @ok="submitSaveAsDashboard"
@@ -2732,7 +2702,7 @@
                 <a-button size="small">{{ t('更多') }}</a-button>
               </a-dropdown>
             </div>
-            <s-table
+            <a-table
               :loading="materialsLoading"
               :columns="materialsColumns"
               :data-source="materialsTableData"
@@ -2780,7 +2750,7 @@
                   </span>
                 </template>
               </template>
-            </s-table>
+            </a-table>
           </div>
         </div>
 
@@ -2938,7 +2908,7 @@
           />
         </div>
       </div>
-      <s-table
+      <a-table
         :loading="loading"
         :columns="storeColumns"
         :data-source="storeData"
@@ -2993,7 +2963,7 @@
             </span>
           </template>
         </template>
-      </s-table>
+      </a-table>
           </div>
 
           <!-- 地区分布和优化师分布 -->
@@ -3151,7 +3121,7 @@
                 <a-button size="small">{{ t('更多') }}</a-button>
               </a-dropdown>
             </div>
-            <s-table
+            <a-table
               :loading="topAccountsLoading"
               :columns="topAccountsColumns"
               :data-source="topAccountsTableData"
@@ -3192,7 +3162,7 @@
                   </span>
                 </template>
               </template>
-            </s-table>
+            </a-table>
           </div>
         </div>
 
@@ -3286,7 +3256,7 @@
                 <a-button size="small">{{ t('更多') }}</a-button>
               </a-dropdown>
             </div>
-            <s-table
+            <a-table
               :loading="topMaterialsLoading"
               :columns="topMaterialsColumns"
               :data-source="topMaterialsTableData"
@@ -3335,7 +3305,7 @@
                   </span>
                 </template>
               </template>
-            </s-table>
+            </a-table>
           </div>
         </div>
       </div>
@@ -3385,9 +3355,13 @@ import {
   createMetaReportCard,
   updateMetaReportCard,
   deleteMetaReportCard,
+  fetchMetaReportMetricDicts,
+  fetchMetaReportDimensionDicts,
   type MetaReportDashboardRow,
   type MetaReportCardRow,
   type MetaReportFolderNode,
+  type MetaReportMetricDictRow,
+  type MetaReportDimensionDictRow,
 } from '@/api/meta-report-dashboard';
 import { Container as DragContainer, Draggable } from '@/components/draggable';
 import {
@@ -3409,20 +3383,6 @@ import {
 
 const { t } = useI18n();
 const userStore = useUserStore();
-
-const dashboardMetricPermissionMap: Record<string, string> = {
-  cost: 'promotion-dashboard:metric:cost',
-  impressions: 'promotion-dashboard:metric:impressions',
-  cpm: 'promotion-dashboard:metric:cpm',
-  clicks: 'promotion-dashboard:metric:clicks',
-  cpc: 'promotion-dashboard:metric:cpc',
-  ctr: 'promotion-dashboard:metric:ctr',
-  conversions: 'promotion-dashboard:metric:conversions',
-  cpa: 'promotion-dashboard:metric:cpa',
-  conversionRate: 'promotion-dashboard:metric:conversionRate',
-  register: 'promotion-dashboard:metric:register',
-  payOrder: 'promotion-dashboard:metric:payOrder',
-};
 
 const collectUserPermissionSlugs = (permissions: unknown): string[] => {
   if (!Array.isArray(permissions)) {
@@ -3599,7 +3559,7 @@ const cardChartTypeOptions = [
   { value: 'tile', label: '平铺', icon: 'tile' },
   { value: 'card-stat', label: '卡片-统计数字', icon: 'card-stat' },
 ];
-const addCardMetricOptions = [
+const legacyAddCardMetricOptions = [
   { value: 'cost', label: t('花费') },
   { value: 'impressions', label: t('展示数') },
   { value: 'cpm', label: t('千次展示成本') },
@@ -3613,26 +3573,100 @@ const addCardMetricOptions = [
   { value: 'payOrder', label: t('付费次数') },
 ];
 
+const metricDictRows = ref<MetaReportMetricDictRow[]>([]);
+const dimensionDictRows = ref<MetaReportDimensionDictRow[]>([]);
+
+const fallbackDimensionOptions = [
+  { value: 'date', label: t('日期') },
+  { value: 'department', label: t('部门') },
+  { value: 'optimizer', label: t('优化师') },
+  { value: 'channel', label: t('渠道') },
+  { value: 'ad_account', label: t('广告账户') },
+  { value: 'campaign', label: t('系列') },
+  { value: 'ad_group', label: t('广告组') },
+  { value: 'creative', label: t('创意') },
+  { value: 'region', label: t('地区') },
+];
+
+const addCardMetricOptions = computed(() => {
+  if (!metricDictRows.value.length) {
+    return legacyAddCardMetricOptions.map((option) => ({
+      ...option,
+      permissionSlug: `promotion-dashboard:metric:${option.value}`,
+    }));
+  }
+
+  return metricDictRows.value.map((row) => ({
+    value: row.metric_key,
+    label: row.metric_name || row.metric_key,
+    permissionSlug: row.permission_slug || `promotion-dashboard:metric:${row.metric_key}`,
+  }));
+});
+
+const addCardDimensionOptions = computed(() => {
+  if (!dimensionDictRows.value.length) {
+    return fallbackDimensionOptions;
+  }
+
+  return dimensionDictRows.value.map((row) => ({
+    value: row.dimension_key,
+    label: row.dimension_name || row.dimension_key,
+  }));
+});
+
 /** 趋势图 — 分组聚合下拉（顺序与设计稿一致） */
 const currentUserPermissionSlugs = computed(() => collectUserPermissionSlugs(userStore.permissions));
 const visibleAddCardMetricOptions = computed(() => {
   if (userStore.is_super === 1) {
-    return addCardMetricOptions;
+    return addCardMetricOptions.value;
   }
 
-  const allowedMetricValues = addCardMetricOptions
-    .filter((option) => currentUserPermissionSlugs.value.includes(dashboardMetricPermissionMap[option.value]))
+  const allowedMetricValues = addCardMetricOptions.value
+    .filter((option) => currentUserPermissionSlugs.value.includes(option.permissionSlug))
     .map((option) => option.value);
 
   if (allowedMetricValues.length === 0) {
-    return addCardMetricOptions;
+    return addCardMetricOptions.value;
   }
 
-  return addCardMetricOptions.filter((option) => allowedMetricValues.includes(option.value));
+  return addCardMetricOptions.value.filter((option) => allowedMetricValues.includes(option.value));
 });
 
 const getAvailableMetricOptions = () => {
-  return visibleAddCardMetricOptions.value.length ? visibleAddCardMetricOptions.value : addCardMetricOptions;
+  return visibleAddCardMetricOptions.value.length ? visibleAddCardMetricOptions.value : addCardMetricOptions.value;
+};
+
+const normalizeAddCardSelections = () => {
+  const metricPool = getAvailableMetricOptions();
+  const metricSet = new Set(metricPool.map((item) => item.value));
+  const dimensionPool = addCardDimensionOptions.value;
+  const dimensionSet = new Set(dimensionPool.map((item) => item.value));
+
+  addCardForm.value.metrics = addCardForm.value.metrics.filter((metric) => metricSet.has(metric));
+  if (!addCardForm.value.metrics.length && metricPool.length) {
+    addCardForm.value.metrics = [metricPool[0].value];
+  }
+
+  if (addCardForm.value.sortField && !metricSet.has(addCardForm.value.sortField)) {
+    addCardForm.value.sortField = addCardForm.value.metrics[0] ?? metricPool[0]?.value ?? 'cost';
+  }
+
+  if (addCardForm.value.xAxisMetric && !metricSet.has(addCardForm.value.xAxisMetric)) {
+    addCardForm.value.xAxisMetric = metricPool[0]?.value ?? 'cost';
+  }
+
+  if (addCardForm.value.yAxisMetric && !metricSet.has(addCardForm.value.yAxisMetric)) {
+    addCardForm.value.yAxisMetric = metricPool[1]?.value ?? metricPool[0]?.value ?? 'impressions';
+  }
+
+  if (Array.isArray(addCardForm.value.dimension)) {
+    addCardForm.value.dimension = addCardForm.value.dimension.filter((dimension) => dimensionSet.has(dimension));
+    if (!addCardForm.value.dimension.length && dimensionPool.length) {
+      addCardForm.value.dimension = [dimensionPool[0].value];
+    }
+  } else if (addCardForm.value.dimension && !dimensionSet.has(addCardForm.value.dimension)) {
+    addCardForm.value.dimension = dimensionPool[0]?.value ?? 'date';
+  }
 };
 
 const groupAggregationOptions = [
@@ -4429,6 +4463,21 @@ const loadFoldersAndDashboards = async () => {
   }
 };
 
+const loadDashboardDictionaries = async () => {
+  try {
+    const [metricRes, dimensionRes] = await Promise.all([
+      fetchMetaReportMetricDicts({ status: 'active' }),
+      fetchMetaReportDimensionDicts({ status: 'active' }),
+    ]);
+    metricDictRows.value = metricRes?.data ?? [];
+    dimensionDictRows.value = dimensionRes?.data ?? [];
+  } catch (error) {
+    console.error('加载看板字典失败:', error);
+    metricDictRows.value = [];
+    dimensionDictRows.value = [];
+  }
+};
+
 const handleCreateMenuClick = (info: any) => {
   const key = String(info.key);
   if (key === 'new-dashboard') {
@@ -5031,6 +5080,14 @@ watch(
   { immediate: true },
 );
 
+watch(
+  [addCardMetricOptions, addCardDimensionOptions],
+  () => {
+    normalizeAddCardSelections();
+  },
+  { immediate: true },
+);
+
 const getChartTypeLabel = (chartType: string) => {
   return cardChartTypeOptions.find((item) => item.value === chartType)?.label ?? t('图表');
 };
@@ -5039,7 +5096,7 @@ const getChartTypeLabel = (chartType: string) => {
 const trendXLabelsLarge = ['03/01', '03/06', '03/11', '03/16', '03/21', '03/26', '03/31'];
 
 const getMetricLabel = (value: string) => {
-  const opt = addCardMetricOptions.find((o) => o.value === value);
+  const opt = addCardMetricOptions.value.find((o) => o.value === value);
   if (opt) return opt.label;
   if (value === 'cost') return t('花费');
   if (value === 'spend') return t('花费');
@@ -6601,6 +6658,7 @@ const disposeCharts = () => {
 };
 
 onMounted(() => {
+  loadDashboardDictionaries();
   loadFoldersAndDashboards();
   // Initial load based on default selectedReport
   if (selectedReport.value === 'summary') {

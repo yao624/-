@@ -45,6 +45,7 @@ use App\Http\Controllers\MetaTask\ScheduledReportController;
 use App\Http\Controllers\MetaTask\NotificationCenterController;
 use App\Http\Controllers\MetaReport\MetaReportDashboardCardController;
 use App\Http\Controllers\MetaReport\MetaReportDashboardController;
+use App\Http\Controllers\MetaReport\MetaReportDictionaryController;
 use App\Http\Controllers\MetaReport\MetaReportDashboardFolderController;
 use App\Http\Controllers\MetaAdCreationCreativeGroupController;
 use App\Http\Controllers\MetaAdCreationDraftController;
@@ -480,6 +481,8 @@ Route::prefix('/v2')->group(function () {
         Route::post('meta-report-dashboard-folders', [MetaReportDashboardFolderController::class, 'store']);
         Route::patch('meta-report-dashboard-folders/{metaReportDashboardFolder}', [MetaReportDashboardFolderController::class, 'update']);
         Route::delete('meta-report-dashboard-folders/{metaReportDashboardFolder}', [MetaReportDashboardFolderController::class, 'destroy']);
+        Route::get('meta-report-dictionaries/metrics', [MetaReportDictionaryController::class, 'metrics']);
+        Route::get('meta-report-dictionaries/dimensions', [MetaReportDictionaryController::class, 'dimensions']);
         Route::get('links/tags/options', [LinkController::class, 'listTagOptions']);
         Route::put('links/{link}/tags', [LinkController::class, 'updateTags']);
         Route::post('links/import', [LinkController::class, 'import']);

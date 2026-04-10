@@ -31,6 +31,40 @@ export interface MetaReportCardRow {
   style_config?: Record<string, unknown> | null;
 }
 
+export interface MetaReportMetricDictRow {
+  id: string;
+  metric_key: string;
+  metric_name: string;
+  metric_name_en?: string | null;
+  unit?: string | null;
+  data_type: string;
+  aggregation_type: string;
+  supported_levels: string[];
+  supported_chart_types: string[];
+  is_filterable: boolean;
+  is_sortable: boolean;
+  is_permission_controlled: boolean;
+  permission_slug?: string | null;
+  sort_order: number;
+  status: string;
+  description?: string | null;
+}
+
+export interface MetaReportDimensionDictRow {
+  id: string;
+  dimension_key: string;
+  dimension_name: string;
+  dimension_name_en?: string | null;
+  value_type: string;
+  supported_levels: string[];
+  is_groupable: boolean;
+  is_filterable: boolean;
+  is_default: boolean;
+  sort_order: number;
+  status: string;
+  description?: string | null;
+}
+
 export async function fetchMetaReportDashboards(params?: { folder_id?: string; board_type?: string; keyword?: string }) {
   return request.get<any, { data: MetaReportDashboardRow[] }>('/meta-report-dashboards', { params });
 }
@@ -128,3 +162,10 @@ export async function deleteMetaReportCard(cardId: string) {
   return request.delete(`/meta-report-dashboard-cards/${cardId}`);
 }
 
+export async function fetchMetaReportMetricDicts(params?: { status?: string }) {
+  return request.get<any, { data: MetaReportMetricDictRow[] }>('/meta-report-dictionaries/metrics', { params });
+}
+
+export async function fetchMetaReportDimensionDicts(params?: { status?: string }) {
+  return request.get<any, { data: MetaReportDimensionDictRow[] }>('/meta-report-dictionaries/dimensions', { params });
+}

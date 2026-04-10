@@ -14,12 +14,13 @@
         </a-radio-group>
       </a-form-item>
       <a-form-item label="Tags">
-        <a-select
-          v-model:value="selectedTags"
-          mode="tags"
-          :options="tagOptions"
-          placeholder="请输入或选择标签"
-          style="width: 100%"
+        <tag-select
+          v-model:modelValue="selectedTagOptionIds"
+          :tag-folders="metaTagTree.tagFolders"
+          :tags="metaTagTree.tags"
+          :tag-options="metaTagTree.tagOptions"
+          placeholder="请选择标签"
+          :creatable="false"
         />
       </a-form-item>
     </a-form>
@@ -28,15 +29,24 @@
 
 <script lang="ts">
 import type { PropType } from 'vue';
-import { defineComponent, ref, watch } from 'vue';
+import { defineComponent, reactive, ref, watch } from 'vue';
 import { message } from 'ant-design-vue';
-import { getLinksValidTags, updateLinkTagsApi } from '@/api/links';
+import TagSelect from '@/components/tag-select/index.vue';
+import { getMetaTagsTree } from '@/api/promotion';
+import { updateLinkTagsApi } from '@/api/links';
 import type { LinkModel } from '@/utils/fb-interfaces';
-
-type TagOption = { label: string; value: string };
+import {
+  normalizeMetaTagTreePayload,
+  resolveNamesByOptionIds,
+  resolveOptionIdsByNames,
+  type LinkMetaTagTreePayload,
+} from './tag-select-utils';
 
 export default defineComponent({
   name: 'LinkTagModal',
+  components: {
+    TagSelect,
+  },
   props: {
     open: { type: Boolean, required: true },
     model: {
@@ -48,16 +58,19 @@ export default defineComponent({
   setup(props, { emit }) {
     const loading = ref(false);
     const action = ref<'add' | 'delete'>('add');
-    const selectedTags = ref<string[]>([]);
-    const tagOptions = ref<TagOption[]>([]);
+    const selectedTagOptionIds = ref<number[]>([]);
+    const metaTagTree = reactive<LinkMetaTagTreePayload>({
+      tagFolders: [],
+      tags: [],
+      tagOptions: [],
+    });
 
-    const loadTags = async () => {
-      const res: any = await getLinksValidTags();
-      const list = Array.isArray(res?.data) ? res.data : [];
-      tagOptions.value = list.map((tag: any) => ({
-        label: tag.user_name ? `${tag.name} - ${tag.user_name}` : tag.name,
-        value: tag.name,
-      }));
+    const loadMetaTags = async () => {
+      const res: any = await getMetaTagsTree();
+      const payload = normalizeMetaTagTreePayload(res?.data);
+      metaTagTree.tagFolders = payload.tagFolders;
+      metaTagTree.tags = payload.tags;
+      metaTagTree.tagOptions = payload.tagOptions;
     };
 
     watch(
@@ -65,8 +78,11 @@ export default defineComponent({
       async (value) => {
         if (!value) return;
         action.value = 'add';
-        selectedTags.value = [];
-        await loadTags();
+        await loadMetaTags();
+        const currentTagNames = Array.isArray(props.model?.tags)
+          ? props.model?.tags.map((item: any) => String(item?.name ?? '')).filter(Boolean)
+          : [];
+        selectedTagOptionIds.value = resolveOptionIdsByNames(currentTagNames, metaTagTree.tagOptions);
       },
       { immediate: true }
     );
@@ -76,7 +92,9 @@ export default defineComponent({
         return;
       }
 
-      if (!selectedTags.value.length) {
+      const selectedNames = resolveNamesByOptionIds(selectedTagOptionIds.value, metaTagTree.tagOptions);
+
+      if (!selectedNames.length) {
         message.warning('请至少填写一个标签');
         return;
       }
@@ -85,7 +103,7 @@ export default defineComponent({
         loading.value = true;
         await updateLinkTagsApi(props.model.id, {
           action: action.value,
-          names: selectedTags.value,
+          names: selectedNames,
         });
         message.success('标签更新成功');
         emit('ok');
@@ -99,8 +117,8 @@ export default defineComponent({
     return {
       loading,
       action,
-      selectedTags,
-      tagOptions,
+      metaTagTree,
+      selectedTagOptionIds,
       handleSubmit,
     };
   },
