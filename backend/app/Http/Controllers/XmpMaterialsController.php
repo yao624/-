@@ -9,6 +9,32 @@ use Illuminate\Support\Facades\Storage;
 
 class XmpMaterialsController extends Controller
 {
+    /**
+     * Normalize stored media URLs so legacy hosts like localhost or old domains
+     * still resolve against the current application host.
+     */
+    private function normalizeMediaUrl(?string $url): ?string
+    {
+        $raw = trim((string) $url);
+        if ($raw === '') {
+            return null;
+        }
+
+        $storageMarker = '/storage/';
+        $storagePos = strpos($raw, $storageMarker);
+        if ($storagePos !== false) {
+            $path = substr($raw, $storagePos);
+            $path = '/' . ltrim($path, '/');
+            return url($path);
+        }
+
+        if (preg_match('#^https?://#i', $raw)) {
+            return $raw;
+        }
+
+        return url('/' . ltrim($raw, '/'));
+    }
+
     private function authUserId(): ?int
     {
         $id = Auth::guard('sanctum')->id();
@@ -778,7 +804,7 @@ class XmpMaterialsController extends Controller
                 'tags' => $tagsMap[(string) $m->id] ?? [],
                 // tags_label：直接返回标签名 label（前端列表展示用）
                 'tags_label' => $tagsLabelMap[(string) $m->id] ?? [],
-                'thumbnail' => $m->thumbnail_url ?: $m->file_url,
+                'thumbnail' => $this->normalizeMediaUrl($m->thumbnail_url ?: $m->file_url),
                 'width' => $m->width !== null && $m->width !== '' ? (int) $m->width : null,
                 'height' => $m->height !== null && $m->height !== '' ? (int) $m->height : null,
                 // 统计字段：with_statistics 时回填聚合结果
@@ -1199,7 +1225,7 @@ class XmpMaterialsController extends Controller
                 'localId' => $m->local_id,
                 'tags' => $tagsMap[(string) $m->id] ?? [],
                 'tags_label' => $tagsLabelMap[(string) $m->id] ?? [],
-                'thumbnail' => $m->thumbnail_url ?: $m->file_url,
+                'thumbnail' => $this->normalizeMediaUrl($m->thumbnail_url ?: $m->file_url),
                 'width' => $m->width !== null && $m->width !== '' ? (int) $m->width : null,
                 'height' => $m->height !== null && $m->height !== '' ? (int) $m->height : null,
                 // 兼容旧字段：cost 表示花费(spend)

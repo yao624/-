@@ -13,7 +13,7 @@ export default ({ mode }: ConfigEnv): UserConfig => {
   const apiBase = env.VITE_APP_API_BASE_URL || '/api/v2';
   const publicPath = env.VITE_APP_PUBLIC_PATH || '/';
   // 与 backend .env APP_URL 对齐；勿默认指向外网域名，否则代理到错误站点会全接口 404
-  const proxyTarget = env.VITE_PROXY_TARGET || env.VUE_APP_PROXY_TARGET || 'http://localhost';
+  const proxyTarget = env.VITE_PROXY_TARGET || env.VUE_APP_PROXY_TARGET || 'http://www.toufang.com/';
   return {
     base: publicPath,
     // 兼容 Cli

@@ -1,0 +1,162 @@
+import type { RouteRecordRaw } from 'vue-router';
+import type { MenuDataItem } from './typing';
+import type { RouteItem } from '@/api/user/login';
+import { getCurrentUserNav } from '@/api/user/login';
+
+// 根级菜单
+const rootRouter: MenuDataItem = {
+  name: 'index',
+  path: '/',
+  redirect: '/promotion/meta-ad',
+  meta: {
+    title: '首页',
+  },
+  component: () => import('@/layouts/index.vue'),
+  children: [] as MenuDataItem[],
+};
+
+const defineRouteComponents: Record<string, any> = {
+  BasicLayout: () => import('@/layouts/index.vue'),
+  RouteView: () => import('@/layouts/route-view.vue'),
+  PageView: () => import('@/layouts/route-view.vue'),
+};
+
+const defineRouteComponentKeys = Object.keys(defineRouteComponents);
+
+export const generator = (
+  routeMap: RouteItem[],
+  parentId: string | number,
+  routeItem?: RouteRecordRaw | MenuDataItem,
+) => {
+  return routeMap
+    .filter(item => item.parentId === parentId)
+    .map(item => {
+      const { title, hideInMenu, hideChildrenInMenu, target, icon, authority } = item.meta || {};
+      const currentRouter: MenuDataItem = {
+        // 如果路由设置了 path，则作为默认 path，否则 路由地址 动态拼接生成如 /dashboard/workplace
+        path: item.path || `${(routeItem && routeItem.path) || ''}/${item.name}`,
+        // 路由名称，建议唯一
+        name: item.name || `${item.id}`,
+        // meta: 页面标题, 菜单图标, 页面权限(供指令权限用，可去掉)
+        meta: {
+          title,
+          icon: icon || undefined,
+          hideInMenu,
+          hideChildrenInMenu,
+          target: target,
+          authority: authority,
+        },
+        // 该路由对应页面的 组件 (动态加载 @/views/ 下面的路径文件)
+        component:
+          item.component && defineRouteComponentKeys.includes(item.component)
+            ? defineRouteComponents[item.component]
+            : () => import(/* @vite-ignore */ `/src/views/${item.component}`),
+      };
+
+      // 为了防止出现后端返回结果不规范，处理有可能出现拼接出两个 反斜杠
+      if (currentRouter.path && !currentRouter.path.startsWith('http')) {
+        currentRouter.path = currentRouter.path.replace('//', '/');
+      }
+
+      // 重定向
+      item.redirect && (currentRouter.redirect = item.redirect);
+
+      // 子菜单，递归处理
+      currentRouter.children = generator(routeMap, item.id, currentRouter);
+      if (currentRouter.children === undefined || currentRouter.children.length <= 0) {
+        delete currentRouter.children;
+      }
+      return currentRouter;
+    })
+    .filter(item => item);
+};
+
+// 从树形结构生成路由
+const generatorFromTree = (treeData: any[], parentRoute?: MenuDataItem): MenuDataItem[] => {
+  return treeData
+    .filter(item => !item.meta?.hideInMenu)
+    .map(item => {
+      const meta = item.meta || {};
+      const { hideInMenu, hideChildrenInMenu, target, icon, authority } = meta;
+      const title = meta.title || item.name; // 使用 name 作为 fallback
+      const currentRouter: MenuDataItem = {
+        path: item.path || (parentRoute ? `${parentRoute.path}/${item.name}` : `/${item.name}`),
+        name: item.name || `${item.id}`,
+        meta: {
+          title,
+          icon: icon || undefined,
+          hideInMenu,
+          hideChildrenInMenu,
+          target,
+          authority,
+        },
+      };
+
+      // 处理组件
+      if (item.component) {
+        if (defineRouteComponentKeys.includes(item.component)) {
+          currentRouter.component = defineRouteComponents[item.component];
+        } else {
+          // 移除 @/ 前缀，转换为相对路径
+          const componentPath = item.component.replace('@/', '');
+          currentRouter.component = () => import(/* @vite-ignore */ `/src/${componentPath}`);
+        }
+      }
+
+      // 防止 path 重复斜杠
+      if (currentRouter.path && !currentRouter.path.startsWith('http')) {
+        currentRouter.path = currentRouter.path.replace('//', '/');
+      }
+
+      // 重定向
+      if (item.redirect) {
+        currentRouter.redirect = item.redirect;
+      }
+
+      // 递归处理子菜单
+      if (item.children && item.children.length > 0 && !hideChildrenInMenu) {
+        currentRouter.children = generatorFromTree(item.children, currentRouter);
+      }
+
+      return currentRouter;
+    })
+    .filter(item => item);
+};
+
+/**
+ * 递归查找第一个有效菜单路径（叶子节点且有组件）
+ */
+const findFirstMenuPath = (routes: MenuDataItem[]): string | null => {
+    for (const route of routes) {
+        // 如果有子菜单，递归查找
+        if (route.children && route.children.length > 0) {
+            const childPath = findFirstMenuPath(route.children);
+            if (childPath) return childPath;
+        }
+        // 如果当前路由有路径和组件，返回
+        if (route.path && route.component) {
+            return route.path;
+        }
+    }
+    return null;
+};
+
+export const generatorDynamicRouter = () => {
+    return new Promise<RouteRecordRaw>((resolve, reject) => {
+        getCurrentUserNav()
+            .then((res: any) => {
+                // 接口返回的 data 已经是树结构（有 children）
+                const menuData = res?.data || res || [];
+                const routes = generatorFromTree(menuData);
+
+                // 动态设置重定向到第一个有效菜单
+                const firstPath = findFirstMenuPath(routes);
+                rootRouter.redirect = firstPath || '/no-menu';
+                rootRouter.children = routes;
+                resolve(rootRouter as RouteRecordRaw);
+            })
+            .catch(err => {
+                reject(err);
+            });
+    });
+};

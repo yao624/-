@@ -1,78 +1,92 @@
-﻿sql־@backend/sql/sql޸־.txt
+SQL 操作日志 @ backend/sql/sql修改日志.txt
 
-2026-03-25  Meta İر
-- Ǩƽű: database/migrations/2026_03_25_100000_create_meta_copy_library_tables.php
-- SQLļLZC: backend/sql/lzc/tool_copy_library.sql
-- 漰:
-  - meta_copy_libraries: İָ/ҵİ⡢ûɼΧ״̬
-  - meta_copy_folders: İ༶ļУ֧ 20 ͳֱϵϼİ
-  - meta_copy_items: İݣprimary_text/headline/description/ע ȣļ
-  - meta_copy_library_permissions: İȨû/ɫƿɹдɾȨ
-  - meta_copy_performance_daily: İάͶտգ¼չʾ///ת/ָ
-- ;˵:  XMP ġİ⡱ͶŲṩ/ҵİ顢༶ļкȨ޿ƣɰİͶűݣΪѡİú͸ṩݽṹ
+2026-03-25 Meta 文案库 LZC
+- 迁移脚本: database/migrations/2026_03_25_100000_create_meta_copy_library_tables.php
+- SQL 文件 LZC: backend/sql/lzc/tool_copy_library.sql
+- 涉及表:
+  - meta_copy_libraries: 文案库主表，区分个人库/企业库、可见范围和状态
+  - meta_copy_folders: 文案库多级文件夹，支持层级结构和排序
+  - meta_copy_items: 文案内容表，包含 primary_text、headline、description、备注等
+  - meta_copy_library_permissions: 文案库权限表，支持用户/角色级别授权
+  - meta_copy_performance_daily: 文案效果日汇总表
+- 用途说明: 为 XMP 文案库提供库、文件夹、内容、权限和效果沉淀的数据结构
 
-2026-03-27  Meta ر
-- Ǩƽű: database/migrations/2026_03_27_120000_create_meta_report_dashboard_tables.php
-- SQLļLZC: backend/sql/lzc/tool_report_dashboard.sql
-- 漰:
-  - meta_report_dashboard_folders: ļ༶Ŀ¼ +  + ״̬
-  - meta_report_dashboards: ơļСλãҵ//ϵͳ͡Ĭɸѡϴαʱ
-  - meta_report_dashboard_cards: 忨Ƭñ¼Ƭ⡢ͼ͡״Լѯ/ʽ
-  - meta_report_dashboard_shares: Ȩޱû/ɫܷ༭Э
-- ;˵: ֧ǰˡ/Զ忴塱ܣṩû֯ĿĿ¼ϢƬѯãԼ干/ЭȨ޵ĳ־ûṹ
+2026-03-27 Meta 报表看板 LZC
+- 迁移脚本: database/migrations/2026_03_27_120000_create_meta_report_dashboard_tables.php
+- SQL 文件 LZC: backend/sql/lzc/tool_report_dashboard.sql
+- 涉及表:
+  - meta_report_dashboard_folders: 看板文件夹
+  - meta_report_dashboards: 看板主表
+  - meta_report_dashboard_cards: 看板卡片配置
+  - meta_report_dashboard_shares: 看板共享权限
+- 用途说明: 支撑 Meta 报表看板的目录、卡片、共享和查询配置
 
-2026-03-31  Meta Facebook ҳرLZC
-- SQLļ: backend/sql/lzc/tool_facebook_homepage.sql
-- 漰:
-  - meta_fb_pages: FacebookҳϢҳIDơȨ״̬ͬʱȣ
-  - meta_fb_keyword_packs: ؼʰ״̬ˣ
-  - meta_fb_keywords: ؼϸؼʡƥ䷽ʽȼظģ壩
-  - meta_fb_page_auto_rules: ҳԶãͣؼʰ
-  - meta_fb_page_bindings: ҳԴ˺/ʲ󶨹ϵԴ͡ԴID״̬
-  - meta_fb_post_comments: ӡݡ״̬ݣ
-  - meta_fb_comment_actions: ۲ˮ/ɾ/ظʧϢ
-- ;˵: ء > Facebookҳģĺݽṹ֧ҳ۹ؼʻظͺ
+2026-03-31 Meta Facebook 主页 LZC
+- SQL 文件: backend/sql/lzc/tool_facebook_homepage.sql
+- 涉及表:
+  - meta_fb_pages
+  - meta_fb_keyword_packs
+  - meta_fb_keywords
+  - meta_fb_page_auto_rules
+  - meta_fb_page_bindings
+  - meta_fb_post_comments
+  - meta_fb_comment_actions
+- 用途说明: 支撑 Facebook 主页管理、关键词回复和评论处理能力
 
-2026-03-31  - رLZC
-- SQLļ: backend/sql/lzc/tool_task_center.sql
-- 漰:
-  - meta_task_jobs: ͡״̬ύ/ʱ䡢ˡͨ/˺/ʲɸѡֶΡյȣ
-  - meta_task_job_items: ϸִĿֵĶ󼶽·ִյȣ
-  - meta_task_operation_logs: ־/༭//AIִ/ԵȲƣ
-- ;˵: ֧š > ġб顢ִнԣԼơ
+2026-03-31 Meta 任务中心 LZC
+- SQL 文件: backend/sql/lzc/tool_task_center.sql
+- 涉及表:
+  - meta_task_jobs
+  - meta_task_job_items
+  - meta_task_operation_logs
+- 用途说明: 支撑任务列表、任务项执行明细和任务操作日志
 
-2026-03-31  Meta ֪ͨ رLZC
-- SQLļ: backend/sql/lzc/tool_notifications.sql
-- 漰:
-  - meta_notifications: û֪ͨûһУ֧͡Ѷ/ɾ״̬չתϢȣ
-- ;˵: ֧š֪ͨġб/δ/Ѷ״̬άΪġϵͳ֪ͨAI֪ͨṩͳһء
+2026-03-31 Meta 通知中心 LZC
+- SQL 文件: backend/sql/lzc/tool_notifications.sql
+- 涉及表:
+  - meta_notifications
+- 用途说明: 支撑系统通知和 AI 通知的统一消息中心
 
-2026-03-31  Meta ʱ رLZC
-- SQLļ: backend/sql/lzc/tool_scheduled_reports.sql
-- 漰:
-  - meta_scheduled_reports: ʱ͡cronʱռˡ´ʱȣ
-  - meta_scheduled_report_cards: ʱƬƬáɸѡλõȣ
-  - meta_scheduled_report_runs: ʱм¼ʽ״̬Ϣַȣ
-- ;˵: ֧šʱáʼִм¼׷١
+2026-03-31 Meta 定时报表 LZC
+- SQL 文件: backend/sql/lzc/tool_scheduled_reports.sql
+- 涉及表:
+  - meta_scheduled_reports
+  - meta_scheduled_report_cards
+  - meta_scheduled_report_runs
+- 用途说明: 支撑定时报表配置、卡片快照和执行记录
 
-2026-04-08 links ṹ
-- Ǩļ: database/migrations/2026_04_08_160000_add_language_fields_to_links_table.php
-- ݱ: links
-- ֶ: default_locale, language_variants, import_source
-- ;˵: ֶ֧ URLԴ٣Լʲ
-2026-04-08 links ǩ
-- Ǩļ: database/migrations/2026_04_08_170000_create_link_tags_table.php
-- ݱ: link_tags
-- ޸˵: links ģ鲻ٸͨ tags/taggablesΪʹö link_tags ǩ
-- Ӱ췶Χ: /༭ӱǩάӱǩɸѡ뵼ǩд
-2026-04-08 link_tags עͲ
-- Ǩļ: database/migrations/2026_04_08_180000_add_comments_to_link_tags_table.php
-- ݱ: link_tags
-- ޸˵: Ϊ link_tags ֶβעͣΪ InnoDB
-2026-04-09  Meta ָ/άֵ
-- Ǩƽű: database/migrations/2026_04_09_150000_create_meta_report_dictionary_tables.php
-- 漰ݱ:
-  - meta_report_metric_dicts: ֵָ䣬ͳһάָ롢ơλۺϷʽͼȨ slug ȶ
-  - meta_report_dimension_dicts: άֵ䣬ͳһάάȱ롢ơֵ͡Ƿɷ/ɸѡò㼶ȶ
- 
+2026-04-08 links 多语言字段
+- 迁移文件: database/migrations/2026_04_08_160000_add_language_fields_to_links_table.php
+- 数据表: links
+- 字段:
+  - default_locale
+  - language_variants
+  - import_source
+- 用途说明: 支撑链接多语言 URL 配置、默认语言和导入来源标记
 
+2026-04-08 links 标签表
+- 迁移文件: database/migrations/2026_04_08_170000_create_link_tags_table.php
+- 数据表: link_tags
+- 变更说明: links 模块不再复用通用 tags/taggables，改为使用 link_tags 独立维护链接标签
+- 影响范围: 链接新增、编辑、标签维护、标签筛选、批量导入标签写入
+
+2026-04-08 link_tags 注释补充
+- 迁移文件: database/migrations/2026_04_08_180000_add_comments_to_link_tags_table.php
+- 数据表: link_tags
+- 变更说明: 为 link_tags 表及字段补充中文注释，并统一存储引擎为 InnoDB
+
+2026-04-09 Meta 指标/维度字典
+- 迁移脚本: database/migrations/2026_04_09_150000_create_meta_report_dictionary_tables.php
+- 涉及表:
+  - meta_report_metric_dicts: 指标字典，统一指标编码、名称、单位、聚合方式和权限控制
+  - meta_report_dimension_dicts: 维度字典，统一维度编码、名称、可筛选项和层级配置
+
+2026-04-10 link_tags 增加标签选项关联
+- 迁移文件: database/migrations/2026_04_10_170000_add_meta_tag_option_id_to_link_tags_table.php
+- 数据表: link_tags
+- 新增字段:
+  - meta_tag_option_id: 关联 meta_tag_options.id
+- 新增索引:
+  - idx_link_tags_user_option (`user_id`, `meta_tag_option_id`)
+  - idx_link_tags_link_option (`link_id`, `meta_tag_option_id`)
+- 变更说明: 链接标签改为通过标签选项 ID 精确关联，解决同名标签歧义问题；name 字段仅保留为展示快照

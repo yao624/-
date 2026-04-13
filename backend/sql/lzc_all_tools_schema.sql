@@ -573,31 +573,42 @@ CREATE TABLE IF NOT EXISTS `meta_scheduled_report_runs` (
  * ===================================================================== */
 
 ALTER TABLE `links`
-  ADD COLUMN `default_locale` VARCHAR(32) NULL COMMENT '默诨代码' AFTER `notes`,
-  ADD COLUMN `language_variants` JSON NULL COMMENT '多 URL 变体配置' AFTER `default_locale`,
-  ADD COLUMN `import_source` VARCHAR(32) NULL COMMENT '手动或入来源标? AFTER `language_variants`;
+  ADD COLUMN `default_locale` VARCHAR(32) NULL COMMENT '默认语言代码' AFTER `notes`,
+  ADD COLUMN `language_variants` JSON NULL COMMENT '多语言 URL 变体配置' AFTER `default_locale`,
+  ADD COLUMN `import_source` VARCHAR(32) NULL COMMENT '手动或导入来源标记' AFTER `language_variants`;
 /* =====================================================================
- * 2026-04-08 links 狫标?
+ * 2026-04-08 links 标签表
  * 迁移文件: database/migrations/2026_04_08_170000_create_link_tags_table.php
- * 数据? link_tags
- * 用? links 模块不再复用通用 tags/taggables，改为使用独?link_tags 表存储链接标?
+ * 数据表: link_tags
+ * 用途: links 模块不再复用通用 tags/taggables，改为使用独立 link_tags 表存储链接标签
  * ===================================================================== */
 
 CREATE TABLE `link_tags` (
   `id` CHAR(26) NOT NULL COMMENT '主键 ULID',
   `link_id` CHAR(26) NOT NULL COMMENT '关联 links.id',
-  `user_id` VARCHAR(26) NOT NULL COMMENT '属用?ID',
-  `name` VARCHAR(191) NOT NULL COMMENT '标名称',
-  `created_at` TIMESTAMP NULL DEFAULT NULL,
-  `updated_at` TIMESTAMP NULL DEFAULT NULL,
-  `deleted_at` TIMESTAMP NULL DEFAULT NULL,
+  `user_id` VARCHAR(26) NOT NULL COMMENT '所属用户 ID',
+  `name` VARCHAR(191) NOT NULL COMMENT '标签名称快照',
+  `created_at` TIMESTAMP NULL DEFAULT NULL COMMENT '创建时间',
+  `updated_at` TIMESTAMP NULL DEFAULT NULL COMMENT '更新时间',
+  `deleted_at` TIMESTAMP NULL DEFAULT NULL COMMENT '软删除时间',
   PRIMARY KEY (`id`),
   KEY `idx_link_tags_link_user` (`link_id`, `user_id`),
   KEY `idx_link_tags_user_name` (`user_id`, `name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='链接模块狫标?;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='链接模块独立标签表';
 /* =====================================================================
- * 2026-04-08 link_tags 表注释补?
+ * 2026-04-08 link_tags 表注释补充
  * 迁移文件: database/migrations/2026_04_08_180000_add_comments_to_link_tags_table.php
- * 俔说明: ?link_tags 表及其字段补充中文注释，并将存储引擎调整?InnoDB
+ * 变更说明: 为 link_tags 表及其字段补充中文注释，并将存储引擎调整为 InnoDB
  * ===================================================================== */
+
+/* =====================================================================
+ * 2026-04-10 link_tags 补充标签选项关联字段
+ * 迁移文件: database/migrations/2026_04_10_170000_add_meta_tag_option_id_to_link_tags_table.php
+ * 变更说明: 增加 meta_tag_option_id，用于关联 meta_tag_options.id，解决同名标签无法精确关联的问题
+ * ===================================================================== */
+
+ALTER TABLE `link_tags`
+  ADD COLUMN `meta_tag_option_id` BIGINT UNSIGNED NULL COMMENT '关联 meta_tag_options.id' AFTER `user_id`,
+  ADD KEY `idx_link_tags_user_option` (`user_id`, `meta_tag_option_id`),
+  ADD KEY `idx_link_tags_link_option` (`link_id`, `meta_tag_option_id`);
 

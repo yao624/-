@@ -312,6 +312,7 @@
               </a-button>
             </a-dropdown>
             <div class="action-right">
+              <a-button @click="materialPickerOpen = true">素材选择器</a-button>
               <a-button :icon="h(ReloadOutlined)" @click="reloadTable">{{ t('刷新') }}</a-button>
               <a-dropdown>
                 <template #overlay>
@@ -694,6 +695,12 @@
     <!-- 新建素材库弹窗 -->
     <create-library-modal v-model:open="createLibraryModalVisible" :library-type="createLibraryType"
       @success="handleCreateLibrarySuccess" />
+
+    <material-picker
+      v-model:open="materialPickerOpen"
+      :multiple="true"
+      @confirm:items-selected="handleMaterialPickerSelected"
+    />
 
     <!-- 批量设置标签弹窗 -->
     <a-modal v-model:open="batchTagModalVisible" :title="t('批量编辑标签')" width="900px" :confirm-loading="batchSaving"
@@ -1102,7 +1109,6 @@ import {
   StarOutlined,
   UserOutlined,
   BankOutlined,
-  TeamOutlined,
   RightOutlined,
   DownOutlined,
   FolderFilled,
@@ -1122,6 +1128,7 @@ import {
 import UploadMaterialModal from './components/upload-material-modal.vue';
 import CreateFolderModal from './components/create-folder-modal.vue';
 import CreateLibraryModal from './components/create-library-modal.vue';
+import MaterialPicker from '@/components/material-picker/index.vue';
 import TagSelect from '@/components/tag-select/index.vue';
 import AdvancedSearchSelect, {
   type AdvancedSelectCategory,
@@ -1137,6 +1144,7 @@ import {
   deleteMaterialLibraryFolder,
   moveMaterialLibraryFolder,
 } from '@/api/material-library/folders';
+import { getOrganizationTree } from '@/api/system/organization';
 
 import {
   listMaterialLibraryColumnTemplates,
@@ -1299,8 +1307,6 @@ const getFolderRootLabel = (folderId: any) => {
   if (inMy) return t('我的素材库');
   const inEnterprise = !!findFolderById(enterpriseFolders.value || [], id);
   if (inEnterprise) return t('企业素材库');
-  const inDept = !!findFolderById(departmentFolders.value || [], id);
-  if (inDept) return t('我的部门');
 
   return t('我的素材库');
 };
@@ -1349,20 +1355,10 @@ const currentBreadcrumbItems = computed<BreadcrumbItem[]>(() => {
     return [{ label: t('企业素材库'), folderId: rootId }, ...nodes];
   }
 
-  const chainInDept = findFolderChainById(departmentFolders.value || [], selectedId);
-  if (chainInDept && chainInDept.length) {
-    const rootId = chainInDept[0]?.id;
-    const nodes = chainInDept
-      .map((n: any) => ({ label: getFolderNodeName(n), folderId: n?.id }))
-      .filter((x: BreadcrumbItem) => !!x.label);
-    return [{ label: t('我的部门'), folderId: rootId }, ...nodes];
-  }
-
   const rootLabel = getFolderRootLabel(selectedFolder.value);
   const allFolders = [
     ...(myFolders.value || []),
     ...(enterpriseFolders.value || []),
-    ...(departmentFolders.value || []),
   ];
   const folder = findFolderById(allFolders, selectedFolder.value);
   const parts = folder ? splitFolderPathParts(folder) : [];
@@ -1386,7 +1382,6 @@ const selectedFolderName = computed(() => {
   const allFolders = [
     ...(myFolders.value || []),
     ...(enterpriseFolders.value || []),
-    ...(departmentFolders.value || []),
   ];
   const folder = findFolderById(allFolders, selectedFolder.value);
   return String(folder?.name || '');
@@ -1395,7 +1390,6 @@ const selectedFolderName = computed(() => {
 // 文件夹数据（侧边栏树：favorites + 各素材库根节点）
 const myFolders = ref<any[]>([]);
 const enterpriseFolders = ref<any[]>([]);
-const departmentFolders = ref<any[]>([]);
 // 获取所有匹配节点的父节点ID（用于自动展开）
 const getMatchingParentKeys = (folders: any[], searchText: string): (string | number)[] => {
   if (!searchText || !searchText.trim()) {
@@ -1426,7 +1420,7 @@ const getMatchingParentKeys = (folders: any[], searchText: string): (string | nu
 };
 
 const baseExpandedKeys = computed(() => {
-  const baseKeys = ['root-my', 'root-enterprise', 'root-department'];
+  const baseKeys = ['root-my', 'root-enterprise'];
 
   if (!folderSearchText.value || !folderSearchText.value.trim()) {
     return baseKeys;
@@ -1434,17 +1428,15 @@ const baseExpandedKeys = computed(() => {
 
   const myParentKeys = getMatchingParentKeys(myFolders.value, folderSearchText.value);
   const enterpriseParentKeys = getMatchingParentKeys(enterpriseFolders.value, folderSearchText.value);
-  const departmentParentKeys = getMatchingParentKeys(departmentFolders.value, folderSearchText.value);
 
   return [
     ...baseKeys,
     ...myParentKeys,
     ...enterpriseParentKeys,
-    ...departmentParentKeys,
   ];
 });
 
-const combinedExpandedKeys = ref<string[]>(['root-my', 'root-enterprise', 'root-department']);
+const combinedExpandedKeys = ref<string[]>(['root-my', 'root-enterprise']);
 
 watch(baseExpandedKeys, (newKeys) => {
   combinedExpandedKeys.value = newKeys.map(String);
@@ -1482,7 +1474,6 @@ const filterFolderTree = (folders: any[], searchText: string): any[] => {
 const combinedTreeData = computed(() => {
   const filteredMyFolders = filterFolderTree(myFolders.value, folderSearchText.value);
   const filteredEnterpriseFolders = filterFolderTree(enterpriseFolders.value, folderSearchText.value);
-  const filteredDepartmentFolders = filterFolderTree(departmentFolders.value, folderSearchText.value);
 
   const data: any[] = [];
   data.push({
@@ -1513,16 +1504,6 @@ const combinedTreeData = computed(() => {
     createType: 'enterprise',
     count: filteredEnterpriseFolders.length,
     children: filteredEnterpriseFolders,
-    selectable: false,
-    canDelete: false,
-  });
-  data.push({
-    id: 'root-department',
-    name: t('我的部门'),
-    isVirtualRoot: true,
-    icon: TeamOutlined,
-    count: filteredDepartmentFolders.length,
-    children: filteredDepartmentFolders,
     selectable: false,
     canDelete: false,
   });
@@ -2031,7 +2012,6 @@ const folderSelectOptions = computed(() => {
   const roots = [
     ...(myFolders.value || []),
     ...(enterpriseFolders.value || []),
-    ...(departmentFolders.value || []),
   ];
 
   const out: Array<{ id: any; name: string }> = [];
@@ -2463,7 +2443,6 @@ const materialGroupNameById = computed<Map<string, string>>(
 const allFolderRoots = computed(() => [
   ...(myFolders.value || []),
   ...(enterpriseFolders.value || []),
-  ...(departmentFolders.value || []),
 ]);
 
 const getFolderName = (folderId: any) => {
@@ -2654,7 +2633,6 @@ const createFolderSiblingNames = computed<string[]>(() => {
   const roots = [
     ...(myFolders.value || []),
     ...(enterpriseFolders.value || []),
-    ...(departmentFolders.value || []),
   ];
   const parent = findFolderById(roots, parentId);
   const children = Array.isArray(parent?.children) ? parent.children : [];
@@ -2665,6 +2643,7 @@ const createFolderSiblingNames = computed<string[]>(() => {
 });
 const createLibraryModalVisible = ref(false);
 const createLibraryType = ref<'my' | 'enterprise'>('my');
+const materialPickerOpen = ref(false);
 
 // 批量标签编辑
 const batchTagModalVisible = ref(false);
@@ -2905,6 +2884,112 @@ const normalizeFolderNode = (folder: any) => {
   return node;
 };
 
+const getOrganizationNodes = (nodes: any[]): any[] => {
+  return (nodes || []).filter((node: any) => {
+    if (!node) return false;
+    if (node?.type === 'user') return false;
+
+    const hasName = String(node?.name || '').trim().length > 0;
+    const hasChildren = Array.isArray(node?.children);
+    const hasOrgIdentity = node?.type === 'org' || node?.parent_id !== undefined || node?.parentId !== undefined;
+
+    return hasName && (hasOrgIdentity || hasChildren);
+  });
+};
+
+const loadFolderChildrenRows = async (folder: any) => {
+  const res = await getMaterialLibraryFolderChildren(folder.id, {
+    owner_id: folder.owner_id,
+    library_type: folder.library_type,
+  });
+  return (res?.data || []).map((c: any) => normalizeFolderNode(c));
+};
+
+const syncEnterpriseFoldersFromOrganizationTree = async (
+  parentFolder: any,
+  orgNodes: any[],
+  enterpriseOwnerId: string | number,
+): Promise<boolean> => {
+  const organizations = getOrganizationNodes(orgNodes);
+  if (!organizations.length) return false;
+
+  let changed = false;
+  let existingChildren = await loadFolderChildrenRows(parentFolder);
+
+  for (const org of organizations) {
+    const orgName = String(org?.name || '').trim();
+    if (!orgName) continue;
+
+    let matchedFolder = existingChildren.find(
+      (child: any) => normalizeFolderNameForCompare(child?.name || child?.folder_name) === normalizeFolderNameForCompare(orgName),
+    );
+
+    if (!matchedFolder) {
+      try {
+        await createMaterialLibraryFolder({
+          parent_id: parentFolder.id,
+          folder_name: orgName,
+          library_type: 1,
+          owner_id: enterpriseOwnerId,
+        });
+        changed = true;
+      } catch (e: any) {
+        if (!String(e?.response?.data?.message || '').includes('同级目录已存在同名文件夹')) {
+          console.warn(`ensure enterprise org folder failed: ${orgName}`, e);
+        }
+      }
+
+      existingChildren = await loadFolderChildrenRows(parentFolder);
+      matchedFolder = existingChildren.find(
+        (child: any) => normalizeFolderNameForCompare(child?.name || child?.folder_name) === normalizeFolderNameForCompare(orgName),
+      );
+    }
+
+    if (matchedFolder) {
+      const childChanged = await syncEnterpriseFoldersFromOrganizationTree(
+        {
+          ...matchedFolder,
+          owner_id: matchedFolder.owner_id ?? enterpriseOwnerId,
+          library_type: 1,
+        },
+        org?.children || [],
+        enterpriseOwnerId,
+      );
+      changed = childChanged || changed;
+    }
+  }
+
+  return changed;
+};
+
+const ensureEnterpriseOrganizationFolders = async (
+  enterpriseRows: any[],
+  enterpriseOwnerId: string | number | undefined,
+) => {
+  if (enterpriseOwnerId === undefined || enterpriseOwnerId === null || enterpriseOwnerId === '') return false;
+
+  const enterpriseRoot =
+    (enterpriseRows || []).find((row: any) => Number(row?.parent_id ?? -1) === 0 && isDefaultLibraryByName(row?.name || row?.folder_name))
+    || (enterpriseRows || []).find((row: any) => Number(row?.parent_id ?? -1) === 0)
+    || null;
+
+  if (!enterpriseRoot) return false;
+
+  const orgRes = await getOrganizationTree();
+  const orgTree = Array.isArray(orgRes?.data)
+    ? orgRes.data
+    : (Array.isArray(orgRes?.data?.data) ? orgRes.data.data : (orgRes || []));
+  return syncEnterpriseFoldersFromOrganizationTree(
+    {
+      ...enterpriseRoot,
+      owner_id: enterpriseRoot.owner_id ?? enterpriseOwnerId,
+      library_type: 1,
+    },
+    orgTree,
+    enterpriseOwnerId,
+  );
+};
+
 const loadFolderChildren = async (folder: any) => {
   const res = await getMaterialLibraryFolderChildren(folder.id, {
     owner_id: folder.owner_id,
@@ -3135,7 +3220,6 @@ const onTreeDrop = async (info: any) => {
   if (dropToGap && targetParentId === 0) {
     const targetFolder = findFolderById(allFolderRoots.value, dropId);
     if (targetFolder.library_type === 1) targetParentId = 'root-enterprise';
-    else if (targetFolder.owner_id && targetFolder.owner_id !== userStore.info?.id) targetParentId = 'root-department';
     else targetParentId = 'root-my';
   }
 
@@ -3144,9 +3228,6 @@ const onTreeDrop = async (info: any) => {
     if (targetParentId === 'root-enterprise') {
       const firstEnt = enterpriseFolders.value[0];
       targetOwnerId = firstEnt ? firstEnt.owner_id : userStore.info?.tenant_id;
-    } else if (targetParentId === 'root-department') {
-      const firstDept = departmentFolders.value[0];
-      targetOwnerId = firstDept ? firstDept.owner_id : userStore.info?.id;
     }
   }
 
@@ -3412,6 +3493,16 @@ const showCreateLibraryModal = (type: 'my' | 'enterprise') => {
   createLibraryModalVisible.value = true;
 };
 
+const handleMaterialPickerSelected = (_keys: Array<string | number>, rows: any[]) => {
+  if (!rows.length) return;
+  if (rows.length === 1) {
+    const picked = rows[0];
+    message.success(`已选择素材：${picked?.name || picked?.material_name || picked?.id}`);
+    return;
+  }
+  message.success(`已选择 ${rows.length} 个素材`);
+};
+
 // 加载表格数据
 const loadTableData = async () => {
   const currentLoadSeq = ++latestTableLoadSeq.value;
@@ -3470,7 +3561,6 @@ const loadTableData = async () => {
     const allFolders = [
       ...(myFolders.value || []),
       ...(enterpriseFolders.value || []),
-      ...(departmentFolders.value || []),
     ];
     const selectedFolderMeta =
       selectedFolder.value && selectedFolder.value !== 'favorites'
@@ -3936,7 +4026,6 @@ const loadFolders = async () => {
     const userInfo: any = userStore.info || {};
     const userId = userInfo?.id;
     const enterpriseId = userInfo?.enterprise_id ?? userInfo?.enterpriseId;
-    const departmentId = userInfo?.department_id ?? userInfo?.departmentId;
 
     const normalizeRoots = (rows: any[]) => (rows || []).map((f: any) => normalizeFolderNode(f));
 
@@ -3951,15 +4040,9 @@ const loadFolders = async () => {
       enterpriseParams.owner_id = enterpriseId;
     }
 
-    const departmentParams: Record<string, any> = { library_type: 0 };
-    if (departmentId !== undefined && departmentId !== null && departmentId !== '') {
-      departmentParams.owner_id = departmentId;
-    }
-
-    const [myRes, enterpriseRes, departmentRes] = await Promise.all([
+    const [myRes, enterpriseRes] = await Promise.all([
       getMaterialLibraryFolders(myParams),
       getMaterialLibraryFolders(enterpriseParams),
-      departmentId ? getMaterialLibraryFolders(departmentParams) : Promise.resolve({ data: [], totalCount: 0 }),
     ]);
 
     const hasDefaultRoot = (rows: any[]) =>
@@ -3967,6 +4050,7 @@ const loadFolders = async () => {
 
     let needReloadMy = false;
     let needReloadEnterprise = false;
+    let needReloadEnterpriseAfterOrgSync = false;
     if (!hasDefaultRoot(myRes.data || []) && myParams.owner_id !== undefined) {
       try {
         await createMaterialLibraryFolder({
@@ -3998,20 +4082,31 @@ const loadFolders = async () => {
       }
     }
 
+    const enterpriseRowsBeforeSync = needReloadEnterprise
+      ? await getMaterialLibraryFolders(enterpriseParams).then((r: any) => r?.data || [])
+      : (enterpriseRes.data || []);
+
+    if ((enterpriseRowsBeforeSync || []).length && enterpriseParams.owner_id !== undefined) {
+      needReloadEnterpriseAfterOrgSync = await ensureEnterpriseOrganizationFolders(
+        enterpriseRowsBeforeSync,
+        enterpriseParams.owner_id,
+      );
+    }
+
     const [myRows, enterpriseRows] = await Promise.all([
       needReloadMy ? getMaterialLibraryFolders(myParams).then((r: any) => r?.data || []) : Promise.resolve(myRes.data || []),
-      needReloadEnterprise ? getMaterialLibraryFolders(enterpriseParams).then((r: any) => r?.data || []) : Promise.resolve(enterpriseRes.data || []),
+      (needReloadEnterprise || needReloadEnterpriseAfterOrgSync)
+        ? getMaterialLibraryFolders(enterpriseParams).then((r: any) => r?.data || [])
+        : Promise.resolve(enterpriseRowsBeforeSync),
     ]);
 
     myFolders.value = normalizeRoots(myRows || []);
     enterpriseFolders.value = normalizeRoots(enterpriseRows || []);
-    departmentFolders.value = normalizeRoots(departmentRes.data || []);
 
     // 页面加载时预取整棵树的子文件夹信息，保证“文件夹/素材”数量初始即正确
     await preloadFolderTreeCounts([
       ...myFolders.value,
       ...enterpriseFolders.value,
-      ...departmentFolders.value,
     ]);
 
     // 首次进入：优先选中第一层文件夹；没有文件夹才默认“我的收藏”
@@ -4019,7 +4114,6 @@ const loadFolders = async () => {
       selectedFolder.value =
         myFolders.value[0]?.id ??
         enterpriseFolders.value[0]?.id ??
-        departmentFolders.value[0]?.id ??
         'favorites';
     }
   } catch (error) {

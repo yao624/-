@@ -1,0 +1,396 @@
+<template>
+  <div class="sub-tag-drilldown">
+    <div class="table-header">
+      <div style="display: flex; gap: 10px">
+        <a-button type="primary" :icon="h(PlusOutlined)" @click="handleAddOption">
+          {{ t('pages.tags.addTagOption') }}
+        </a-button>
+        <a-dropdown :disabled="selectedRowKeys.length === 0">
+          <a-button>
+            {{ t('pages.batchOperation') }}
+            <DownOutlined />
+          </a-button>
+          <template #overlay>
+            <a-menu @click="({ key }) => handleBatchClick(key)">
+              <a-menu-item key="edit">{{ t('pages.batchEdit') }}</a-menu-item>
+              <a-menu-item key="delete">{{ t('pages.batchDelete') }}</a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
+      </div>
+      <a-input
+        v-model:value="searchText"
+        :placeholder="t('pages.tags.searchTagOptionPlaceholder')"
+        prefix="Q"
+        allow-clear
+        style="width: 240px; margin-left: 8px"
+      />
+    </div>
+    <a-table
+      :loading="loading"
+      :columns="columns"
+      :data-source="filteredOptions"
+      :pagination="pagination"
+      :row-key="record => record.id"
+      :row-selection="rowSelection"
+      @change="handleTableChange"
+    >
+      <template #bodyCell="{ column, record }">
+        <template v-if="column.dataIndex === 'url'">
+          <a-image
+            v-if="record.url"
+            :src="getImageUrl(record.url)"
+            :width="50"
+            style="width: 50px; height: 50px; object-fit: cover"
+          />
+          <span v-else>-</span>
+        </template>
+        <template v-if="column.dataIndex === 'operation'">
+          <a-button
+            v-if="level < 3"
+            type="link"
+            size="small"
+            @click="handleDrillDown(record)"
+          >
+            {{ t('pages.tags.subTagManagement') }}
+          </a-button>
+          <a-button type="link" size="small" @click="handleEdit(record)">
+            {{ t('编辑') }}
+          </a-button>
+          <a-button type="link" size="small" danger @click="handleDelete(record)">
+            {{ t('删除') }}
+          </a-button>
+        </template>
+      </template>
+    </a-table>
+
+    <!-- 批量编辑弹窗 -->
+    <a-modal
+      v-model:open="batchEditVisible"
+      :title="t('pages.batchEdit')"
+      width="1200px"
+      :confirm-loading="saving"
+      :mask-closable="false"
+      @ok="handleBatchSave"
+      @cancel="batchEditVisible = false"
+    >
+      <a-table
+        :columns="batchColumns"
+        :data-source="batchOptions"
+        :pagination="false"
+        row-key="id"
+        size="small"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.dataIndex === 'name'">
+            <a-input v-model:value="record.name" />
+          </template>
+          <template v-else-if="column.dataIndex === 'description'">
+            <a-input v-model:value="record.description" />
+          </template>
+          <template v-else-if="column.dataIndex === 'url'">
+            <div v-if="record.url" class="image-preview-wrapper">
+              <img :src="getImageUrl(record.url)" style="width: 50px; height: 50px; object-fit: cover" />
+              <span class="image-delete-btn" @click="record.url = ''">&times;</span>
+            </div>
+            <a-upload
+              v-else
+              :show-upload-list="false"
+              accept="image/*"
+              :before-upload="(file: File) => { handleImageUpload(file, record); return false; }"
+            >
+              <a-button size="small"><UploadOutlined /> {{ t('pages.tags.upload') }}</a-button>
+            </a-upload>
+          </template>
+          <template v-else-if="column.dataIndex === 'remark1'">
+            <a-input v-model:value="record.remark1" />
+          </template>
+          <template v-else-if="column.dataIndex === 'remark2'">
+            <a-input v-model:value="record.remark2" />
+          </template>
+        </template>
+      </a-table>
+    </a-modal>
+  </div>
+</template>
+
+<script lang="ts" setup>
+import { ref, computed, watch, onMounted, h } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { message, Modal } from 'ant-design-vue';
+import { PlusOutlined, UploadOutlined, DownOutlined } from '@ant-design/icons-vue';
+import {
+  createTagOptionApi,
+  updateTagOptionApi,
+  deleteTagOptionApi,
+  getTagOptionsApi,
+  uploadTagOptionImageApi,
+} from '@/api/tags';
+
+const props = defineProps<{
+  pathChain: { name: string; id: number | string }[];
+  level: number;
+}>();
+
+const emit = defineEmits<{
+  (e: 'drill-down', record: any): void;
+  (e: 'add-option', parentId: number | string): void;
+  (e: 'edit-option', option: any, parentId: number | string): void;
+  (e: 'delete-option', option: any): void;
+  (e: 'batch-edit', options: any[], parentId: number | string): void;
+  (e: 'exit'): void;
+  (e: 'options-change', options: any[]): void;
+  (e: 'loading-change', loading: boolean): void;
+}>();
+
+const { t } = useI18n();
+
+// ============ 状态 ============
+const loading = ref(false);
+const options = ref<any[]>([]);
+const searchText = ref('');
+const selectedRowKeys = ref<any[]>([]);
+const saving = ref(false);
+
+// 监听options变化，通知父组件
+watch(options, (val) => {
+  emit('options-change', val);
+}, { immediate: true });
+
+// 监听loading变化，通知父组件
+watch(loading, (val) => {
+  emit('loading-change', val);
+}, { immediate: true });
+
+const pagination = ref({
+  current: 1,
+  pageSize: 20,
+  total: 0,
+  showTotal: (total: number) => `Total ${total} items`,
+  showSizeChanger: true,
+  pageSizeOptions: ['10', '20', '50', '100'],
+});
+
+// 批量编辑
+const batchEditVisible = ref(false);
+const batchOptions = ref<any[]>([]);
+
+let idCounter = 100;
+const generateId = () => ++idCounter;
+
+// ============ 计算属性 ============
+const pathString = computed(() => props.pathChain.map(p => p.name).join('/'));
+
+const filteredOptions = computed(() => {
+  if (!searchText.value) return options.value;
+  const search = searchText.value.toLowerCase();
+  return options.value.filter(
+    (opt: any) =>
+      opt.name?.toLowerCase().includes(search) || opt.description?.toLowerCase().includes(search),
+  );
+});
+
+const rowSelection = computed(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  onChange: (keys: any[]) => {
+    selectedRowKeys.value = keys;
+  },
+}));
+
+const columns = computed(() => [
+  { title: t('pages.tags.optionName'), dataIndex: 'name', width: 150 },
+  { title: t('pages.tags.optionDesc'), dataIndex: 'description', width: 200 },
+  { title: t('pages.tags.optionImage'), dataIndex: 'url', width: 120 },
+  { title: t('pages.tags.optionRemark1'), dataIndex: 'remark1', width: 150 },
+  { title: t('pages.tags.optionRemark2'), dataIndex: 'remark2', width: 150 },
+  { title: t('pages.operation'), dataIndex: 'operation', width: 200, fixed: 'right' },
+]);
+
+const batchColumns = computed(() => [
+  { title: t('pages.tags.optionName'), dataIndex: 'name', width: 150 },
+  { title: t('pages.tags.optionDesc'), dataIndex: 'description', width: 150 },
+  { title: t('pages.tags.optionImage'), dataIndex: 'url', width: 150 },
+  { title: t('pages.tags.optionRemark1'), dataIndex: 'remark1', width: 120 },
+  { title: t('pages.tags.optionRemark2'), dataIndex: 'remark2', width: 120 },
+]);
+
+// ============ 方法 ============
+const parentId = computed(() => props.pathChain[props.pathChain.length - 1]?.id);
+
+const loadOptions = async () => {
+  if (!parentId.value) return;
+  loading.value = true;
+  try {
+    const res = await getTagOptionsApi(parentId.value);
+    options.value = res?.data?.list || res?.data || [];
+    pagination.value.total = options.value.length;
+  } finally {
+    loading.value = false;
+  }
+};
+
+// 监听pathChain的最后一个id（parentId）变化，重新加载数据
+watch(
+  () => props.pathChain[props.pathChain.length - 1]?.id,
+  () => {
+    loadOptions();
+  },
+  { immediate: true }
+);
+
+const handleTableChange = (pag: any) => {
+  pagination.value.current = pag.current;
+  pagination.value.pageSize = pag.pageSize;
+};
+
+const handleDrillDown = (record: any) => {
+  emit('drill-down', record);
+};
+
+const handleAddOption = () => {
+  emit('add-option', parentId.value);
+};
+
+const handleEdit = (option: any) => {
+  emit('edit-option', option, parentId.value);
+};
+
+const handleDelete = async (option: any) => {
+  Modal.confirm({
+    title: t('pages.tags.deleteConfirmTitle'),
+    content: t('pages.tags.folderDeleteHint'),
+    okText: t('pages.confirm'),
+    cancelText: t('pages.cancel'),
+    async onOk() {
+      await deleteTagOptionApi({ ids: [option.id] });
+      const idx = options.value.findIndex((o: any) => o.id === option.id);
+      if (idx > -1) options.value.splice(idx, 1);
+      pagination.value.total = options.value.length;
+      message.success(t('pages.opSuccessfully'));
+    },
+  });
+};
+
+const handleBatchClick = (key: string) => {
+  if (selectedRowKeys.value.length === 0) {
+    message.warning(t('pages.selectAtLeastOne'));
+    return;
+  }
+  if (key === 'delete') {
+    Modal.confirm({
+      title: t('pages.tags.deleteConfirmTitle'),
+      content: t('pages.tags.folderDeleteHint'),
+      okText: t('pages.confirm'),
+      cancelText: t('pages.cancel'),
+      async onOk() {
+        await deleteTagOptionApi({ ids: selectedRowKeys.value });
+        options.value = options.value.filter((o: any) => !selectedRowKeys.value.includes(o.id));
+        pagination.value.total = options.value.length;
+        selectedRowKeys.value = [];
+        message.success(t('pages.opSuccessfully'));
+      },
+    });
+  } else if (key === 'edit') {
+    batchOptions.value = options.value
+      .filter((o: any) => selectedRowKeys.value.includes(o.id))
+      .map((o: any) => ({ ...o }));
+    batchEditVisible.value = true;
+  }
+};
+
+const getImageUrl = (url: string) => {
+  if (!url) return '';
+  if (url.startsWith('http')) return url;
+  const proxyTarget = import.meta.env.VITE_API_PROXY_TARGET || '';
+  return proxyTarget + url;
+};
+
+const handleImageUpload = async (file: File, record: any) => {
+  if (file.size > 5 * 1024 * 1024) {
+    message.error(t('pages.tags.imageSizeExceed'));
+    return;
+  }
+  const res = await uploadTagOptionImageApi(file);
+  record.url = res.data?.url;
+};
+
+const handleBatchSave = async () => {
+  const hasEmpty = batchOptions.value.some((o: any) => !o.name?.trim());
+  if (hasEmpty) {
+    message.error(t('pages.tags.optionNameRequired'));
+    return;
+  }
+  const names = batchOptions.value.filter((o: any) => o.name?.trim()).map((o: any) => o.name);
+  if (names.length !== new Set(names).size) {
+    message.error(t('pages.tags.optionNameDuplicate'));
+    return;
+  }
+  saving.value = true;
+  try {
+    await updateTagOptionApi({
+      options: batchOptions.value.map((o: any) => ({
+        id: o.id,
+        name: o.name,
+        description: o.description,
+        url: o.url,
+        remark1: o.remark1,
+        remark2: o.remark2,
+      })),
+    });
+    batchOptions.value.forEach((edited: any) => {
+      const idx = options.value.findIndex((o: any) => o.id === edited.id);
+      if (idx > -1) options.value[idx] = { ...edited };
+    });
+    selectedRowKeys.value = [];
+    batchEditVisible.value = false;
+    message.success(t('pages.opSuccessfully'));
+  } finally {
+    saving.value = false;
+  }
+};
+
+// 暴露方法给父组件
+defineExpose({
+  loadOptions,
+  pathString,
+  searchText,
+  loading,
+  options,
+});
+</script>
+
+<style lang="less" scoped>
+.sub-tag-drilldown {
+  .table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+}
+
+.image-preview-wrapper {
+  position: relative;
+  display: inline-block;
+
+  .image-delete-btn {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 18px;
+    height: 18px;
+    line-height: 18px;
+    text-align: center;
+    background: rgba(0, 0, 0, 0.5);
+    color: #fff;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 14px;
+    display: none;
+  }
+
+  &:hover .image-delete-btn {
+    display: block;
+  }
+}
+</style>
