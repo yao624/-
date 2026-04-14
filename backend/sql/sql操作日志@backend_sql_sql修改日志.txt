@@ -90,3 +90,41 @@ SQL 操作日志 @ backend/sql/sql修改日志.txt
   - idx_link_tags_user_option (`user_id`, `meta_tag_option_id`)
   - idx_link_tags_link_option (`link_id`, `meta_tag_option_id`)
 - 变更说明: 链接标签改为通过标签选项 ID 精确关联，解决同名标签歧义问题；name 字段仅保留为展示快照
+
+
+2026-04-13 Meta 素材库可见范围
+- 迁移文件: database/migrations/2026_04_13_181000_create_meta_material_permission_tables.php
+- SQL 文件:
+  - backend/sql/meta_permissions.sql
+  - backend/sql/lzc_all_tools_schema.sql
+- 涉及表:
+  - meta_material_permissions: 素材可见范围主表，记录素材可见范围、是否包含子部门、设置人等信息
+  - meta_material_permission_subjects: 素材可见范围主体明细表，记录被授权的用户或部门
+- 用途说明: 支持企业素材库按可见范围控制素材查看权限
+
+2026-04-14 Meta 素材库多设计师/多创意人
+- 迁移文件: database/migrations/2026_04_14_090000_add_multi_person_fields_to_meta_materials_and_sessions.php
+- SQL 文件:
+  - backend/sql/lzc_all_tools_schema.sql
+- 涉及表:
+  - meta_materials
+  - meta_upload_sessions
+- 新增字段:
+  - meta_materials.designer_ids_json: 设计师 ID 列表 JSON
+  - meta_materials.creator_ids_json: 创意人 ID 列表 JSON
+  - meta_upload_sessions.designer_ids_json: 设计师 ID 列表 JSON
+  - meta_upload_sessions.creator_ids_json: 创意人 ID 列表 JSON
+- 用途说明: 支持素材和上传会话保存多个设计师、多个创意人，配合前端多选与筛选能力
+
+
+2026-04-13 Meta 素材创建人字段
+- 迁移文件: database/migrations/2026_04_13_180000_add_created_by_to_meta_materials_table.php
+- SQL 文件:
+  - backend/sql/lzc_all_tools_schema.sql
+- 涉及表:
+  - meta_materials
+- 新增字段:
+  - created_by: 素材创建人用户 ID
+- 新增索引:
+  - idx_meta_materials_created_by (created_by)
+- 用途说明: 支持素材按创建人做可见范围管理与权限判断

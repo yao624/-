@@ -138,9 +138,11 @@
           </a-space>
           <a-table
             :loading="tableLoading"
+            :virtual="true"
             :columns="columns"
             :data-source="tableRows"
             :row-key="r => r.id"
+            :scroll="{ x: 1600, y: 620 }"
             :pagination="pagination"
             :row-selection="{ selectedRowKeys, onChange: onSelectRows, getCheckboxProps }"
             @change="onTableChange"

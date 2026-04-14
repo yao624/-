@@ -41,6 +41,7 @@
 
       <div class="table-section">
         <a-table
+          :virtual="true"
           :columns="columns"
           :data-source="dataSource"
           :row-key="record => record.id"

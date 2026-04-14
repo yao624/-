@@ -205,6 +205,21 @@
                       {{ activePreviewRow.remarks || activePreviewRow.remark || '-' }}
                     </div>
                   </div>
+                  <div class="preview-field">
+                    <div class="preview-label">可见范围</div>
+                    <div class="preview-value">
+                      <div>{{ formatPermissionSummary(activePreviewRow) }}</div>
+                      <div v-if="getPermissionSubjects(activePreviewRow).length" class="preview-permission-tags">
+                        <a-tag
+                          v-for="tag in getPermissionSubjects(activePreviewRow)"
+                          :key="`${activePreviewRow.id}-${tag}`"
+                          color="blue"
+                        >
+                          {{ tag }}
+                        </a-tag>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -238,6 +253,13 @@ type FolderMeta = {
 type MaterialRow = Record<string, any> & {
   id: string | number;
   type?: string;
+};
+
+type MaterialPermission = {
+  scope?: 'enterprise' | 'users' | 'departments' | 'mixed';
+  includeSubDepartments?: boolean;
+  userNames?: string[];
+  departmentNames?: string[];
 };
 
 const props = withDefaults(
@@ -407,6 +429,49 @@ function formatDate(value: any) {
   const parsed = dayjs(value);
   if (!parsed.isValid()) return '-';
   return parsed.format('YYYY-MM-DD HH:mm:ss');
+}
+
+function getFolderMetaByMaterial(record: MaterialRow): FolderMeta | null {
+  const folderId = record?.folderId ?? record?.folder_id;
+  if (folderId === undefined || folderId === null || folderId === '') return null;
+  return folderMetaMap.value[String(folderId)] || null;
+}
+
+function getMaterialPermission(record: MaterialRow): MaterialPermission | null {
+  const permission = record?.permission;
+  if (!permission || typeof permission !== 'object') return null;
+  return permission as MaterialPermission;
+}
+
+function getPermissionSubjects(record: MaterialRow): string[] {
+  const permission = getMaterialPermission(record);
+  if (!permission) return [];
+  const departmentNames = Array.isArray(permission.departmentNames) ? permission.departmentNames : [];
+  const userNames = Array.isArray(permission.userNames) ? permission.userNames : [];
+  const tags = [
+    ...departmentNames.map(name =>
+      permission.includeSubDepartments ? `${name}（含子部门）` : String(name),
+    ),
+    ...userNames.map(name => String(name)),
+  ].filter(Boolean);
+  return Array.from(new Set(tags));
+}
+
+function formatPermissionSummary(record: MaterialRow) {
+  const permission = getMaterialPermission(record);
+  const folderMeta = getFolderMetaByMaterial(record);
+  const libraryTypeValue = String(folderMeta?.library_type ?? '').trim();
+
+  if (!permission || !permission.scope) {
+    return libraryTypeValue === '1' ? '企业内可见' : '当前素材库可见';
+  }
+
+  if (permission.scope === 'enterprise') return '企业内可见';
+  if (permission.scope === 'users') return '指定人员可见';
+  if (permission.scope === 'departments') {
+    return permission.includeSubDepartments ? '指定部门可见（含子部门）' : '指定部门可见';
+  }
+  return permission.includeSubDepartments ? '指定人员和部门可见（含子部门）' : '指定人员和部门可见';
 }
 
 function handleOpenChange(value: boolean) {
@@ -630,6 +695,7 @@ async function reloadItems() {
     const response = await getMaterialLibraryMaterials({
       folder_id: selectedFolderId.value,
       owner_id: meta?.owner_id,
+      library_type: meta?.library_type,
       pageNo: pagination.current,
       pageSize: pagination.pageSize,
       global_search: keyword.value || undefined,
@@ -1122,6 +1188,13 @@ watch(libraryType, async () => {
 .preview-rich-text {
   min-height: 72px;
   white-space: pre-wrap;
+}
+
+.preview-permission-tags {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .preview-card-detail {

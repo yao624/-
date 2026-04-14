@@ -1,0 +1,70 @@
+export interface MaterialEditState {
+  width: number;
+  height: number;
+  bgColor: string;
+  bgMode: 'solid' | 'image';
+  bgImageUrl: string;
+  blurAmount: number;
+  fillMode: 'contain' | 'cover' | 'custom';
+  cropX: number;
+  cropY: number;
+  cropW: number;
+  cropH: number;
+}
+
+export interface CreateTaskForm {
+  materialType: 'image' | 'video';
+  materials: any[];
+  folderOption: 'original' | 'new';
+  targetFolderId?: string;
+  tags: string[];
+  designerId?: string;
+  creativeId?: string;
+  materialName: string;
+  uploadedMaterialIds?: string[];
+}
+
+export type MaterialType = 'image' | 'video';
+export type FieldMode = 'original' | 'unified' | 'smart';
+export type TaskStatus = 'pending' | 'processing' | 'completed' | 'failed';
+export type MaterialEditStatus = 'success' | 'failed' | 'pending';
+
+export interface FolderInfo {
+  id: string;
+  name: string;
+}
+
+export interface DesignerInfo {
+  id: string;
+  name: string;
+}
+
+export interface CreativeInfo {
+  id: string;
+  name: string;
+}
+
+export interface TagInfo {
+  id: string;
+  name: string;
+  color: string;
+}
+
+export interface MaterialEditorTask {
+  id: string;
+  status: TaskStatus;
+  createdAt: string;
+  createdBy: string;
+  folderId?: string;
+  folderName?: string;
+}
+
+export interface MaterialEditItem {
+  id: string;
+  name: string;
+  previewUrl: string;
+  originalPreviewUrl: string;
+  status: MaterialEditStatus;
+  editContent: string;
+  reason: string;
+}

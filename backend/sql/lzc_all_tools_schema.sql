@@ -612,3 +612,61 @@ ALTER TABLE `link_tags`
   ADD KEY `idx_link_tags_user_option` (`user_id`, `meta_tag_option_id`),
   ADD KEY `idx_link_tags_link_option` (`link_id`, `meta_tag_option_id`);
 
+/* =====================================================================
+ * 2026-04-13 Meta 素材库可见范围
+ * 迁移文件: database/migrations/2026_04_13_181000_create_meta_material_permission_tables.php
+ * ===================================================================== */
+
+CREATE TABLE IF NOT EXISTS `meta_material_permissions` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '素材可见范围ID',
+  `material_id` BIGINT UNSIGNED NOT NULL COMMENT '素材ID',
+  `scope` VARCHAR(32) NOT NULL DEFAULT 'enterprise' COMMENT '可见范围类型（enterprise/mixed）',
+  `include_sub_departments` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否包含子部门',
+  `created_by` VARCHAR(64) NULL COMMENT '设置权限的用户ID',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_meta_material_permissions_material` (`material_id`),
+  KEY `idx_meta_material_permissions_scope` (`scope`),
+  CONSTRAINT `fk_meta_material_permissions_material`
+    FOREIGN KEY (`material_id`) REFERENCES `meta_materials` (`id`)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Meta工具-素材库-素材可见范围主表';
+
+CREATE TABLE IF NOT EXISTS `meta_material_permission_subjects` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '素材可见范围主体ID',
+  `permission_id` BIGINT UNSIGNED NOT NULL COMMENT '可见范围主表ID',
+  `subject_type` VARCHAR(32) NOT NULL COMMENT '主体类型（user/department）',
+  `subject_id` VARCHAR(64) NOT NULL COMMENT '主体ID（用户ID或部门ID）',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_meta_material_perm_subject` (`permission_id`, `subject_type`, `subject_id`),
+  KEY `idx_meta_material_perm_subject_lookup` (`subject_type`, `subject_id`),
+  CONSTRAINT `fk_meta_material_perm_subject_permission`
+    FOREIGN KEY (`permission_id`) REFERENCES `meta_material_permissions` (`id`)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Meta工具-素材库-素材可见范围主体明细表';
+
+/* =====================================================================
+ * 2026-04-14 Meta 素材库多设计师/多创意人
+ * 迁移文件: database/migrations/2026_04_14_090000_add_multi_person_fields_to_meta_materials_and_sessions.php
+ * ===================================================================== */
+
+ALTER TABLE `meta_upload_sessions`
+  ADD COLUMN `designer_ids_json` JSON NULL COMMENT '设计师ID列表JSON' AFTER `designer_id`,
+  ADD COLUMN `creator_ids_json` JSON NULL COMMENT '创意人ID列表JSON' AFTER `creator_id`;
+
+ALTER TABLE `meta_materials`
+  ADD COLUMN `designer_ids_json` JSON NULL COMMENT '设计师ID列表JSON' AFTER `designer_id`,
+  ADD COLUMN `creator_ids_json` JSON NULL COMMENT '创意人ID列表JSON' AFTER `creator_id`;
+
+/* =====================================================================
+ * 2026-04-13 Meta 素材创建人字段
+ * 迁移文件: database/migrations/2026_04_13_180000_add_created_by_to_meta_materials_table.php
+ * ===================================================================== */
+
+ALTER TABLE `meta_materials`
+  ADD COLUMN `created_by` VARCHAR(64) NULL COMMENT '素材创建人用户ID' AFTER `creator_id`,
+  ADD KEY `idx_meta_materials_created_by` (`created_by`);
+

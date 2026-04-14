@@ -1,0 +1,304 @@
+import { ref, onBeforeUnmount } from 'vue';
+import { fabric } from 'fabric';
+import Editor, {
+  IEditor,
+  WorkspacePlugin,
+  CenterAlignPlugin,
+  AddBaseTypePlugin,
+} from '@kuaitu/core';
+
+export function useMiniEditor() {
+  let canvasEditor: IEditor | null = null;
+  let fabricCanvas: fabric.Canvas | null = null;
+  const currentImage = ref<fabric.Image | null>(null);
+  let loadSeq = 0; // Guard against concurrent loadImage calls
+
+  function initCanvas(canvasId: string) {
+    const canvasEl = document.getElementById(canvasId) as HTMLCanvasElement;
+    if (!canvasEl) {
+      console.error(`Canvas element #${canvasId} not found`);
+      return;
+    }
+
+    fabricCanvas = new fabric.Canvas(canvasId, {
+      fireRightClick: false,
+      stopContextMenu: true,
+      preserveObjectStacking: true,
+      selection: false,
+    });
+
+    canvasEditor = new Editor() as IEditor;
+    canvasEditor.init(fabricCanvas);
+    canvasEditor
+      .use(WorkspacePlugin)
+      .use(CenterAlignPlugin)
+      .use(AddBaseTypePlugin);
+  }
+
+  function destroyCanvas() {
+    if (canvasEditor) {
+      const plugin = canvasEditor.getPlugin('WorkspacePlugin');
+      if (plugin) {
+        plugin.destroy();
+      }
+      canvasEditor.destory();
+      canvasEditor = null;
+    }
+    if (fabricCanvas) {
+      fabricCanvas.dispose();
+      fabricCanvas = null;
+    }
+    currentImage.value = null;
+  }
+
+  async function loadImage(url: string, fillMode: 'contain' | 'cover' | 'custom', crop?: { x: number; y: number; w: number; h: number }) {
+    if (!canvasEditor || !fabricCanvas) return;
+
+    // Bump sequence number to invalidate any in-flight loads
+    const mySeq = ++loadSeq;
+
+    // Clear ALL non-workspace objects (not just currentImage)
+    fabricCanvas.getObjects().forEach((obj: any) => {
+      if (obj.id !== 'workspace') {
+        fabricCanvas.remove(obj);
+      }
+    });
+    currentImage.value = null;
+    fabricCanvas.renderAll();
+
+    const workspace = canvasEditor.getWorkspase();
+    if (!workspace) return;
+
+    const wsW = workspace.width || 1;
+    const wsH = workspace.height || 1;
+
+    try {
+      const img = await new Promise<fabric.Image>((resolve, reject) => {
+        fabric.Image.fromURL(
+          url,
+          (imgEl) => {
+            if (imgEl) {
+              resolve(imgEl);
+            } else {
+              reject(new Error('Failed to load image'));
+            }
+          },
+          {}
+        );
+      });
+
+      // If another loadImage was triggered while we awaited, discard this result
+      if (mySeq !== loadSeq) return;
+
+      const { scale, left, top } = computeLayout(fillMode, img, wsW, wsH, crop);
+
+      img.set({
+        selectable: false,
+        evented: false,
+        hasControls: false,
+        originX: 'center',
+        originY: 'center',
+        left,
+        top,
+        scaleX: scale,
+        scaleY: scale,
+      });
+
+      fabricCanvas.add(img);
+      currentImage.value = img;
+      fabricCanvas.renderAll();
+    } catch (err) {
+      console.error('Failed to load image:', err);
+    }
+  }
+
+  function setSize(width: number, height: number) {
+    if (!canvasEditor) return;
+    canvasEditor.setSize(width, height);
+    // Re-apply image scaling after size change
+    if (currentImage.value) {
+      applyFillMode(getFillMode());
+    }
+  }
+
+  // Internal: compute scale/position for given fillMode
+  function computeLayout(
+    fillMode: 'contain' | 'cover' | 'custom',
+    img: fabric.Image,
+    wsW: number,
+    wsH: number,
+    crop?: { x: number; y: number; w: number; h: number },
+  ) {
+    const imgW = img.width || 1;
+    const imgH = img.height || 1;
+    let scale: number;
+    let left: number;
+    let top: number;
+
+    if (fillMode === 'contain') {
+      scale = Math.min(wsW / imgW, wsH / imgH);
+      left = wsW / 2;
+      top = wsH / 2;
+    } else if (fillMode === 'cover') {
+      scale = Math.max(wsW / imgW, wsH / imgH);
+      left = wsW / 2;
+      top = wsH / 2;
+    } else {
+      // custom: cropX/cropY are percentage offsets (0-100), cropW/cropH are percentages of source image
+      const cx = crop?.x || 0;
+      const cy = crop?.y || 0;
+      const cw = crop?.w || 100;
+      const ch = crop?.h || 100;
+      // Scale crop region to fill workspace
+      scale = Math.max(wsW / (imgW * cw / 100), wsH / (imgH * ch / 100));
+      // Offset: center the crop region in workspace, shifted by cropX/cropY percentage
+      const cropCenterX = imgW * (cx + cw / 2) / 100;
+      const cropCenterY = imgH * (cy + ch / 2) / 100;
+      left = wsW / 2 - (cropCenterX - imgW / 2) * scale;
+      top = wsH / 2 - (cropCenterY - imgH / 2) * scale;
+    }
+
+    return { scale, left, top };
+  }
+
+  function setBgColor(color: string, blur: number = 0) {
+    if (!canvasEditor) return;
+    canvasEditor.setWorkspaseBg(color);
+    const workspace = canvasEditor.getWorkspase();
+    if (workspace) {
+      if (blur > 0) {
+        const wsW = workspace.width || 1;
+        const wsH = workspace.height || 1;
+        const tmpCanvas = document.createElement('canvas');
+        tmpCanvas.width = wsW;
+        tmpCanvas.height = wsH;
+        const ctx = tmpCanvas.getContext('2d')!;
+        ctx.filter = `blur(${blur}px)`;
+        ctx.fillStyle = color;
+        ctx.fillRect(0, 0, wsW, wsH);
+        workspace.set('fill', new fabric.Pattern({
+          source: tmpCanvas,
+          repeat: 'no-repeat',
+        }));
+      } else {
+        workspace.set('fill', color);
+        workspace.set('pattern', undefined);
+      }
+      workspace.set('dirty', true);
+    }
+    fabricCanvas?.renderAll();
+  }
+
+  async function setBgImage(url: string, blur: number = 0) {
+    if (!canvasEditor || !fabricCanvas) return;
+    const workspace = canvasEditor.getWorkspase();
+    if (!workspace) return;
+
+    if (!url) {
+      // No image — revert to white solid
+      workspace.set('pattern', undefined);
+      workspace.set('fill', '#ffffff');
+      workspace.set('dirty', true);
+      fabricCanvas.renderAll();
+      return;
+    }
+
+    try {
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = reject;
+        image.src = url;
+      });
+
+      const wsW = workspace.width || 1;
+      const wsH = workspace.height || 1;
+
+      // Draw image onto a temp canvas scaled to workspace size (cover mode, centered)
+      const tmpCanvas = document.createElement('canvas');
+      tmpCanvas.width = wsW;
+      tmpCanvas.height = wsH;
+      const ctx = tmpCanvas.getContext('2d')!;
+      if (blur > 0) {
+        ctx.filter = `blur(${blur}px)`;
+      }
+      const scale = Math.max(wsW / img.width, wsH / img.height);
+      const drawW = img.width * scale;
+      const drawH = img.height * scale;
+      ctx.drawImage(img, (wsW - drawW) / 2, (wsH - drawH) / 2, drawW, drawH);
+
+      workspace.set('fill', new fabric.Pattern({
+        source: tmpCanvas,
+        repeat: 'no-repeat',
+      }));
+      workspace.set('dirty', true);
+      fabricCanvas.renderAll();
+    } catch (err) {
+      console.error('Failed to load background image:', err);
+    }
+  }
+
+  function getFillMode(): 'contain' | 'cover' | 'custom' {
+    return 'contain';
+  }
+
+  function applyFillMode(
+    fillMode: 'contain' | 'cover' | 'custom',
+    crop?: { x: number; y: number; w: number; h: number },
+  ) {
+    if (!canvasEditor || !currentImage.value || !fabricCanvas) return;
+    const workspace = canvasEditor.getWorkspase();
+    if (!workspace) return;
+    const wsW = workspace.width || 1;
+    const wsH = workspace.height || 1;
+    const { scale, left, top } = computeLayout(fillMode, currentImage.value, wsW, wsH, crop);
+    currentImage.value.set({ scaleX: scale, scaleY: scale, left, top });
+    fabricCanvas.renderAll();
+  }
+
+  function clearCanvas() {
+    if (!fabricCanvas) return;
+    fabricCanvas.getObjects().forEach((obj: any) => {
+      if (obj.id !== 'workspace') {
+        fabricCanvas!.remove(obj);
+      }
+    });
+    currentImage.value = null;
+  }
+
+  function exportCanvasAsBlob(format?: string, quality?: number): Promise<Blob | null> {
+    if (!fabricCanvas) return Promise.resolve(null);
+    return new Promise((resolve) => {
+      fabricCanvas.renderAll();
+      fabricCanvas.getElement().toBlob((blob) => {
+        resolve(blob);
+      }, format || 'image/png', quality || 0.95);
+    });
+  }
+
+  function exportCanvasAsDataURL(format?: string, quality?: number): string {
+    if (!fabricCanvas) return '';
+    fabricCanvas.renderAll();
+    return fabricCanvas.toDataURL({
+      format: format || 'png',
+      quality: quality || 0.95,
+    });
+  }
+
+  onBeforeUnmount(() => {
+    destroyCanvas();
+  });
+
+  return {
+    initCanvas,
+    destroyCanvas,
+    loadImage,
+    setSize,
+    setBgColor,
+    setBgImage,
+    applyFillMode,
+    clearCanvas,
+    exportCanvasAsBlob,
+    exportCanvasAsDataURL,
+  };
+}

@@ -21,6 +21,7 @@
 
     <a-table
       :loading="state.loading"
+      :virtual="true"
       :scroll="{ y: tableHeight, x: 1600 }"
       :columns="columns"
       :data-source="state.dataSource"

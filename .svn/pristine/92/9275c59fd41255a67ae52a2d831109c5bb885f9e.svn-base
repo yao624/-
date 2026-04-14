@@ -1,0 +1,986 @@
+<template>
+  <a-modal
+    v-model:open="visible"
+    :title="t('pages.materialEditorManage.createTask.title')"
+    :width="1200"
+    :footer="null"
+    :destroy-on-close="true"
+    @cancel="handleCancel"
+  >
+    <div class="create-task-modal">
+      <!-- Step Indicator -->
+      <div class="step-indicator">
+        <span class="step-text">{{ t('pages.materialEditorManage.createTask.step') }} {{ currentStep }}{{ t('pages.materialEditorManage.createTask.stepOf', { total: 2 }) }}</span>
+      </div>
+
+      <!-- Step 1 Content -->
+      <div v-show="currentStep === 1" class="step-content">
+        <a-form ref="formRef" :model="form" layout="vertical" :label-col="{ span: 24 }" :wrapper-col="{ span: 24 }">
+          <!-- 素材类型 -->
+          <a-form-item :label="t('pages.materialEditorManage.createTask.materialType')" required>
+            <a-radio-group v-model:value="form.materialType" button-style="solid">
+              <a-radio-button value="image">{{ t('pages.materialEditorManage.createTask.materialType.image') }}</a-radio-button>
+              <a-radio-button value="video">{{ t('pages.materialEditorManage.createTask.materialType.video') }}</a-radio-button>
+            </a-radio-group>
+          </a-form-item>
+
+          <!-- 选择素材 -->
+          <a-form-item :label="t('pages.materialEditorManage.createTask.selectMaterial')" required>
+            <a-button block @click="handleSelectMaterial">
+              <PlusOutlined />
+              {{ t('pages.materialEditorManage.createTask.selectMaterial') }}
+            </a-button>
+            <div v-if="form.materials.length > 0" class="selected-materials">
+              <div class="selected-materials-header">
+                <span class="selected-materials-count">
+                  {{ t('pages.materialEditorManage.materialPicker.selected', { count: form.materials.length }) }}
+                </span>
+                <a-space>
+                  <a-button type="link" size="small" danger @click="handleClearMaterials">
+                    {{ t('pages.materialEditorManage.materialPicker.clear') }}
+                  </a-button>
+                  <a-button type="link" size="small" @click="handleSelectMaterial">
+                    {{ t('pages.materialEditorManage.materialPicker.replace') }}
+                  </a-button>
+                </a-space>
+              </div>
+              <div class="selected-materials-grid">
+                <div v-for="item in form.materials" :key="item.id" class="selected-material-card">
+                  <div class="selected-material-thumb-wrapper">
+                    <img v-if="item.type === 'image' && item.previewUrl" :src="item.previewUrl" class="selected-material-thumb" />
+                    <video v-else-if="item.type === 'video' && item.previewUrl" :src="item.previewUrl" class="selected-material-thumb" muted />
+                    <div v-else class="selected-material-thumb selected-material-thumb--empty">
+                      {{ item.type === 'video' ? '视频' : '文件' }}
+                    </div>
+                    <div class="selected-material-remove" @click="handleRemoveMaterial(item.id)">
+                      <CloseOutlined />
+                    </div>
+                  </div>
+                  <div class="selected-material-name">{{ item.name }}</div>
+                </div>
+              </div>
+            </div>
+          </a-form-item>
+
+          <!-- 目标文件夹 -->
+          <a-form-item :label="t('pages.materialEditorManage.createTask.targetFolder')" required>
+            <a-radio-group v-model:value="form.folderOption" button-style="solid">
+              <a-radio-button value="original">{{ t('pages.materialEditorManage.createTask.originalFolder') }}</a-radio-button>
+              <a-radio-button value="new">{{ t('pages.materialEditorManage.createTask.newFolder') }}</a-radio-button>
+            </a-radio-group>
+
+            <!-- 新文件夹选择 (仅当选择新文件夹时显示) -->
+            <div v-if="form.folderOption === 'new'" class="folder-select-wrapper">
+              <div class="folder-picker-panel">
+                <div class="folder-picker-selected" @click="toggleFolderTreePanel">
+                  {{ selectedFolderLabel || t('pages.materialEditorManage.createTask.selectFolder') }}
+                </div>
+                <a-input
+                  v-if="folderUiState.showFolderTreePanel"
+                  v-model:value="folderTreeKeyword"
+                  class="folder-tree-search"
+                  :placeholder="t('搜索文件夹')"
+                  allow-clear
+                >
+                  <template #prefix>
+                    <SearchOutlined />
+                  </template>
+                </a-input>
+                <a-tree
+                  v-if="folderUiState.showFolderTreePanel"
+                  class="upload-folder-tree"
+                  :tree-data="filteredFolderTreeData"
+                  :selected-keys="selectedFolderTreeKeys"
+                  :expanded-keys="expandedFolderTreeKeys"
+                  :field-names="{ title: 'title', key: 'key', children: 'children' }"
+                  block-node
+                  @select="handleFolderTreeSelect"
+                  @expand="handleFolderTreeExpand"
+                >
+                  <template #title="{ dataRef }">
+                    <div class="upload-folder-tree-title">
+                      <template v-if="dataRef?.isRootGroup">
+                        <UserOutlined v-if="dataRef?.rootType === 'my'" class="root-icon" />
+                        <BankOutlined v-else-if="dataRef?.rootType === 'enterprise'" class="root-icon" />
+                        <FolderFilled v-else class="root-icon" />
+                      </template>
+                      <FolderFilled v-else class="folder-icon" />
+                      <span :class="{ 'is-root-title': !!dataRef?.isRootGroup }">{{ dataRef?.title }}</span>
+                    </div>
+                  </template>
+                </a-tree>
+              </div>
+            </div>
+          </a-form-item>
+
+          <!-- 标签 -->
+          <a-form-item :label="t('pages.materialEditorManage.createTask.tags')">
+            <a-radio-group v-model:value="form.tagMode" button-style="solid">
+              <a-radio-button value="original">{{ t('pages.materialEditorManage.createTask.option.original') }}</a-radio-button>
+              <a-radio-button value="unified">{{ t('pages.materialEditorManage.createTask.option.unified') }}</a-radio-button>
+              <a-radio-button value="smart">{{ t('pages.materialEditorManage.createTask.option.smart') }}</a-radio-button>
+            </a-radio-group>
+
+            <!-- 统一设置下拉框 -->
+            <div v-if="form.tagMode === 'unified'" class="option-select-wrapper">
+              <a-select
+                v-model:value="form.tags"
+                mode="multiple"
+                :placeholder="t('pages.materialEditorManage.createTask.tagsPlaceholder')"
+                allow-clear
+                :options="tagOptions"
+                style="width: 100%;"
+              >
+              </a-select>
+            </div>
+
+            <!-- 智能识别下拉框 -->
+            <div v-if="form.tagMode === 'smart'" class="option-select-wrapper">
+              <a-select
+                v-model:value="form.smartTagId"
+                :placeholder="t('pages.materialEditorManage.createTask.tagsPlaceholder')"
+                allow-clear
+                show-search
+                :filter-option="filterOption"
+                style="width: 100%;"
+              >
+                <a-select-option v-for="tag in tagList" :key="tag.id" :value="tag.id">
+                  {{ tag.name }}
+                </a-select-option>
+              </a-select>
+            </div>
+          </a-form-item>
+
+          <!-- 设计师 -->
+          <a-form-item :label="t('pages.materialEditorManage.createTask.designer')">
+            <a-radio-group v-model:value="form.designerMode" button-style="solid">
+              <a-radio-button value="original">{{ t('pages.materialEditorManage.createTask.option.original') }}</a-radio-button>
+              <a-radio-button value="unified">{{ t('pages.materialEditorManage.createTask.option.unified') }}</a-radio-button>
+              <a-radio-button value="smart">{{ t('pages.materialEditorManage.createTask.option.smart') }}</a-radio-button>
+            </a-radio-group>
+
+            <!-- 统一设置下拉框 -->
+            <div v-if="form.designerMode === 'unified'" class="option-select-wrapper">
+              <a-select
+                v-model:value="form.designerId"
+                :placeholder="t('pages.materialEditorManage.createTask.designerPlaceholder')"
+                allow-clear
+                show-search
+                :filter-option="filterOption"
+                style="width: 100%;"
+              >
+                <a-select-option v-for="designer in designerList" :key="designer.id" :value="designer.id">
+                  {{ designer.name }}
+                </a-select-option>
+              </a-select>
+            </div>
+
+            <!-- 智能识别下拉框 -->
+            <div v-if="form.designerMode === 'smart'" class="option-select-wrapper">
+              <a-select
+                v-model:value="form.smartDesignerId"
+                :placeholder="t('pages.materialEditorManage.createTask.designerPlaceholder')"
+                allow-clear
+                show-search
+                :filter-option="filterOption"
+                style="width: 100%;"
+              >
+                <a-select-option v-for="designer in designerList" :key="designer.id" :value="designer.id">
+                  {{ designer.name }}
+                </a-select-option>
+              </a-select>
+            </div>
+          </a-form-item>
+
+          <!-- 创意人 -->
+          <a-form-item :label="t('pages.materialEditorManage.createTask.creative')">
+            <a-radio-group v-model:value="form.creativeMode" button-style="solid">
+              <a-radio-button value="original">{{ t('pages.materialEditorManage.createTask.option.original') }}</a-radio-button>
+              <a-radio-button value="unified">{{ t('pages.materialEditorManage.createTask.option.unified') }}</a-radio-button>
+              <a-radio-button value="smart">{{ t('pages.materialEditorManage.createTask.option.smart') }}</a-radio-button>
+            </a-radio-group>
+
+            <!-- 统一设置下拉框 -->
+            <div v-if="form.creativeMode === 'unified'" class="option-select-wrapper">
+              <a-select
+                v-model:value="form.creativeId"
+                :placeholder="t('pages.materialEditorManage.createTask.creativePlaceholder')"
+                allow-clear
+                show-search
+                :filter-option="filterOption"
+                style="width: 100%;"
+              >
+                <a-select-option v-for="creative in creativeList" :key="creative.id" :value="creative.id">
+                  {{ creative.name }}
+                </a-select-option>
+              </a-select>
+            </div>
+
+            <!-- 智能识别下拉框 -->
+            <div v-if="form.creativeMode === 'smart'" class="option-select-wrapper">
+              <a-select
+                v-model:value="form.smartCreativeId"
+                :placeholder="t('pages.materialEditorManage.createTask.creativePlaceholder')"
+                allow-clear
+                show-search
+                :filter-option="filterOption"
+                style="width: 100%;"
+              >
+                <a-select-option v-for="creative in creativeList" :key="creative.id" :value="creative.id">
+                  {{ creative.name }}
+                </a-select-option>
+              </a-select>
+            </div>
+          </a-form-item>
+
+          <!-- 素材名称 -->
+          <a-form-item :label="t('pages.materialEditorManage.createTask.materialName')">
+            <a-input
+              v-model:value="form.materialName"
+              :placeholder="t('pages.materialEditorManage.createTask.materialNamePlaceholder')"
+              allow-clear
+            />
+          </a-form-item>
+        </a-form>
+      </div>
+
+      <!-- Step 2 Content -->
+      <div v-if="currentStep === 2" class="step-content step2-content">
+        <div class="workbench-wrapper">
+          <canvas-editor-panel
+            ref="canvasEditorPanelRef"
+            :materials="form.materials"
+            @update:materials="handleEditorMaterialsUpdate"
+          />
+        </div>
+      </div>
+
+      <!-- Footer Buttons -->
+      <div class="modal-footer">
+        <a-space>
+          <a-button v-if="currentStep === 1" @click="handleCancel">
+            {{ t('pages.materialEditorManage.createTask.cancel') }}
+          </a-button>
+          <a-button v-if="currentStep === 2" @click="handlePrevious">
+            {{ t('pages.materialEditorManage.createTask.previous') }}
+          </a-button>
+          <a-button v-if="currentStep === 1" type="primary" @click="handleNext">
+            {{ t('pages.materialEditorManage.createTask.next') }}
+          </a-button>
+          <a-button v-if="currentStep === 2" type="primary" @click="handleFinish" :loading="isUploading">
+            {{ t('pages.materialEditorManage.createTask.finish') }}
+          </a-button>
+        </a-space>
+      </div>
+    </div>
+
+    <!-- Material Picker -->
+    <MaterialPicker
+      v-model:open="materialPickerVisible"
+      :multiple="true"
+      :default-selected-row-keys="selectedKeys"
+      :default-selected-rows="selectedRows"
+      @confirm:items-selected="handleConfirmItemsSelected"
+    />
+  </a-modal>
+</template>
+
+<script setup lang="ts">
+import { ref, reactive, computed, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { message } from 'ant-design-vue';
+import { PlusOutlined, SearchOutlined, UserOutlined, BankOutlined, FolderFilled, CloseOutlined } from '@ant-design/icons-vue';
+import type { CreateTaskForm, FolderInfo, DesignerInfo, CreativeInfo, TagInfo, MaterialType, FieldMode } from '../types';
+import MaterialPicker from '@/components/material-picker/index.vue';
+import CanvasEditorPanel from './canvas/CanvasEditorPanel.vue';
+import {
+  getMaterialLibraryFolders,
+  getMaterialLibraryFolderChildren,
+} from '@/api/material-library/folders';
+import { useUserStore } from '@/store/user';
+import { uploadEditedMaterials } from '../utils/uploadEditedMaterials';
+import type { UploadMaterialItem } from '../utils/uploadEditedMaterials';
+
+const { t } = useI18n();
+
+const props = defineProps<{
+  open: boolean;
+  folderList?: FolderInfo[];
+  designerList?: DesignerInfo[];
+  creativeList?: CreativeInfo[];
+  tagList?: TagInfo[];
+}>();
+
+const emit = defineEmits<{
+  'update:open': [value: boolean];
+  'create': [form: CreateTaskForm];
+  'select-material': []; // 埋点: 选择素材
+}>();
+
+// Current step
+const currentStep = ref(1);
+
+// Canvas editor panel ref
+const canvasEditorPanelRef = ref<InstanceType<typeof CanvasEditorPanel> | null>(null);
+
+// Upload loading state
+const isUploading = ref(false);
+
+// Modal visibility
+const visible = computed({
+  get: () => props.open,
+  set: (val) => emit('update:open', val),
+});
+
+// Form data
+const form = reactive<{
+  materialType: MaterialType | undefined;
+  materials: any[];
+  folderOption: 'original' | 'new';
+  targetFolderId: string | undefined;
+  tagMode: FieldMode;
+  tags: string[];
+  smartTagId: string | undefined;
+  designerMode: FieldMode;
+  designerId: string | undefined;
+  smartDesignerId: string | undefined;
+  creativeMode: FieldMode;
+  creativeId: string | undefined;
+  smartCreativeId: string | undefined;
+  materialName: string;
+}>({
+  materialType: 'image',
+  materials: [],
+  folderOption: 'original',
+  targetFolderId: undefined,
+  tagMode: 'original',
+  tags: [],
+  smartTagId: undefined,
+  designerMode: 'original',
+  designerId: undefined,
+  smartDesignerId: undefined,
+  creativeMode: 'original',
+  creativeId: undefined,
+  smartCreativeId: undefined,
+  materialName: '',
+});
+
+// Mock data lists
+const mockFolderList: FolderInfo[] = [
+  { id: 'folder1', name: '项目A文件夹' },
+  { id: 'folder2', name: '项目B文件夹' },
+  { id: 'folder3', name: '项目C文件夹' },
+];
+
+const mockDesignerList: DesignerInfo[] = [
+  { id: 'd1', name: '张三' },
+  { id: 'd2', name: '李四' },
+  { id: 'd3', name: '王五' },
+];
+
+const mockCreativeList: CreativeInfo[] = [
+  { id: 'c1', name: '创意A' },
+  { id: 'c2', name: '创意B' },
+  { id: 'c3', name: '创意C' },
+];
+
+const mockTagList: TagInfo[] = [
+  { id: 't1', name: '促销', color: 'red' },
+  { id: 't2', name: '节日', color: 'blue' },
+  { id: 't3', name: '品牌', color: 'green' },
+  { id: 't4', name: '活动', color: 'orange' },
+];
+
+const folderList = computed(() => props.folderList || mockFolderList);
+const designerList = computed(() => props.designerList || mockDesignerList);
+const creativeList = computed(() => props.creativeList || mockCreativeList);
+const tagList = computed(() => props.tagList || mockTagList);
+const tagOptions = computed(() =>
+  tagList.value.map(tag => ({
+    label: tag.name,
+    value: tag.id,
+  }))
+);
+
+// Filter option for select
+const filterOption = (input: string, option: any) => {
+  return option?.label?.toLowerCase().includes(input.toLowerCase());
+};
+
+
+// Reset form
+const resetForm = () => {
+  currentStep.value = 1;
+  form.materialType = 'image';
+  form.materials = [];
+  form.folderOption = 'original';
+  form.targetFolderId = undefined;
+  form.tagMode = 'original';
+  form.tags = [];
+  form.smartTagId = undefined;
+  form.designerMode = 'original';
+  form.designerId = undefined;
+  form.smartDesignerId = undefined;
+  form.creativeMode = 'original';
+  form.creativeId = undefined;
+  form.smartCreativeId = undefined;
+  form.materialName = '';
+};
+
+// Handle cancel
+const handleCancel = () => {
+  resetForm();
+  visible.value = false;
+};
+
+// Handle next step
+const handleNext = () => {
+  // Validate
+  if (!form.materialType) {
+    message.error(t('pages.materialEditorManage.createTask.pleaseSelectMaterialType'));
+    return;
+  }
+  if (form.folderOption === 'new' && !form.targetFolderId) {
+    message.error(t('pages.materialEditorManage.createTask.pleaseSelectTargetFolder'));
+    return;
+  }
+
+  // Validate materials - 用户必须选择至少一个素材
+  if (form.materials.length === 0) {
+    message.error(t('pages.materialEditorManage.createTask.pleaseSelectMaterials'));
+    return;
+  }
+
+  currentStep.value = 2;
+};
+
+// Handle previous step
+const handlePrevious = () => {
+  currentStep.value = 1;
+};
+
+// Handle finish
+const handleFinish = async () => {
+  if (isUploading.value) return;
+  
+  try {
+    isUploading.value = true;
+    
+    // 导出当前编辑的素材为图片
+    if (!canvasEditorPanelRef.value) {
+      message.error(t('pages.materialEditorManage.createTask.canvasNotReady'));
+      return;
+    }
+    
+    const blob = await canvasEditorPanelRef.value.exportCurrentCanvasAsBlob();
+    if (!blob) {
+      message.error(t('pages.materialEditorManage.createTask.exportFailed'));
+      return;
+    }
+    
+    // 准备上传素材数据
+    const uploadMaterials: UploadMaterialItem[] = [{
+      id: form.materials[0]?.id || `edited_${Date.now()}`,
+      name: form.materialName || form.materials[0]?.name || `edited_material_${Date.now()}.png`,
+      blob: blob,
+      folderId: form.folderOption === 'new' ? form.targetFolderId : undefined,
+    }];
+    
+    // 准备上传选项
+    const uploadOptions = {
+      designerId: form.designerMode === 'unified' ? form.designerId : undefined,
+      creativeId: form.creativeMode === 'unified' ? form.creativeId : undefined,
+      tags: form.tagMode === 'unified' ? form.tags : [],
+      materialGroupIds: form.folderOption === 'new' && form.targetFolderId ? [form.targetFolderId] : [],
+    };
+    
+    // 上传编辑后的素材
+    message.info(t('pages.materialEditorManage.createTask.uploadingMaterials'));
+    const uploadResult = await uploadEditedMaterials(uploadMaterials, uploadOptions);
+    
+    if (uploadResult?.data?.material_ids && uploadResult.data.material_ids.length > 0) {
+      message.success(t('pages.materialEditorManage.createTask.materialsUploaded'));
+      
+      // 构建创建表单
+      const createForm: CreateTaskForm = {
+        materialType: form.materialType,
+        materials: form.materials,
+        folderOption: form.folderOption,
+        targetFolderId: form.targetFolderId,
+        tags: form.tagMode === 'unified' ? form.tags : [],
+        designerId: form.designerMode === 'unified' ? form.designerId : undefined,
+        creativeId: form.creativeMode === 'unified' ? form.creativeId : undefined,
+        materialName: form.materialName,
+        uploadedMaterialIds: uploadResult.data.material_ids,
+      };
+
+      emit('create', createForm);
+      message.success(t('pages.materialEditorManage.createTask.taskCreated'));
+      resetForm();
+      visible.value = false;
+    } else {
+      message.error(t('pages.materialEditorManage.createTask.uploadFailed'));
+    }
+  } catch (error: any) {
+    console.error('Upload failed:', error);
+    message.error(t('pages.materialEditorManage.createTask.uploadError', { error: error.message }));
+  } finally {
+    isUploading.value = false;
+  }
+};
+
+// Material picker
+const materialPickerVisible = ref(false);
+const selectedKeys = ref<Array<string | number>>([]);
+const selectedRows = ref<any[]>([]);
+
+// Handle select material
+const handleSelectMaterial = () => {
+  materialPickerVisible.value = true;
+};
+
+// Handle material picker confirm
+const handleConfirmItemsSelected = (keys: Array<string | number>, rows: any[]) => {
+  selectedKeys.value = keys;
+  selectedRows.value = rows;
+  form.materials = rows.map(m => ({
+    id: String(m.id),
+    name: m.name || m.material_name,
+    type: m.type || (m.material_type === 0 ? 'image' : 'video'),
+    previewUrl: m.thumbnail || m.thumb_url || m.thumbnail_url || m.file_url || m.url || '',
+  }));
+
+  materialPickerVisible.value = false;
+  message.success(t('pages.materialEditorManage.materialPicker.selected', { count: rows.length }));
+};
+
+// Handle remove single material
+const handleRemoveMaterial = (id: string | number) => {
+  const key = String(id);
+  form.materials = form.materials.filter(m => String(m.id) !== key);
+  selectedKeys.value = selectedKeys.value.filter(k => String(k) !== key);
+  selectedRows.value = selectedRows.value.filter(r => String(r.id) !== key);
+};
+
+// Handle clear all materials
+const handleClearMaterials = () => {
+  form.materials = [];
+  selectedKeys.value = [];
+  selectedRows.value = [];
+};
+
+// Handle editor materials update
+const handleEditorMaterialsUpdate = (updatedMaterials: any[]) => {
+  form.materials = updatedMaterials;
+};
+
+// --- Folder Tree ---
+const userStore = useUserStore();
+const folderTreeData = ref<any[]>([]);
+const folderTreeKeyword = ref('');
+const selectedFolderTreeKeys = ref<string[]>([]);
+const expandedFolderTreeKeys = ref<Array<string | number>>([]);
+const folderUiState = reactive({ showFolderTreePanel: false });
+
+const getFolderDisplayName = (folder: any): string => {
+  const raw = String(folder?.name || folder?.folder_name || folder?.folder_path || '').trim();
+  if (!raw) return '';
+  const parts = raw.split('/').filter(Boolean);
+  return parts[parts.length - 1] || raw;
+};
+
+const normalizeFolderNode = (folder: any) => ({
+  ...folder,
+  children: Array.isArray(folder?.children) ? folder.children : [],
+});
+
+const buildTreeNode = (folder: any): any => {
+  const id = String(folder?.id ?? '');
+  return {
+    title: getFolderDisplayName(folder),
+    value: id,
+    key: id,
+    class: folder?.isRootGroup ? 'upload-folder-tree-root' : '',
+    children: (folder?.children || []).map((c: any) => buildTreeNode(c)),
+  };
+};
+
+const findTreeNodeByKey = (nodes: any[], key: string): any | null => {
+  for (const node of nodes || []) {
+    if (String(node?.key) === key || String(node?.value) === key) return node;
+    const found = findTreeNodeByKey(node?.children || [], key);
+    if (found) return found;
+  }
+  return null;
+};
+
+const collectNodeKeys = (nodes: any[]): Array<string | number> => {
+  const keys: Array<string | number> = [];
+  const walk = (arr: any[]) => {
+    (arr || []).forEach((n: any) => {
+      if (n?.key !== undefined && n?.key !== null) keys.push(n.key);
+      walk(n?.children || []);
+    });
+  };
+  walk(nodes || []);
+  return keys;
+};
+
+const filterFolderNodes = (nodes: any[], keyword: string): any[] => {
+  const q = String(keyword || '').trim().toLowerCase();
+  if (!q) return nodes;
+  const out: any[] = [];
+  (nodes || []).forEach((node: any) => {
+    const children = filterFolderNodes(node?.children || [], q);
+    const label = String(node?.title || '').toLowerCase();
+    if (label.includes(q) || children.length > 0) {
+      out.push({ ...node, children });
+    }
+  });
+  return out;
+};
+
+const filteredFolderTreeData = computed(() =>
+  filterFolderNodes(folderTreeData.value || [], folderTreeKeyword.value)
+);
+
+const selectedFolderLabel = computed(() => {
+  const id = String(form.targetFolderId || '').trim();
+  if (!id) return '';
+  const treeNode = findTreeNodeByKey(folderTreeData.value || [], id);
+  if (treeNode?.title) return String(treeNode.title);
+  return id;
+});
+
+const handleFolderTreeSelect = (selectedKeys: Array<string | number>, e: any) => {
+  const node = e?.node?.dataRef || e?.node || {};
+  if (node?.isRootGroup) return;
+  const id = selectedKeys?.[0] !== undefined ? String(selectedKeys[0]) : '';
+  form.targetFolderId = id || undefined;
+  selectedFolderTreeKeys.value = id ? [id] : [];
+  folderUiState.showFolderTreePanel = false;
+};
+
+const handleFolderTreeExpand = (keys: Array<string | number>) => {
+  expandedFolderTreeKeys.value = keys;
+};
+
+const toggleFolderTreePanel = () => {
+  folderUiState.showFolderTreePanel = !folderUiState.showFolderTreePanel;
+};
+
+// Auto-expand when searching
+watch(folderTreeKeyword, (val) => {
+  if (val?.trim()) {
+    expandedFolderTreeKeys.value = collectNodeKeys(filteredFolderTreeData.value || []);
+  } else {
+    expandedFolderTreeKeys.value = ['__root_my__', '__root_enterprise__', '__root_department__'];
+  }
+}, { immediate: false });
+
+const loadFolderChildrenRecursively = async (folder: any, fallback: { owner_id?: any; library_type?: any }) => {
+  const current = normalizeFolderNode(folder);
+  let children = Array.isArray(current.children) ? current.children : [];
+  if (!children.length && current?.id !== undefined && current?.id !== null && current?.id !== '') {
+    try {
+      const res = await getMaterialLibraryFolderChildren(current.id, {
+        owner_id: current?.owner_id ?? fallback.owner_id,
+        library_type: current?.library_type ?? fallback.library_type,
+      } as any);
+      children = (res?.data || []).map((x: any) => normalizeFolderNode(x));
+    } catch {
+      children = [];
+    }
+  } else {
+    children = children.map((x: any) => normalizeFolderNode(x));
+  }
+  current.children = children;
+  if (children.length) {
+    current.children = await Promise.all(
+      children.map((c: any) => loadFolderChildrenRecursively(c, {
+        owner_id: current?.owner_id ?? fallback.owner_id,
+        library_type: current?.library_type ?? fallback.library_type,
+      })),
+    );
+  }
+  return current;
+};
+
+const loadFolderTree = async () => {
+  try {
+    const userId = userStore?.userInfo?.id;
+    const enterpriseId = userStore?.userInfo?.enterpriseId ?? userStore?.userInfo?.enterprise_id;
+    const departmentId = userStore?.userInfo?.departmentId ?? userStore?.userInfo?.department_id;
+
+    const myParams: Record<string, any> = { library_type: 0 };
+    if (userId !== undefined && userId !== null && userId !== '') myParams.owner_id = userId;
+    const enterpriseParams: Record<string, any> = { library_type: 1 };
+    if (enterpriseId !== undefined && enterpriseId !== null && enterpriseId !== '') enterpriseParams.owner_id = enterpriseId;
+    const departmentParams: Record<string, any> = { library_type: 0 };
+    if (departmentId !== undefined && departmentId !== null && departmentId !== '') departmentParams.owner_id = departmentId;
+
+    const [myRes, enterpriseRes, departmentRes] = await Promise.all([
+      getMaterialLibraryFolders(myParams as any),
+      getMaterialLibraryFolders(enterpriseParams as any),
+      departmentId ? getMaterialLibraryFolders(departmentParams as any) : Promise.resolve({ data: [] }),
+    ]);
+
+    const rawMy = (myRes.data || []).map((f: any) => normalizeFolderNode(f));
+    const rawEnt = (enterpriseRes.data || []).map((f: any) => normalizeFolderNode(f));
+    const rawDept = (departmentRes.data || []).map((f: any) => normalizeFolderNode(f));
+
+    const myTree = await Promise.all(rawMy.map((f: any) => loadFolderChildrenRecursively(f, { owner_id: userId, library_type: 0 })));
+    const entTree = await Promise.all(rawEnt.map((f: any) => loadFolderChildrenRecursively(f, { owner_id: enterpriseId, library_type: 1 })));
+    const deptTree = await Promise.all(rawDept.map((f: any) => loadFolderChildrenRecursively(f, { owner_id: departmentId, library_type: 0 })));
+
+    folderTreeData.value = [
+      {
+        title: '我的素材库', value: '__root_my__', key: '__root_my__',
+        isRootGroup: true, rootType: 'my', selectable: false, disabled: true, disableCheckbox: true,
+        children: myTree.map((f: any) => buildTreeNode(f)),
+      },
+      {
+        title: '企业素材库', value: '__root_enterprise__', key: '__root_enterprise__',
+        isRootGroup: true, rootType: 'enterprise', selectable: false, disabled: true, disableCheckbox: true,
+        children: entTree.map((f: any) => buildTreeNode(f)),
+      },
+      {
+        title: '我的部门', value: '__root_department__', key: '__root_department__',
+        isRootGroup: true, rootType: 'department', selectable: false, disabled: true, disableCheckbox: true,
+        children: deptTree.map((f: any) => buildTreeNode(f)),
+      },
+    ];
+    expandedFolderTreeKeys.value = ['__root_my__', '__root_enterprise__', '__root_department__'];
+  } catch (err) {
+    console.error('加载文件夹树失败:', err);
+  }
+};
+
+// Reset form when modal opens/closes
+watch(visible, (val) => {
+  if (val) {
+    loadFolderTree();
+  } else {
+    resetForm();
+    // Reset folder tree state
+    folderTreeData.value = [];
+    folderTreeKeyword.value = '';
+    selectedFolderTreeKeys.value = [];
+    expandedFolderTreeKeys.value = [];
+    folderUiState.showFolderTreePanel = false;
+  }
+});
+</script>
+
+<style scoped lang="less">
+.create-task-modal {
+  padding: 8px 0;
+
+  .step-indicator {
+    text-align: center;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #f0f0f0;
+
+    .step-text {
+      font-size: 14px;
+      font-weight: 500;
+      color: #262626;
+    }
+  }
+
+  .step-content {
+    min-height: 350px;
+
+    :deep(.ant-form-item) {
+      margin-bottom: 16px;
+    }
+
+    :deep(.ant-form-item-label > label) {
+      font-size: 14px;
+      color: #262626;
+      font-weight: 500;
+    }
+
+    .selected-materials {
+      margin-top: 12px;
+    }
+
+    .selected-materials-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .selected-materials-count {
+      font-size: 13px;
+      color: #52c41a;
+      font-weight: 500;
+    }
+
+    .selected-materials-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 10px;
+    }
+
+    .selected-material-card {
+      position: relative;
+    }
+
+    .selected-material-thumb-wrapper {
+      position: relative;
+      width: 100%;
+      padding-bottom: 100%;
+    }
+
+    .selected-material-thumb {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 1px solid #e8e8e8;
+      background: #f5f5f5;
+    }
+
+    .selected-material-thumb--empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #999;
+      font-size: 12px;
+    }
+
+    .selected-material-remove {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.5);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 10px;
+      opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 1;
+    }
+
+    .selected-material-card:hover .selected-material-remove {
+      opacity: 1;
+    }
+
+    .selected-material-name {
+      margin-top: 4px;
+      font-size: 12px;
+      color: #333;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-align: center;
+    }
+
+    .folder-select-wrapper,
+    .option-select-wrapper {
+      margin-top: 12px;
+    }
+  }
+
+  .step2-content {
+    min-height: 500px;
+
+    .workbench-wrapper {
+      width: 100%;
+      height: 500px;
+      display: flex;
+      flex-direction: column;
+    }
+  }
+
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 16px;
+    border-top: 1px solid #f0f0f0;
+    margin-top: 8px;
+  }
+}
+
+// Folder picker
+.folder-picker-panel {
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.folder-picker-selected {
+  height: 32px;
+  line-height: 32px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  padding: 0 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #333;
+  &:hover {
+    border-color: #4096ff;
+  }
+}
+
+.folder-tree-search {
+  margin-bottom: 8px;
+}
+
+.upload-folder-tree {
+  border: 1px solid #f0f0f0;
+  border-radius: 4px;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.upload-folder-tree-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  .root-icon {
+    color: #d4a017;
+    font-size: 14px;
+  }
+
+  .folder-icon {
+    color: #f4b73f;
+    font-size: 14px;
+  }
+
+  .is-root-title {
+    font-weight: 500;
+  }
+}
+
+:deep(.upload-folder-tree .ant-tree-treenode) {
+  width: 100%;
+  padding: 1px 0;
+}
+
+:deep(.upload-folder-tree .ant-tree-node-content-wrapper) {
+  border-radius: 4px;
+}
+
+:deep(.upload-folder-tree .ant-tree-node-content-wrapper.ant-tree-node-selected) {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+:deep(.upload-folder-tree .upload-folder-tree-root > .ant-tree-node-content-wrapper) {
+  background: #f5f5f5;
+}
+</style>

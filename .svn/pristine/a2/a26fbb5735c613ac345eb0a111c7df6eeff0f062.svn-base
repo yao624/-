@@ -1,0 +1,482 @@
+<template>
+  <div class="editor-controls">
+    <!-- 尺寸 -->
+    <div class="control-section">
+      <div class="section-header" @click="sizeCollapsed = !sizeCollapsed">
+        <span class="section-title">尺寸</span>
+        <RightOutlined class="section-arrow" :class="{ rotated: !sizeCollapsed }" />
+      </div>
+      <div v-show="!sizeCollapsed" class="section-body">
+        <div class="size-row">
+          <a-input-number
+            :value="width"
+            :min="1"
+            :max="10000"
+            size="small"
+            placeholder="宽"
+            @change="(val: number | null) => emit('update:width', val || 1920)"
+          />
+          <span class="size-x">×</span>
+          <a-input-number
+            :value="height"
+            :min="1"
+            :max="10000"
+            size="small"
+            placeholder="高"
+            @change="(val: number | null) => emit('update:height', val || 1080)"
+          />
+        </div>
+        <div class="preset-grid">
+          <span
+            v-for="preset in presets"
+            :key="preset.name"
+            class="preset-tag"
+            :class="{ active: width === preset.width && height === preset.height }"
+            @click="emit('preset', preset.width, preset.height)"
+          >
+            {{ preset.name }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 填充方式 -->
+    <div class="control-section">
+      <div class="section-header" @click="fillCollapsed = !fillCollapsed">
+        <span class="section-title">填充方式</span>
+        <RightOutlined class="section-arrow" :class="{ rotated: !fillCollapsed }" />
+      </div>
+      <div v-show="!fillCollapsed" class="section-body">
+        <div class="bg-tabs">
+          <span
+            v-for="tab in fillTabs"
+            :key="tab.value"
+            class="bg-tab"
+            :class="{ active: fillMode === tab.value }"
+            @click="emit('update:fillMode', tab.value)"
+          >
+            {{ tab.label }}
+          </span>
+        </div>
+
+        <!-- 自定义裁剪参数 -->
+        <div v-if="fillMode === 'custom'" class="bg-content">
+          <div class="crop-row">
+            <a-input-number
+              :value="cropX"
+              :min="0"
+              size="small"
+              style="flex: 1;"
+              placeholder="X偏移"
+              @change="(val: number | null) => emit('update:cropX', val || 0)"
+            />
+            <a-input-number
+              :value="cropY"
+              :min="0"
+              size="small"
+              style="flex: 1;"
+              placeholder="Y偏移"
+              @change="(val: number | null) => emit('update:cropY', val || 0)"
+            />
+          </div>
+          <div class="crop-row">
+            <a-input-number
+              :value="cropW"
+              :min="1"
+              size="small"
+              style="flex: 1;"
+              placeholder="裁剪宽"
+              @change="(val: number | null) => emit('update:cropW', val || 100)"
+            />
+            <a-input-number
+              :value="cropH"
+              :min="1"
+              size="small"
+              style="flex: 1;"
+              placeholder="裁剪高"
+              @change="(val: number | null) => emit('update:cropH', val || 100)"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 背景 -->
+    <div class="control-section">
+      <div class="section-header" @click="bgCollapsed = !bgCollapsed">
+        <span class="section-title">背景</span>
+        <RightOutlined class="section-arrow" :class="{ rotated: !bgCollapsed }" />
+      </div>
+      <div v-show="!bgCollapsed" class="section-body">
+        <div class="bg-tabs">
+          <span
+            v-for="tab in bgTabs"
+            :key="tab.value"
+            class="bg-tab"
+            :class="{ active: bgMode === tab.value }"
+            @click="emit('update:bgMode', tab.value)"
+          >
+            {{ tab.label }}
+          </span>
+        </div>
+
+        <!-- 纯色 -->
+        <div v-if="bgMode === 'solid'" class="bg-content">
+          <color-picker
+            :model-value="bgColor"
+            @change="handleBgColorChange"
+          />
+        </div>
+
+        <!-- 图片 -->
+        <div v-if="bgMode === 'image'" class="bg-content">
+          <div v-if="bgImageUrl" class="bg-image-preview">
+            <img :src="bgImageUrl" alt="" />
+            <span class="bg-image-remove" @click="emit('update:bgImageUrl', '')">
+              <CloseOutlined />
+            </span>
+          </div>
+          <a-button size="small" block @click="handlePickBgImage">
+            {{ bgImageUrl ? '更换图片' : '选择图片' }}
+          </a-button>
+          <input
+            ref="bgImageInputRef"
+            type="file"
+            accept="image/*"
+            style="display: none;"
+            @change="handleBgImageSelected"
+          />
+        </div>
+
+        <!-- 模糊（所有背景模式可用） -->
+        <div class="blur-section">
+          <div class="blur-header">
+            <span class="blur-label">模糊</span>
+            <a-switch
+              :checked="blurAmount > 0"
+              size="small"
+              @change="(checked: boolean) => emit('update:blurAmount', checked ? 5 : 0)"
+            />
+          </div>
+          <div v-if="blurAmount > 0" class="blur-slider-row">
+            <a-slider
+              :value="blurAmount"
+              :min="1"
+              :max="20"
+              :step="1"
+              size="small"
+              @change="(val: number) => emit('update:blurAmount', val)"
+            />
+            <span class="blur-value">{{ blurAmount }}px</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 应用到所有素材 -->
+    <div class="apply-all">
+      <a-checkbox :checked="applyAll" @change="(e: any) => emit('update:applyAll', e.target.checked)">
+        应用到所有素材
+      </a-checkbox>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue';
+import { RightOutlined, CloseOutlined } from '@ant-design/icons-vue';
+import ColorPicker from '@/components/fabric-editor/color-picker.vue';
+
+const props = defineProps<{
+  width: number;
+  height: number;
+  bgColor: string;
+  bgMode: 'solid' | 'image';
+  bgImageUrl: string;
+  blurAmount: number;
+  fillMode: 'contain' | 'cover' | 'custom';
+  cropX: number;
+  cropY: number;
+  cropW: number;
+  cropH: number;
+  applyAll: boolean;
+}>();
+
+const emit = defineEmits<{
+  'update:width': [value: number];
+  'update:height': [value: number];
+  'update:bgColor': [value: string];
+  'update:bgMode': [value: 'solid' | 'image'];
+  'update:bgImageUrl': [value: string];
+  'update:blurAmount': [value: number];
+  'update:fillMode': [value: 'contain' | 'cover' | 'custom'];
+  'update:cropX': [value: number];
+  'update:cropY': [value: number];
+  'update:cropW': [value: number];
+  'update:cropH': [value: number];
+  'update:applyAll': [value: boolean];
+  'preset': [width: number, height: number];
+}>();
+
+// Collapsible state
+const sizeCollapsed = ref(false);
+const fillCollapsed = ref(false);
+const bgCollapsed = ref(false);
+
+const presets = [
+  { name: '1920×1080', width: 1920, height: 1080 },
+  { name: '1080×1920', width: 1080, height: 1920 },
+  { name: '1080×1080', width: 1080, height: 1080 },
+  { name: '750×1334', width: 750, height: 1334 },
+  { name: '375×667', width: 375, height: 667 },
+  { name: '1280×720', width: 1280, height: 720 },
+];
+
+const bgTabs = [
+  { label: '纯色', value: 'solid' },
+  { label: '图片', value: 'image' },
+];
+
+const fillTabs = [
+  { label: '自动填充', value: 'contain' },
+  { label: '自动裁剪', value: 'cover' },
+  // { label: '自定义裁剪', value: 'custom' },
+];
+
+function handleBgColorChange(data: { color: string }) {
+  emit('update:bgColor', data.color);
+}
+
+// Background image upload
+const bgImageInputRef = ref<HTMLInputElement | null>(null);
+
+function handlePickBgImage() {
+  bgImageInputRef.value?.click();
+}
+
+function handleBgImageSelected(e: Event) {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  emit('update:bgImageUrl', url);
+  input.value = '';
+}
+</script>
+
+<style scoped lang="less">
+.editor-controls {
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-left: 1px solid #e8e8e8;
+  background: #fff;
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+
+// --- Section ---
+.control-section {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  cursor: pointer;
+  user-select: none;
+  &:hover {
+    background: #fafafa;
+  }
+}
+
+.section-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+}
+
+.section-arrow {
+  font-size: 10px;
+  color: #999;
+  transition: transform 0.2s;
+  &.rotated {
+    transform: rotate(90deg);
+  }
+}
+
+.section-body {
+  padding: 0 14px 12px;
+}
+
+// --- Size ---
+.size-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+
+  :deep(.ant-input-number) {
+    flex: 1;
+  }
+}
+
+.size-x {
+  color: #999;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.preset-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.preset-tag {
+  padding: 2px 8px;
+  font-size: 12px;
+  color: #666;
+  background: #f5f5f5;
+  border: 1px solid #e8e8e8;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.2s;
+  &:hover {
+    color: #1890ff;
+    border-color: #91d5ff;
+  }
+  &.active {
+    color: #1890ff;
+    border-color: #1890ff;
+    background: #e6f7ff;
+  }
+}
+
+// --- Background tabs ---
+.bg-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 12px;
+  border: 1px solid #e8e8e8;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bg-tab {
+  flex: 1;
+  text-align: center;
+  padding: 5px 0;
+  font-size: 12px;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-right: 1px solid #e8e8e8;
+  &:last-child {
+    border-right: none;
+  }
+  &:hover {
+    color: #1890ff;
+    background: #f0f8ff;
+  }
+  &.active {
+    color: #1890ff;
+    background: #e6f7ff;
+    font-weight: 500;
+  }
+}
+
+.bg-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+// --- Blur ---
+.blur-section {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.blur-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.blur-label {
+  font-size: 12px;
+  color: #666;
+}
+
+.blur-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  :deep(.ant-slider) {
+    flex: 1;
+    margin: 0;
+  }
+}
+
+.blur-value {
+  font-size: 12px;
+  color: #999;
+  min-width: 32px;
+  text-align: right;
+}
+
+// --- Background image ---
+.bg-image-preview {
+  position: relative;
+  width: 100%;
+  height: 80px;
+  border: 1px solid #e8e8e8;
+  border-radius: 4px;
+  overflow: hidden;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.bg-image-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 50%;
+  color: #fff;
+  font-size: 10px;
+  cursor: pointer;
+  &:hover {
+    background: rgba(0, 0, 0, 0.7);
+  }
+}
+
+// --- Apply all ---
+.apply-all {
+  padding: 12px 14px;
+  border-top: 1px solid #f0f0f0;
+  margin-top: auto;
+}
+
+// --- Crop ---
+.crop-row {
+  display: flex;
+  gap: 6px;
+}
+</style>

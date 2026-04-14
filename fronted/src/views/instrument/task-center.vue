@@ -191,12 +191,13 @@
       <div class="table-section">
         <a-table
           class="task-center-main-table"
+          :virtual="true"
           :columns="columns"
           :data-source="dataSource"
           :row-key="record => record.id"
           :loading="loading"
           :pagination="pagination"
-          :scroll="{ x: 1720 }"
+          :scroll="{ x: 1720, y: 620 }"
           @change="handleTableChange"
           size="middle"
         >

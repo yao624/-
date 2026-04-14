@@ -1,0 +1,410 @@
+<template>
+  <page-container :showPageHeader="false">
+    <div class="material-editor-manage-page">
+      <div class="content-card">
+        <!-- 筛选区域 -->
+        <filter-section
+          :fields="filterFields"
+          :default-visible-keys="['taskId', 'status', 'createdBy', 'createdAt']"
+          :show-modal="false"
+          storage-key="material-editor-filter-keys"
+          @search="handleFilterSearch"
+        />
+
+        <!-- 操作栏 -->
+        <div class="action-bar">
+          <a-space>
+            <a-button type="primary" @click="handleCreateTask">
+              {{ t('pages.materialEditorManage.actions.createTask') }}
+            </a-button>
+          </a-space>
+          <a-button @click="handleRefresh">
+            {{ t('pages.materialEditorManage.actions.refresh') }}
+          </a-button>
+        </div>
+
+        <!-- 表格区域 -->
+        <div class="table-area">
+          <task-table
+            :data-source="taskData"
+            :loading="loading"
+            :pagination="pagination"
+            @page-change="handlePageChange"
+            @detail="handleDetail"
+            @view-folder="handleViewFolder"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- 详情弹窗 -->
+    <a-modal
+      v-model:open="detailModalVisible"
+      :title="t('pages.materialEditorManage.actions.detail')"
+      width="1600px"
+      :footer="null"
+    >
+      <div class="detail-content">
+        <!-- 任务信息 -->
+        <a-descriptions :column="2" bordered class="task-info">
+          <a-descriptions-item :label="t('pages.materialEditorManage.table.taskId')">
+            {{ currentTask?.id }}
+          </a-descriptions-item>
+          <a-descriptions-item :label="t('pages.materialEditorManage.table.status')">
+            <a-tag :color="getStatusColor(currentTask?.status)">
+              {{ currentTask ? t(`pages.materialEditorManage.status.${currentTask.status}`) : '-' }}
+            </a-tag>
+          </a-descriptions-item>
+          <a-descriptions-item :label="t('pages.materialEditorManage.table.createdAt')">
+            {{ currentTask?.createdAt }}
+          </a-descriptions-item>
+          <a-descriptions-item :label="t('pages.materialEditorManage.table.createdBy')">
+            {{ currentTask?.creator }}
+          </a-descriptions-item>
+          <a-descriptions-item v-if="currentTask?.taskName" :label="t('pages.materialEditorManage.table.taskName')" :span="2">
+            {{ currentTask?.taskName }}
+          </a-descriptions-item>
+          <a-descriptions-item v-if="currentTask?.designerName" :label="t('pages.materialEditorManage.table.designerName')">
+            {{ currentTask?.designerName }}
+          </a-descriptions-item>
+          <a-descriptions-item v-if="currentTask?.materialType" :label="t('pages.materialEditorManage.table.materialType')">
+            {{ currentTask?.materialType }}
+          </a-descriptions-item>
+          <a-descriptions-item v-if="currentTask?.tags && currentTask.tags.length > 0" :label="t('pages.materialEditorManage.table.tags')" :span="2">
+            <a-tag v-for="tag in currentTask?.tags" :key="tag" color="blue">{{ tag }}</a-tag>
+          </a-descriptions-item>
+          <a-descriptions-item v-if="currentTask?.folderName" :label="t('pages.materialEditorManage.table.folderName')" :span="2">
+            {{ currentTask?.folderName }}
+          </a-descriptions-item>
+          <a-descriptions-item :label="t('pages.materialEditorManage.table.statistics.total')">
+            {{ currentTask?.totalCount ?? 0 }}
+          </a-descriptions-item>
+          <a-descriptions-item :label="t('pages.materialEditorManage.table.statistics.success')">
+            <a-tag color="success">{{ currentTask?.successCount ?? 0 }}</a-tag>
+          </a-descriptions-item>
+          <a-descriptions-item :label="t('pages.materialEditorManage.table.statistics.failed')">
+            <a-tag color="error">{{ currentTask?.failedCount ?? 0 }}</a-tag>
+          </a-descriptions-item>
+          <a-descriptions-item :label="t('pages.materialEditorManage.table.statistics.pending')">
+            <a-tag color="default">{{ currentTask?.pendingCount ?? 0 }}</a-tag>
+          </a-descriptions-item>
+        </a-descriptions>
+
+        <!-- 素材编辑列表 -->
+        <div class="material-list-section">
+          <div class="section-title">{{ t('pages.materialEditorManage.detailTable.title') }}</div>
+          <material-edit-table
+            :data-source="materialItems"
+            :loading="materialItemsLoading"
+            :pagination="materialItemsPagination"
+            @page-change="handleMaterialPageChange"
+          />
+        </div>
+      </div>
+    </a-modal>
+
+    <!-- 新增任务弹窗 -->
+    <create-task-modal
+      v-model:open="createTaskModalVisible"
+      @create="handleTaskCreated"
+      @select-material="handleSelectMaterialLog"
+    />
+  </page-container>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { message } from 'ant-design-vue';
+import type { Dayjs } from 'dayjs';
+import TaskTable from './components/TaskTable.vue';
+import MaterialEditTable from './components/MaterialEditTable.vue';
+import CreateTaskModal from './components/CreateTaskModal.vue';
+import FilterSection from '@/components/filter-section/FilterSection.vue';
+import type { FilterFieldConfig } from '@/components/filter-section/types';
+import { getMaterialEditorTasks, getMaterialEditorTaskDetail, createMaterialEditorTask } from '@/api/material-library/material-editor';
+import { getUserOptions } from '@/api/user/options';
+import type { MaterialEditorTask, MaterialEditItem, TaskDetail, TaskStatus, CreateTaskForm } from './types';
+
+const { t } = useI18n();
+
+// Filter fields configuration
+const filterFields = computed<FilterFieldConfig[]>(() => [
+  {
+    key: 'taskId',
+    label: t('pages.materialEditorManage.filter.taskId'),
+    type: 'input',
+    placeholder: t('pages.materialEditorManage.filter.taskIdPlaceholder'),
+  },
+  {
+    key: 'status',
+    label: t('pages.materialEditorManage.filter.status'),
+    type: 'select',
+    placeholder: t('pages.materialEditorManage.filter.statusPlaceholder'),
+    options: [
+      { value: 'pending', label: t('pages.materialEditorManage.status.pending') },
+      { value: 'processing', label: t('pages.materialEditorManage.status.processing') },
+      { value: 'completed', label: t('pages.materialEditorManage.status.completed') },
+      { value: 'failed', label: t('pages.materialEditorManage.status.failed') },
+    ],
+  },
+  {
+    key: 'createdBy',
+    label: t('pages.materialEditorManage.filter.createdBy'),
+    type: 'select',
+    placeholder: t('pages.materialEditorManage.filter.createdByPlaceholder'),
+    options: userOptions.value,
+    allowClear: true,
+  },
+  {
+    key: 'createdAt',
+    label: t('pages.materialEditorManage.filter.createdAt'),
+    type: 'date-range',
+  },
+]);
+
+// User options for createdBy filter
+const userOptions = ref<Array<{ value: string; label: string }>>([]);
+
+// Data
+const taskData = ref<MaterialEditorTask[]>([]);
+const loading = ref(false);
+const currentPage = ref(1);
+const pageSize = ref(20);
+const total = ref(0);
+
+// Detail Modal
+const detailModalVisible = ref(false);
+const currentTask = ref<TaskDetail | null>(null);
+const materialItems = ref<MaterialEditItem[]>([]);
+const materialItemsLoading = ref(false);
+const materialItemsCurrentPage = ref(1);
+const materialItemsPageSize = ref(10);
+const materialItemsTotal = ref(0);
+
+// Create Task Modal
+const createTaskModalVisible = ref(false);
+
+// 筛选条件
+const currentTaskId = ref<string | undefined>();
+const currentStatus = ref<TaskStatus | undefined>();
+const currentCreatedBy = ref<string | undefined>();
+const dateRange = ref<[Dayjs, Dayjs] | undefined>();
+const currentStartDate = ref<string | undefined>();
+const currentEndDate = ref<string | undefined>();
+
+// Handle filter search from filter-section component
+const handleFilterSearch = (filters: Record<string, any>) => {
+  // Process date range
+  if (filters.createdAt && filters.createdAt.length === 2) {
+    currentStartDate.value = filters.createdAt[0].format('YYYY-MM-DD');
+    currentEndDate.value = filters.createdAt[1].format('YYYY-MM-DD');
+  } else {
+    currentStartDate.value = undefined;
+    currentEndDate.value = undefined;
+  }
+
+  // Update filter values
+  currentTaskId.value = filters.taskId;
+  currentStatus.value = filters.status;
+  currentCreatedBy.value = filters.createdBy;
+  dateRange.value = filters.createdAt;
+
+  currentPage.value = 1;
+  loadData();
+};
+
+// Computed
+const pagination = computed(() => ({
+  current: currentPage.value,
+  pageSize: pageSize.value,
+  total: total.value,
+  showSizeChanger: true,
+  showQuickJumper: true,
+  showTotal: (total: number) => t('pages.materialEditorManage.messages.total', { count: total }),
+}));
+
+const materialItemsPagination = computed(() => ({
+  current: materialItemsCurrentPage.value,
+  pageSize: materialItemsPageSize.value,
+  total: materialItemsTotal.value,
+  showSizeChanger: true,
+  showQuickJumper: true,
+  showTotal: (total: number) => t('pages.materialEditorManage.messages.total', { count: total }),
+}));
+
+// Methods
+const loadData = async () => {
+  loading.value = true;
+  try {
+    const response = await getMaterialEditorTasks({
+      pageNo: currentPage.value,
+      pageSize: pageSize.value,
+      task_name: currentTaskId.value,
+      status: currentStatus.value,
+      created_by: currentCreatedBy.value,
+      create_time_start: currentStartDate.value,
+      create_time_end: currentEndDate.value,
+    });
+    taskData.value = response.data.data;
+    total.value = response.data.totalCount;
+  } finally {
+    loading.value = false;
+  }
+};
+
+const loadMaterialItems = async () => {
+  if (!currentTask.value) return;
+
+  materialItemsLoading.value = true;
+  try {
+    const response = await getMaterialEditorTaskDetail(currentTask.value.id);
+    // Update currentTask with full detail
+    currentTask.value = response.data;
+    materialItems.value = response.data.items;
+    materialItemsTotal.value = response.data.totalCount;
+  } finally {
+    materialItemsLoading.value = false;
+  }
+};
+
+const handlePageChange = (page: number, size: number) => {
+  currentPage.value = page;
+  pageSize.value = size;
+  loadData();
+};
+
+const handleMaterialPageChange = (page: number, size: number) => {
+  materialItemsCurrentPage.value = page;
+  materialItemsPageSize.value = size;
+  loadMaterialItems();
+};
+
+const handleDetail = (record: MaterialEditorTask) => {
+  currentTask.value = { id: record.id } as TaskDetail;
+  materialItemsCurrentPage.value = 1;
+  detailModalVisible.value = true;
+  loadMaterialItems();
+};
+
+const handleViewFolder = (record: MaterialEditorTask) => {
+  // TODO: 查看文件夹功能 - 埋点
+  console.log('查看文件夹:', record);
+  message.info(t('pages.materialEditorManage.messages.viewFolderInfo', { folder: record.folderName || record.id }));
+};
+
+const getStatusColor = (status?: TaskStatus): string => {
+  if (!status) return 'default';
+  const colorMap: Record<string, string> = {
+    pending: 'default',
+    processing: 'processing',
+    completed: 'success',
+    failed: 'error',
+  };
+  return colorMap[status] || 'default';
+};
+
+const handleCreateTask = () => {
+  createTaskModalVisible.value = true;
+};
+
+const handleTaskCreated = async (form: CreateTaskForm) => {
+  try {
+    // Build API request payload
+    const payload = {
+      task_name: `${form.materialType === 'image' ? '图片' : '视频'}编辑任务_${new Date().toLocaleDateString()}`,
+      material_type: form.materialType,
+      folder_option: form.folderOption,
+      folder_id: form.targetFolderId ? parseInt(form.targetFolderId) : undefined,
+      materials: form.materials.map(m => ({
+        material_id: parseInt(m.id),
+        material_name: m.name,
+        preview_url: m.previewUrl,
+      })),
+      tags: form.tags,
+      designer_id: form.designerId ? parseInt(form.designerId) : undefined,
+      creator_id: form.creativeId ? parseInt(form.creativeId) : undefined,
+      created_by: 1, // TODO: Get from auth context
+    };
+
+    await createMaterialEditorTask(payload);
+    message.success(t('pages.materialEditorManage.createTask.taskCreated'));
+    loadData();
+  } catch (error) {
+    console.error('Failed to create task:', error);
+    message.error(t('pages.materialEditorManage.messages.createTaskFailed'));
+  }
+};
+
+const handleSelectMaterialLog = () => {
+  // 埋点: 选择素材
+  console.log('埋点: 选择素材');
+};
+
+const handleRefresh = () => {
+  loadData();
+};
+
+// Load user options
+const loadUserOptions = async () => {
+  try {
+    const response = await getUserOptions();
+    if (response?.data) {
+      userOptions.value = response.data;
+    }
+  } catch (error) {
+    console.error('Failed to load user options:', error);
+  }
+};
+
+// Lifecycle
+onMounted(() => {
+  loadUserOptions();
+  loadData();
+});
+</script>
+
+<style scoped lang="less">
+.material-editor-manage-page {
+  height: calc(100vh - 120px);
+  min-height: 500px;
+
+  .content-card {
+    background: #fff;
+    border-radius: 8px;
+    padding: 16px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+
+    .action-bar {
+      flex-shrink: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .table-area {
+      flex: 1;
+      overflow: hidden;
+      min-height: 0;
+    }
+  }
+}
+
+.detail-content {
+  .task-info {
+    margin-bottom: 16px;
+  }
+
+  .material-list-section {
+    .section-title {
+      font-size: 16px;
+      font-weight: 500;
+      margin-bottom: 12px;
+      color: #262626;
+    }
+  }
+}
+</style>

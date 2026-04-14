@@ -118,6 +118,7 @@
 
       <div class="table-section">
         <a-table
+          :virtual="true"
           :columns="activeTabKey === 'home' ? columns : activeTabKey === 'comment' ? commentColumns : keywordColumns"
           :data-source="activeTabKey === 'home' ? dataSource : activeTabKey === 'comment' ? commentDataSource : keywordDataSource"
           :row-key="record => record.id"

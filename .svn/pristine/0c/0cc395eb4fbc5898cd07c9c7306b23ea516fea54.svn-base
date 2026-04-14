@@ -1,0 +1,220 @@
+import { message } from 'ant-design-vue';
+import { useI18n } from 'vue-i18n';
+import {
+  uploadTempSessionInit,
+  uploadTempSessionChunk,
+  uploadTempSessionFilesStatus,
+  uploadTempSessionCommit,
+} from '@/api/material-library/materials';
+
+const CHUNK_SIZE = 2 * 1024 * 1024; // 2MB 分片大小
+const MAX_CHUNK_RETRIES = 3;
+const RETRY_BASE_DELAY_MS = 1000;
+const RETRY_MAX_DELAY_MS = 8000;
+
+export interface UploadMaterialItem {
+  id: string;
+  name: string;
+  blob: Blob;
+  folderId?: string;
+}
+
+export interface UploadOptions {
+  designerId?: string;
+  creativeId?: string;
+  tags?: string[];
+  materialGroupIds?: string[];
+}
+
+interface UploadSession {
+  sessionId: string;
+  sessionCode: string;
+}
+
+/**
+ * 将Blob转换为分片数组
+ */
+function createChunks(blob: Blob, chunkSize: number = CHUNK_SIZE): Blob[] {
+  const chunks: Blob[] = [];
+  let offset = 0;
+  
+  while (offset < blob.size) {
+    const end = Math.min(offset + chunkSize, blob.size);
+    chunks.push(blob.slice(offset, end));
+    offset = end;
+  }
+  
+  return chunks;
+}
+
+/**
+ * 上传单个分片，带重试机制
+ */
+async function uploadChunkWithRetry(
+  sessionId: string,
+  fileKey: string,
+  chunkIndex: number,
+  chunkTotal: number,
+  chunk: Blob,
+  fileName: string
+): Promise<void> {
+  const formData = new FormData();
+  formData.append('file_key', fileKey);
+  formData.append('chunk_index', String(chunkIndex));
+  formData.append('chunk_total', String(chunkTotal));
+  formData.append('chunk', chunk, fileName);
+
+  let lastError: any = null;
+  
+  for (let attempt = 1; attempt <= MAX_CHUNK_RETRIES; attempt++) {
+    try {
+      await uploadTempSessionChunk(sessionId, formData);
+      return;
+    } catch (error: any) {
+      lastError = error;
+      if (attempt >= MAX_CHUNK_RETRIES) break;
+      
+      // 指数退避延迟
+      const delay = Math.min(RETRY_MAX_DELAY_MS, RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1));
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  throw lastError;
+}
+
+/**
+ * 上传单个素材文件
+ */
+async function uploadSingleMaterial(
+  session: UploadSession,
+  material: UploadMaterialItem,
+  uploadOptions: UploadOptions
+): Promise<void> {
+  const { t } = useI18n();
+  
+  // 创建分片
+  const chunks = createChunks(material.blob);
+  const fileKey = `edited_${material.id}_${Date.now()}`;
+  
+  message.loading(t('pages.materialEditorManage.upload.uploading', { name: material.name }));
+  
+  // 获取已上传的分片状态（支持断点续传）
+  const statusRes = await uploadTempSessionFilesStatus(session.sessionId);
+  const serverFiles = statusRes?.data?.files || [];
+  const receivedMap = new Map<string, Set<number>>();
+  
+  serverFiles.forEach((file: any) => {
+    const indices = Array.isArray(file?.received_chunk_indices) ? file.received_chunk_indices : [];
+    receivedMap.set(String(file.file_key), new Set(indices.map((x: number) => Number(x))));
+  });
+  
+  const receivedSet = receivedMap.get(fileKey) || new Set<number>();
+  
+  // 上传缺失的分片
+  for (let i = 0; i < chunks.length; i++) {
+    if (receivedSet.has(i)) continue; // 跳过已上传的分片
+    
+    try {
+      await uploadChunkWithRetry(
+        session.sessionId,
+        fileKey,
+        i,
+        chunks.length,
+        chunks[i],
+        material.name
+      );
+    } catch (error: any) {
+      message.error(t('pages.materialEditorManage.upload.chunkUploadFailed', { name: material.name, error: error.message }));
+      throw error;
+    }
+  }
+  
+  message.success(t('pages.materialEditorManage.upload.fileUploaded', { name: material.name }));
+}
+
+/**
+ * 初始化上传会话
+ */
+async function initUploadSession(
+  materials: UploadMaterialItem[],
+  uploadOptions: UploadOptions
+): Promise<UploadSession> {
+  const payload: Record<string, any> = {
+    file_count: materials.length,
+    total_size: materials.reduce((sum, item) => sum + item.blob.size, 0),
+  };
+  
+  // 添加可选参数
+  if (uploadOptions.designerId) {
+    payload.designer_id = uploadOptions.designerId;
+  }
+  if (uploadOptions.creativeId) {
+    payload.creative_id = uploadOptions.creativeId;
+  }
+  if (uploadOptions.tags && uploadOptions.tags.length > 0) {
+    payload.tags = uploadOptions.tags;
+  }
+  if (uploadOptions.materialGroupIds && uploadOptions.materialGroupIds.length > 0) {
+    payload.material_group_ids = uploadOptions.materialGroupIds;
+  }
+  
+  const res = await uploadTempSessionInit(payload);
+  const sessionId = String(res?.data?.session_id || '');
+  const sessionCode = String(res?.data?.session_code || '');
+  
+  if (!sessionId) {
+    throw new Error('Failed to initialize upload session');
+  }
+  
+  return { sessionId, sessionCode };
+}
+
+/**
+ * 提交上传会话
+ */
+async function commitUploadSession(session: UploadSession, folderId?: string): Promise<any> {
+  const payload: Record<string, any> = {};
+  
+  if (folderId) {
+    payload.material_group_id = folderId;
+  }
+  
+  return await uploadTempSessionCommit(session.sessionId, payload);
+}
+
+/**
+ * 批量上传编辑后的素材
+ */
+export async function uploadEditedMaterials(
+  materials: UploadMaterialItem[],
+  uploadOptions: UploadOptions = {}
+): Promise<any> {
+  const { t } = useI18n();
+  
+  if (!materials || materials.length === 0) {
+    throw new Error(t('pages.materialEditorManage.upload.noMaterials'));
+  }
+  
+  message.info(t('pages.materialEditorManage.upload.startingUpload', { count: materials.length }));
+  
+  try {
+    // 1. 初始化上传会话
+    const session = await initUploadSession(materials, uploadOptions);
+    
+    // 2. 逐个上传素材文件
+    for (const material of materials) {
+      await uploadSingleMaterial(session, material, uploadOptions);
+    }
+    
+    // 3. 提交上传会话
+    const commitResult = await commitUploadSession(session, materials[0]?.folderId);
+    
+    message.success(t('pages.materialEditorManage.upload.allMaterialsUploaded'));
+    
+    return commitResult;
+  } catch (error: any) {
+    message.error(t('pages.materialEditorManage.upload.uploadFailed', { error: error.message }));
+    throw error;
+  }
+}

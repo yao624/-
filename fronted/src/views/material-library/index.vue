@@ -113,7 +113,48 @@
           <div class="filter-left">
             <div class="filter-grid">
               <a-select v-if="showFilterField('materialGroupId')" v-model:value="filters.materialGroupId"
-                :placeholder="t('素材组')" class="filter-field" allow-clear @change="handleFilterChange">
+                :placeholder="t('素材组')" class="filter-field" allow-clear show-search :filter-option="false"
+                :loading="filterMaterialGroupLoading" :open="filterMaterialGroupOpen"
+                @change="handleFilterChange" @search="handleFilterMaterialGroupSearch"
+                @click="handleFilterMaterialGroupClick" @dropdownVisibleChange="handleFilterMaterialGroupDropdownVisibleChange">
+                <template #dropdownRender="{ menuNode: menu }">
+                  <div class="filter-group-create">
+                    <div class="filter-group-create-title">
+                      <span>新增素材组</span>
+                      <a-button
+                        size="small"
+                        type="link"
+                        class="filter-group-create-clear"
+                        @click="handleFilterMaterialGroupClearSearch"
+                        @mousedown.stop="filterMaterialGroupInteracting = true"
+                      >
+                        清空搜索
+                      </a-button>
+                    </div>
+                    <a-input
+                      v-model:value="filterMaterialGroupCreateName"
+                      placeholder="输入新素材组名称"
+                      size="small"
+                      :maxlength="100"
+                      @pressEnter="handleCreateFilterMaterialGroup"
+                      @mousedown.stop="filterMaterialGroupInteracting = true"
+                      @click.stop
+                    />
+                    <a-button
+                      type="primary"
+                      size="small"
+                      class="filter-group-create-btn"
+                      :disabled="!canCreateFilterMaterialGroup"
+                      :loading="filterMaterialGroupCreating"
+                      @click="handleCreateFilterMaterialGroup"
+                      @mousedown.stop="filterMaterialGroupInteracting = true"
+                    >
+                      新增
+                    </a-button>
+                  </div>
+                  <a-divider style="margin: 4px 0" />
+                  <v-nodes :vnodes="menu" />
+                </template>
                 <a-select-option v-for="g in materialGroups" :key="g.id" :value="g.id">
                   {{ g.name }}
                 </a-select-option>
@@ -130,23 +171,28 @@
                 class="filter-field"
                 @update:modelValue="handleFilterChange"
               />
-              <AdvancedSearchSelect
+              <UserPicker
                 v-if="showFilterField('designer')"
-                v-model="designerSelectedValues"
-                :categories="designerCategories"
-                :items="designerItems"
-                :placeholder="t('设计师')"
+                v-model="designerFilterUserIds"
+                :org-tree="organizationTreeData"
+                :dept-id="2"
+                :placeholder="'请选择设计师'"
+                :search-placeholder="'搜索设计师'"
+                :selected-empty-label="'暂无已选设计师'"
+                :remove-label="'移除'"
                 class="filter-field"
-                @change="handleFilterChange"
+                @update:modelValue="handleFilterChange"
               />
-              <AdvancedSearchSelect
+              <UserPicker
                 v-if="showFilterField('creator')"
-                v-model="creatorSelectedValues"
-                :categories="creatorCategories"
-                :items="creatorItems"
-                :placeholder="t('创意人')"
+                v-model="creatorFilterUserIds"
+                :org-tree="organizationTreeData"
+                :placeholder="'请选择创意人'"
+                :search-placeholder="'搜索创意人'"
+                :selected-empty-label="'暂无已选创意人'"
+                :remove-label="'移除'"
                 class="filter-field"
-                @change="handleFilterChange"
+                @update:modelValue="handleFilterChange"
               />
               <AdvancedSearchSelect
                 v-if="showFilterField('materialType')"
@@ -304,6 +350,7 @@
                     </a-popconfirm>
                   </a-menu-item>
                   <a-menu-item @click="openBatchMoveModal">{{ t('批量移动') }}</a-menu-item>
+                  <a-menu-item v-if="canManageSelectedPermission" @click="openBatchPermissionModal">{{ t('批量设置可见范围') }}</a-menu-item>
                   <a-menu-item @click="openBatchTagModal">{{ t('批量设置标签') }}</a-menu-item>
                 </a-menu>
               </template>
@@ -361,12 +408,13 @@
           <a-table
             v-if="viewMode === 'list'"
             :loading="loading"
+            :virtual="true"
             :columns="visibleColumns"
             :data-source="tableData"
             :pagination="pagination"
             :row-selection="rowSelection"
             :row-key="record => record.id"
-            :scroll="{ x: 2800 }"
+            :scroll="{ x: 2800, y: 620 }"
             @change="handleTableChange"
           >
             <template #bodyCell="{ column, record }">
@@ -483,7 +531,7 @@
               </template>
               <template v-else-if="column.dataIndex === 'designerId'">
                 <template v-if="record.type === 'folder'">
-                  <span>{{ getDesignerName(record.designerId) }}</span>
+                  <span>{{ getDesignerName(record.designerIds?.length ? record.designerIds : record.designerId) }}</span>
                 </template>
                 <template v-else>
                   <span
@@ -491,13 +539,13 @@
                     :class="{ 'editable-cell--disabled': !isCellEditableRecord(record) }"
                     @click.stop="openCellEditor('designerId', record)"
                   >
-                    {{ getDesignerName(record.designerId) === '-' ? t('点击编辑') : getDesignerName(record.designerId) }}
+                    {{ getDesignerName(record.designerIds?.length ? record.designerIds : record.designerId) === '-' ? t('点击编辑') : getDesignerName(record.designerIds?.length ? record.designerIds : record.designerId) }}
                   </span>
                 </template>
               </template>
               <template v-else-if="column.dataIndex === 'creatorId'">
                 <template v-if="record.type === 'folder'">
-                  <span>{{ getCreatorName(record.creatorId) }}</span>
+                  <span>{{ getCreatorName(record.creatorIds?.length ? record.creatorIds : record.creatorId) }}</span>
                 </template>
                 <template v-else>
                   <span
@@ -505,7 +553,7 @@
                     :class="{ 'editable-cell--disabled': !isCellEditableRecord(record) }"
                     @click.stop="openCellEditor('creatorId', record)"
                   >
-                    {{ getCreatorName(record.creatorId) === '-' ? t('点击编辑') : getCreatorName(record.creatorId) }}
+                    {{ getCreatorName(record.creatorIds?.length ? record.creatorIds : record.creatorId) === '-' ? t('点击编辑') : getCreatorName(record.creatorIds?.length ? record.creatorIds : record.creatorId) }}
                   </span>
                 </template>
               </template>
@@ -537,7 +585,14 @@
                 <span>{{ record.materialCount ?? '-' }}</span>
               </template>
               <template v-else-if="column.dataIndex === 'auditStatus'">
-                <span>{{ formatAuditStatus(record.auditStatus, record.rejectReason) }}</span>
+                <a
+                  v-if="Number(record.auditStatus) === 2"
+                  class="audit-status-link"
+                  @click="openAuditRejectReasonModal(record)"
+                >
+                  {{ formatAuditStatus(record.auditStatus, record.rejectReason) }}
+                </a>
+                <span v-else>{{ formatAuditStatus(record.auditStatus, record.rejectReason) }}</span>
               </template>
               <template v-else-if="column.dataIndex === 'source'">
                 <span>{{ formatSource(record.source) }}</span>
@@ -549,7 +604,14 @@
                 <span>{{ formatShape(record.width, record.height) }}</span>
               </template>
               <template v-else-if="column.dataIndex === 'rejectReason'">
-                <span>{{ record.rejectReason ?? '-' }}</span>
+                <a
+                  v-if="record.rejectReason"
+                  class="audit-status-link"
+                  @click="openAuditRejectReasonModal(record)"
+                >
+                  {{ record.rejectReason }}
+                </a>
+                <span v-else>-</span>
               </template>
               <template v-else-if="column.dataIndex === 'rating'">
                 <span>{{ record.rating ?? '-' }}</span>
@@ -619,6 +681,9 @@
                   </a-button>
                   <a-button type="link" size="small" @click="openUsagesModal(record)">
                     {{ t('使用记录') }}
+                  </a-button>
+                  <a-button v-if="canManageMaterialPermission(record)" type="link" size="small" @click="openMaterialPermissionModal(record)">
+                    {{ t('设置可见范围') }}
                   </a-button>
                 </a-space>
                 <span v-else>-</span>
@@ -695,6 +760,14 @@
     <!-- 新建素材库弹窗 -->
     <create-library-modal v-model:open="createLibraryModalVisible" :library-type="createLibraryType"
       @success="handleCreateLibrarySuccess" />
+
+    <material-permission-modal
+      v-model:open="permissionModalVisible"
+      :materials="permissionModalTargets"
+      :initial-value="permissionModalInitialValue"
+      :read-only="permissionModalReadOnly"
+      @success="handlePermissionModalSuccess"
+    />
 
     <material-picker
       v-model:open="materialPickerOpen"
@@ -837,17 +910,19 @@
           <a-input v-model:value="cellEditPersonKeyword" :placeholder="t('搜索姓名')" allow-clear />
           <div class="cell-edit-selector-body">
             <div class="cell-edit-selector-left">
-              <tree :tree-data="cellEditPersonTreeData" :expanded-keys="['person-root']" :selectable="true"
-                :selected-keys="cellEditPersonSelectedId ? [cellEditPersonSelectedId] : []"
-                @select="handleCellEditPersonSelect" />
+              <tree :tree-data="cellEditPersonTreeData" :expanded-keys="['person-root']" checkable
+                :checked-keys="cellEditPersonSelectedIds"
+                @check="handleCellEditPersonCheck" />
             </div>
             <div class="cell-edit-selector-right">
               <div class="cell-edit-selected-header">
-                <span>{{ t('已选') }} {{ cellEditPersonSelectedId ? 1 : 0 }} {{ t('个') }}</span>
+                <span>{{ t('已选') }} {{ cellEditPersonSelectedIds.length }} {{ t('个') }}</span>
                 <a @click="clearCellEditPersonSelection">{{ t('清除') }}</a>
               </div>
               <div class="cell-edit-selected-list">
-                <a-tag v-if="cellEditPersonSelectedId">{{ cellEditPersonSelectedName }}</a-tag>
+                <template v-if="cellEditPersonSelectedNames.length">
+                  <a-tag v-for="name in cellEditPersonSelectedNames" :key="name">{{ name }}</a-tag>
+                </template>
                 <span v-else class="cell-edit-empty">{{ t('暂无选中') }}</span>
               </div>
             </div>
@@ -893,19 +968,24 @@
         </a-form-item>
 
         <a-form-item :label="t('设计师')">
-          <a-select v-model:value="editFormData.designer_id" style="width: 100%" allow-clear>
-            <a-select-option v-for="d in designers" :key="d.id" :value="d.id">
-              {{ d.name }}
-            </a-select-option>
-          </a-select>
+          <UserPicker
+            v-model="editFormData.designer_ids"
+            :org-tree="organizationTreeData"
+            :dept-id="2"
+            placeholder="请选择设计师"
+            selected-empty-label="暂无已选设计师"
+            remove-label="移除"
+          />
         </a-form-item>
 
         <a-form-item :label="t('创意人')">
-          <a-select v-model:value="editFormData.creator_id" style="width: 100%" allow-clear>
-            <a-select-option v-for="c in creators" :key="c.id" :value="c.id">
-              {{ c.name }}
-            </a-select-option>
-          </a-select>
+          <UserPicker
+            v-model="editFormData.creator_ids"
+            :org-tree="organizationTreeData"
+            placeholder="请选择创意人"
+            selected-empty-label="暂无已选创意人"
+            remove-label="移除"
+          />
         </a-form-item>
 
         <a-form-item :label="t('素材组')">
@@ -914,6 +994,15 @@
               {{ g.name }}
             </a-select-option>
           </a-select>
+        </a-form-item>
+
+        <a-form-item :label="t('评分')">
+          <div class="edit-rating-row">
+            <a-rate v-model:value="editFormData.rating" :allow-half="true" />
+            <a-button v-if="editFormData.rating" type="link" size="small" @click="editFormData.rating = 0">
+              {{ t('清空') }}
+            </a-button>
+          </div>
         </a-form-item>
 
         <a-form-item :label="t('备注')">
@@ -959,6 +1048,18 @@
           <a-textarea v-model:value="auditRejectForm.reject_reason" :rows="4" :maxlength="500" />
         </a-form-item>
       </a-form>
+    </a-modal>
+
+    <a-modal
+      v-model:open="auditRejectReasonModalVisible"
+      :title="t('审核拒绝原因')"
+      width="560px"
+      :footer="null"
+      @cancel="closeAuditRejectReasonModal"
+    >
+      <div class="audit-reject-reason-view">
+        {{ auditRejectReasonText || t('暂无拒绝原因') }}
+      </div>
     </a-modal>
 
     <!-- 使用记录弹窗 -->
@@ -1102,6 +1203,7 @@
 <script lang="ts" setup>
 import { ref, computed, onMounted, h, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useRoute } from 'vue-router';
 import { useUserStore } from '@/store/user';
 import dayjs, { type Dayjs } from 'dayjs';
 import { message, Tree } from 'ant-design-vue';
@@ -1128,7 +1230,9 @@ import {
 import UploadMaterialModal from './components/upload-material-modal.vue';
 import CreateFolderModal from './components/create-folder-modal.vue';
 import CreateLibraryModal from './components/create-library-modal.vue';
+import MaterialPermissionModal from './components/material-permission-modal.vue';
 import MaterialPicker from '@/components/material-picker/index.vue';
+import { UserPicker } from '@/components/user-picker';
 import TagSelect from '@/components/tag-select/index.vue';
 import AdvancedSearchSelect, {
   type AdvancedSelectCategory,
@@ -1156,6 +1260,7 @@ import {
   updateMaterial,
   updateMaterialProductionCost,
   deleteMaterial as deleteMaterialById,
+  saveMaterialPermissions,
   batchMaterialActions,
   auditMaterial,
   exportMaterials,
@@ -1171,11 +1276,13 @@ import {
   getMaterialLibraryRejectReasonOptions,
   getMaterialLibraryMaterialGroups,
   getMaterialLibrarySystemTags,
+  createMaterialLibraryMaterialGroup,
 } from '@/api/material-library/options';
 import { getMetaTagsTree, createTagOption } from '@/api/promotion';
 
 const { t } = useI18n();
 const userStore = useUserStore();
+const VNodes = (_: any, { attrs }: any) => attrs.vnodes;
 
 type ColumnTemplate = {
   id: string;
@@ -1206,7 +1313,7 @@ const loadColumnTemplates = async () => {
         .filter(Boolean) as ColumnTemplate[];
     }
   } catch (e) {
-    console.warn('loadColumnTemplates localStorage failed:', e);
+    console.warn('读取本地列模板失败:', e);
     columnTemplates.value = [];
   }
 
@@ -1385,6 +1492,15 @@ const selectedFolderName = computed(() => {
   ];
   const folder = findFolderById(allFolders, selectedFolder.value);
   return String(folder?.name || '');
+});
+
+const currentSelectedFolderMeta = computed(() => {
+  if (!selectedFolder.value || selectedFolder.value === 'favorites') return null;
+  const allFolders = [
+    ...(myFolders.value || []),
+    ...(enterpriseFolders.value || []),
+  ];
+  return findFolderById(allFolders, selectedFolder.value);
 });
 
 // 文件夹数据（侧边栏树：favorites + 各素材库根节点）
@@ -1623,6 +1739,7 @@ const loadFilterTemplates = () => {
     const raw = localStorage.getItem(FILTER_TEMPLATE_STORAGE_KEY);
     if (!raw) return;
     const parsed = JSON.parse(raw);
+    const savedSelectedId = typeof parsed?.selectedId === 'string' ? parsed.selectedId : 'default';
     const templatesFromStorage = Array.isArray(parsed?.templates) ? parsed.templates : null;
     if (templatesFromStorage) {
       const normalize = (tpl: any): FilterTemplate | null => {
@@ -1654,8 +1771,12 @@ const loadFilterTemplates = () => {
     const customSet = new Set(customFields.map(String));
     const isSameAsDefault =
       defaultSet.size === customSet.size && Array.from(defaultSet).every((k) => customSet.has(k));
-
-    selectedFilterTemplateId.value = isSameAsDefault ? 'default' : 'custom';
+    const validTemplateIds = new Set(filterTemplates.value.map((x) => x.id));
+    if (savedSelectedId === 'custom' && !isSameAsDefault && validTemplateIds.has('custom')) {
+      selectedFilterTemplateId.value = 'custom';
+    } else {
+      selectedFilterTemplateId.value = 'default';
+    }
   } catch (e) {
     // 本地存储不可用时不影响正常使用
     console.warn('loadFilterTemplates failed:', e);
@@ -1703,7 +1824,6 @@ const handleSaveCustomFilterTemplate = async () => {
   const fields = [...new Set(editTemplateFields.value.map((x) => String(x)))].filter((k) =>
     allowedCustomFilterFields.includes(k),
   );
-
   if (fields.length === 0) {
     message.warning(t('至少选择一个筛选项'));
     return;
@@ -1748,10 +1868,18 @@ const statisticsDateRange = ref<[Dayjs, Dayjs]>([dayjs().subtract(6, 'days'), da
 const autoUpdateLoading = ref(false);
 
 // 筛选选项数据
+const organizationTreeData = ref<any[]>([]);
 const designers = ref<any[]>([]);
 const tags = ref<any[]>([]);
 const creators = ref<any[]>([]);
 const materialGroups = ref<any[]>([]);
+const filterMaterialGroupLoading = ref(false);
+const filterMaterialGroupOpen = ref(false);
+const filterMaterialGroupInteracting = ref(false);
+const filterMaterialGroupKeyword = ref('');
+const filterMaterialGroupCreateName = ref('');
+const filterMaterialGroupCreating = ref(false);
+let filterMaterialGroupSearchTimer: ReturnType<typeof setTimeout> | null = null;
 
 // TagSelect（meta-tags/tree）数据：用于素材库标签筛选 & 单元格标签编辑
 const metaTagFolders = ref<Array<{ id: number; name: string }>>([]);
@@ -1931,25 +2059,27 @@ const metaTagOptionSelectedIds = computed<number[]>({
   },
 });
 
-const designerCategories = computed<AdvancedSelectCategory[]>(() => [{ key: 'designer', label: t('未分类') }]);
-const designerItems = computed<AdvancedSelectItem[]>(() =>
-  (designers.value || []).map((x: any) => ({
-    categoryKey: 'designer',
-    value: (x?.id ?? '') as ValueLike,
-    label: String(x?.name ?? ''),
-  })),
-);
-const designerSelectedValues = makeMultiFilterModel('designer');
+const designerFilterUserIds = computed<ValueLike[]>({
+  get() {
+    const v = filters.value.designer;
+    if (Array.isArray(v)) return v;
+    return v !== undefined && v !== null && v !== '' ? [v] : [];
+  },
+  set(vals) {
+    filters.value.designer = Array.isArray(vals) && vals.length ? vals : undefined;
+  },
+});
 
-const creatorCategories = computed<AdvancedSelectCategory[]>(() => [{ key: 'creator', label: t('未分类') }]);
-const creatorItems = computed<AdvancedSelectItem[]>(() =>
-  (creators.value || []).map((x: any) => ({
-    categoryKey: 'creator',
-    value: (x?.id ?? '') as ValueLike,
-    label: String(x?.name ?? ''),
-  })),
-);
-const creatorSelectedValues = makeMultiFilterModel('creator');
+const creatorFilterUserIds = computed<ValueLike[]>({
+  get() {
+    const v = filters.value.creator;
+    if (Array.isArray(v)) return v;
+    return v !== undefined && v !== null && v !== '' ? [v] : [];
+  },
+  set(vals) {
+    filters.value.creator = Array.isArray(vals) && vals.length ? vals : undefined;
+  },
+});
 
 const materialTypeCategories = computed<AdvancedSelectCategory[]>(() => [{ key: 'materialType', label: t('未分类') }]);
 const materialTypeItems = computed<AdvancedSelectItem[]>(() => [
@@ -2430,15 +2560,47 @@ const visibleColumns = computed(() => {
 });
 
 // 列渲染：id -> name / 格式化
+const collectOrganizationUsers = (nodes: any[], deptId?: number | null) => {
+  const result: Array<{ id: string; name: string }> = [];
+  const seen = new Set<string>();
+  const walk = (items: any[], inTargetDept: boolean) => {
+    (items || []).forEach((node: any) => {
+      const currentInTargetDept = deptId == null ? true : inTargetDept || Number(node?.id) === Number(deptId);
+      if (Array.isArray(node?.users) && currentInTargetDept) {
+        node.users.forEach((user: any) => {
+          const id = String(user?.id ?? '').trim();
+          const name = String(user?.name ?? '').trim();
+          if (!id || !name || seen.has(id)) return;
+          seen.add(id);
+          result.push({ id, name });
+        });
+      }
+      if (Array.isArray(node?.children) && node.children.length) {
+        walk(node.children, currentInTargetDept);
+      }
+    });
+  };
+  walk(nodes || [], false);
+  return result;
+};
+
+const designerUserOptions = computed(() => collectOrganizationUsers(organizationTreeData.value, 2));
+const creatorUserOptions = computed(() => collectOrganizationUsers(organizationTreeData.value, null));
+
 const designerNameById = computed<Map<string, string>>(
-  () => new Map<string, string>((designers.value || []).map((d: any) => [String(d.id), String(d.name || '')])),
+  () => new Map<string, string>(designerUserOptions.value.map((d) => [String(d.id), String(d.name || '')])),
 );
 const creatorNameById = computed<Map<string, string>>(
-  () => new Map<string, string>((creators.value || []).map((c: any) => [String(c.id), String(c.name || '')])),
+  () => new Map<string, string>(creatorUserOptions.value.map((c) => [String(c.id), String(c.name || '')])),
 );
 const materialGroupNameById = computed<Map<string, string>>(
   () => new Map<string, string>((materialGroups.value || []).map((g: any) => [String(g.id), String(g.name || '')])),
 );
+const canCreateFilterMaterialGroup = computed(() => {
+  const name = String(filterMaterialGroupCreateName.value || '').trim();
+  if (!name) return false;
+  return !(materialGroups.value || []).some((g: any) => String(g?.name || '').trim() === name);
+});
 
 const allFolderRoots = computed(() => [
   ...(myFolders.value || []),
@@ -2452,11 +2614,23 @@ const getFolderName = (folderId: any) => {
 };
 
 const getDesignerName = (designerId: any) => {
+  if (Array.isArray(designerId)) {
+    const labels = designerId
+      .map((id: any) => designerNameById.value.get(String(id)) || '')
+      .filter(Boolean);
+    return labels.length ? labels.join('、') : '-';
+  }
   if (designerId === null || designerId === undefined || designerId === '') return '-';
   return designerNameById.value.get(String(designerId)) || '-';
 };
 
 const getCreatorName = (creatorId: any) => {
+  if (Array.isArray(creatorId)) {
+    const labels = creatorId
+      .map((id: any) => creatorNameById.value.get(String(id)) || '')
+      .filter(Boolean);
+    return labels.length ? labels.join('、') : '-';
+  }
   if (creatorId === null || creatorId === undefined || creatorId === '') return '-';
   return creatorNameById.value.get(String(creatorId)) || '-';
 };
@@ -2526,7 +2700,7 @@ const formatAuditStatus = (auditStatus: any, rejectReason: any) => {
   const v = auditStatus === null || auditStatus === undefined || auditStatus === '' ? null : Number(auditStatus);
   if (v === 0) return t('待审核');
   if (v === 1) return t('审核通过');
-  if (v === 2) return rejectReason ? `${t('审核拒绝')}(${rejectReason})` : t('审核拒绝');
+  if (v === 2) return rejectReason ? `${t('审核拒绝')}(1)` : t('审核拒绝');
   return '-';
 };
 
@@ -2644,6 +2818,11 @@ const createFolderSiblingNames = computed<string[]>(() => {
 const createLibraryModalVisible = ref(false);
 const createLibraryType = ref<'my' | 'enterprise'>('my');
 const materialPickerOpen = ref(false);
+const permissionModalVisible = ref(false);
+const permissionModalTargets = ref<any[]>([]);
+const permissionModalInitialValue = ref<any>(null);
+const permissionModalReadOnly = ref(false);
+const materialPermissionMap = ref<Record<string, any>>({});
 
 // 批量标签编辑
 const batchTagModalVisible = ref(false);
@@ -2664,7 +2843,7 @@ const cellEditMaterialId = ref<any>(null);
 const cellEditCostValue = ref('');
 const cellEditRemarkValue = ref('');
 const cellEditPersonKeyword = ref('');
-const cellEditPersonSelectedId = ref<string>('');
+const cellEditPersonSelectedIds = ref<string[]>([]);
 // 原 Tree 版标签编辑状态已弃用（保留结构会产生未使用告警）
 
 const cellEditModalTitle = computed(() => {
@@ -2682,9 +2861,10 @@ const editingMaterialId = ref<any>(null);
 const editFormData = ref({
   material_name: '',
   folder_id: undefined as any,
-  designer_id: undefined as any,
-  creator_id: undefined as any,
+  designer_ids: [] as string[],
+  creator_ids: [] as string[],
   material_group_id: undefined as any,
+  rating: 0,
   remarks: '',
   xmp_tag: undefined as any,
   mindworks_locked: false,
@@ -2703,6 +2883,8 @@ const auditRejectMaterialId = ref<any>(null);
 const auditRejectForm = ref({
   reject_reason: '',
 });
+const auditRejectReasonModalVisible = ref(false);
+const auditRejectReasonText = ref('');
 
 // 7.14 使用记录弹窗
 const usagesModalVisible = ref(false);
@@ -2738,6 +2920,68 @@ const batchColumns: any[] = [
     key: 'tags',
   },
 ];
+
+const canManageMaterialPermission = (record: any) => {
+  return !!record && record.type !== 'folder' && Boolean(record.canManagePermission);
+};
+
+const canManageSelectedPermission = computed(() => {
+  const materialRows = selectedRows.value.filter((record: any) => record?.type !== 'folder');
+  return materialRows.length > 0 && materialRows.every((record: any) => canManageMaterialPermission(record));
+});
+
+const normalizeMaterialPermission = (permission: any) => {
+  if (!permission || typeof permission !== 'object') return null;
+  return {
+    scope: String(permission.scope || 'enterprise'),
+    includeSubDepartments: permission.includeSubDepartments ?? permission.include_sub_departments ?? true,
+    userIds: Array.isArray(permission.userIds)
+      ? permission.userIds.map((id: any) => String(id))
+      : Array.isArray(permission.user_ids)
+        ? permission.user_ids.map((id: any) => String(id))
+        : [],
+    userNames: Array.isArray(permission.userNames)
+      ? permission.userNames.map((name: any) => String(name))
+      : Array.isArray(permission.user_names)
+        ? permission.user_names.map((name: any) => String(name))
+        : [],
+    departmentIds: Array.isArray(permission.departmentIds)
+      ? permission.departmentIds.map((id: any) => String(id))
+      : Array.isArray(permission.department_ids)
+        ? permission.department_ids.map((id: any) => String(id))
+        : [],
+    departmentNames: Array.isArray(permission.departmentNames)
+      ? permission.departmentNames.map((name: any) => String(name))
+      : Array.isArray(permission.department_names)
+        ? permission.department_names.map((name: any) => String(name))
+        : [],
+  };
+};
+
+const mergeMaterialPermissionMap = (rows: any[] = []) => {
+  const nextMap = { ...materialPermissionMap.value };
+  rows.forEach((record: any) => {
+    if (!record || record.type === 'folder' || record.id === undefined || record.id === null) return;
+    const normalized = normalizeMaterialPermission(record.permission);
+    if (normalized) {
+      nextMap[String(record.id)] = normalized;
+    } else {
+      delete nextMap[String(record.id)];
+    }
+  });
+  materialPermissionMap.value = nextMap;
+};
+
+const getMaterialPermissionSummary = (record: any) => {
+  const permission = normalizeMaterialPermission(record?.permission) || materialPermissionMap.value[String(record?.id)];
+  if (!permission) return '';
+  if (permission.scope === 'enterprise') return '企业内可见';
+  if (permission.scope === 'users') return `指定人员 ${permission.userIds?.length || 0} 人`;
+  if (permission.scope === 'departments') {
+    return `指定部门 ${permission.departmentIds?.length || 0} 个${permission.includeSubDepartments ? '，含子部门' : ''}`;
+  }
+  return `人员 ${permission.userIds?.length || 0} 人 + 部门 ${permission.departmentIds?.length || 0} 个`;
+};
 
 const handleFilterChange = () => {
   pagination.value.current = 1;
@@ -2897,6 +3141,15 @@ const getOrganizationNodes = (nodes: any[]): any[] => {
   });
 };
 
+const getEnterpriseOrganizationRoots = (nodes: any[]): any[] => {
+  const organizations = getOrganizationNodes(nodes);
+  if (organizations.length !== 1) return organizations;
+
+  const rootNode = organizations[0];
+  const childOrganizations = getOrganizationNodes(rootNode?.children || []);
+  return childOrganizations.length ? childOrganizations : organizations;
+};
+
 const loadFolderChildrenRows = async (folder: any) => {
   const res = await getMaterialLibraryFolderChildren(folder.id, {
     owner_id: folder.owner_id,
@@ -2906,7 +3159,8 @@ const loadFolderChildrenRows = async (folder: any) => {
 };
 
 const syncEnterpriseFoldersFromOrganizationTree = async (
-  parentFolder: any,
+  parentFolder: any | null,
+  existingRows: any[],
   orgNodes: any[],
   enterpriseOwnerId: string | number,
 ): Promise<boolean> => {
@@ -2914,7 +3168,7 @@ const syncEnterpriseFoldersFromOrganizationTree = async (
   if (!organizations.length) return false;
 
   let changed = false;
-  let existingChildren = await loadFolderChildrenRows(parentFolder);
+  let existingChildren = [...(existingRows || [])];
 
   for (const org of organizations) {
     const orgName = String(org?.name || '').trim();
@@ -2927,7 +3181,7 @@ const syncEnterpriseFoldersFromOrganizationTree = async (
     if (!matchedFolder) {
       try {
         await createMaterialLibraryFolder({
-          parent_id: parentFolder.id,
+          parent_id: parentFolder ? parentFolder.id : 0,
           folder_name: orgName,
           library_type: 1,
           owner_id: enterpriseOwnerId,
@@ -2935,23 +3189,34 @@ const syncEnterpriseFoldersFromOrganizationTree = async (
         changed = true;
       } catch (e: any) {
         if (!String(e?.response?.data?.message || '').includes('同级目录已存在同名文件夹')) {
-          console.warn(`ensure enterprise org folder failed: ${orgName}`, e);
+          console.warn(`创建企业部门素材库文件夹失败: ${orgName}`, e);
         }
       }
 
-      existingChildren = await loadFolderChildrenRows(parentFolder);
+      existingChildren = parentFolder
+        ? await loadFolderChildrenRows(parentFolder)
+        : await getMaterialLibraryFolders({
+            library_type: 1,
+            owner_id: enterpriseOwnerId,
+          }).then((r: any) => (r?.data || []).map((c: any) => normalizeFolderNode(c)));
       matchedFolder = existingChildren.find(
         (child: any) => normalizeFolderNameForCompare(child?.name || child?.folder_name) === normalizeFolderNameForCompare(orgName),
       );
     }
 
     if (matchedFolder) {
+      const childRows = await loadFolderChildrenRows({
+        ...matchedFolder,
+        owner_id: matchedFolder.owner_id ?? enterpriseOwnerId,
+        library_type: 1,
+      });
       const childChanged = await syncEnterpriseFoldersFromOrganizationTree(
         {
           ...matchedFolder,
           owner_id: matchedFolder.owner_id ?? enterpriseOwnerId,
           library_type: 1,
         },
+        childRows,
         org?.children || [],
         enterpriseOwnerId,
       );
@@ -2966,27 +3231,26 @@ const ensureEnterpriseOrganizationFolders = async (
   enterpriseRows: any[],
   enterpriseOwnerId: string | number | undefined,
 ) => {
-  if (enterpriseOwnerId === undefined || enterpriseOwnerId === null || enterpriseOwnerId === '') return false;
+  const resolvedEnterpriseOwnerId =
+    enterpriseOwnerId
+    ?? enterpriseRows?.[0]?.owner_id
+    ?? enterpriseRows?.[0]?.enterprise_id
+    ?? enterpriseRows?.[0]?.tenant_id;
 
-  const enterpriseRoot =
-    (enterpriseRows || []).find((row: any) => Number(row?.parent_id ?? -1) === 0 && isDefaultLibraryByName(row?.name || row?.folder_name))
-    || (enterpriseRows || []).find((row: any) => Number(row?.parent_id ?? -1) === 0)
-    || null;
-
-  if (!enterpriseRoot) return false;
+  if (resolvedEnterpriseOwnerId === undefined || resolvedEnterpriseOwnerId === null || resolvedEnterpriseOwnerId === '') {
+    return false;
+  }
 
   const orgRes = await getOrganizationTree();
   const orgTree = Array.isArray(orgRes?.data)
     ? orgRes.data
     : (Array.isArray(orgRes?.data?.data) ? orgRes.data.data : (orgRes || []));
+  const enterpriseTopLevelRows = (enterpriseRows || []).filter((row: any) => Number(row?.parent_id ?? -1) === 0);
   return syncEnterpriseFoldersFromOrganizationTree(
-    {
-      ...enterpriseRoot,
-      owner_id: enterpriseRoot.owner_id ?? enterpriseOwnerId,
-      library_type: 1,
-    },
-    orgTree,
-    enterpriseOwnerId,
+    null,
+    enterpriseTopLevelRows,
+    getEnterpriseOrganizationRoots(orgTree),
+    resolvedEnterpriseOwnerId,
   );
 };
 
@@ -3302,6 +3566,87 @@ const openBatchMoveModal = () => {
   batchMoveModalVisible.value = true;
 };
 
+const openMaterialPermissionModal = (record: any) => {
+  if (!canManageMaterialPermission(record)) {
+    message.warning(t('只有超级管理员和素材创建人可以设置可见范围'));
+    return;
+  }
+  permissionModalTargets.value = [record];
+  permissionModalInitialValue.value = normalizeMaterialPermission(record?.permission)
+    || materialPermissionMap.value[String(record?.id)]
+    || null;
+  permissionModalReadOnly.value = false;
+  permissionModalVisible.value = true;
+};
+
+const openBatchPermissionModal = () => {
+  const materialRows = selectedRows.value.filter((record: any) => record?.type !== 'folder');
+  if (!materialRows.length) {
+    message.warning(t('请先选择至少一条素材'));
+    return;
+  }
+  if (!materialRows.every((record: any) => canManageMaterialPermission(record))) {
+    message.warning(t('只有超级管理员和素材创建人可以设置可见范围'));
+    return;
+  }
+  permissionModalTargets.value = materialRows;
+  permissionModalInitialValue.value = null;
+  permissionModalReadOnly.value = false;
+  permissionModalVisible.value = true;
+};
+
+const handlePermissionModalSuccess = async (payload: any) => {
+  const materialIds = permissionModalTargets.value
+    .map((record: any) => Number(record?.id))
+    .filter((id: number) => Number.isFinite(id) && id > 0);
+  if (!materialIds.length) return;
+
+  const normalizedPayload = normalizeMaterialPermission(payload);
+  if (!normalizedPayload) return;
+
+  try {
+    const res = await saveMaterialPermissions({
+      material_ids: materialIds,
+      scope: normalizedPayload.scope,
+      user_ids: normalizedPayload.userIds,
+      department_ids: normalizedPayload.departmentIds,
+      include_sub_departments: normalizedPayload.includeSubDepartments,
+    });
+
+    const returnedMap = res?.data && !Array.isArray(res.data) ? res.data : {};
+    const nextMap = { ...materialPermissionMap.value };
+
+    permissionModalTargets.value.forEach((record: any) => {
+      const savedPermission = normalizeMaterialPermission(returnedMap?.[String(record.id)]) || normalizedPayload;
+      nextMap[String(record.id)] = savedPermission;
+
+      const rowIndex = tableData.value.findIndex((item: any) => String(item?.id) === String(record.id));
+      if (rowIndex >= 0) {
+        tableData.value[rowIndex] = {
+          ...tableData.value[rowIndex],
+          permission: savedPermission,
+        };
+      }
+    });
+
+    materialPermissionMap.value = nextMap;
+    message.success(permissionModalTargets.value.length > 1 ? t('已批量更新素材可见范围') : t('已更新素材可见范围'));
+    permissionModalTargets.value = [];
+    permissionModalInitialValue.value = null;
+    permissionModalReadOnly.value = false;
+  } catch (error) {
+    console.error('保存素材可见范围失败:', error);
+    message.error((error as any)?.message || t('保存素材可见范围失败'));
+  }
+};
+
+watch(permissionModalVisible, (open) => {
+  if (open) return;
+  permissionModalTargets.value = [];
+  permissionModalInitialValue.value = null;
+  permissionModalReadOnly.value = false;
+});
+
 const closeBatchMoveModal = () => {
   batchMoveModalVisible.value = false;
   batchMoveTargetFolderId.value = null;
@@ -3515,14 +3860,14 @@ const loadTableData = async () => {
 
     const pageNo = pagination.value.current;
     const pageSize = pagination.value.pageSize;
-    const shouldSendSort = showFilterField('sortField') || showFilterField('sortOrder');
-    const params: Record<string, any> = {
-      pageNo,
-      pageSize,
-      designer_id: showFilterField('designer') ? filters.value.designer : undefined,
-      creator_id: showFilterField('creator') ? filters.value.creator : undefined,
-      // TagSelect 输出的是“标签选项ID”（你的后端用 tag_ids 来筛选该 ID 列表）
-      tag_ids: showFilterField('tags') ? filters.value.tags : undefined,
+      const shouldSendSort = showFilterField('sortField') || showFilterField('sortOrder');
+      const params: Record<string, any> = {
+        pageNo,
+        pageSize,
+        designer_id: showFilterField('designer') ? filters.value.designer : undefined,
+        creator_id: showFilterField('creator') ? filters.value.creator : undefined,
+        // TagSelect 输出的是“标签选项ID”（你的后端用 tag_ids 来筛选该 ID 列表）
+        tag_ids: showFilterField('tags') ? filters.value.tags : undefined,
       global_search: globalSearchText.value,
       include_subfolders: showSubfolders.value ? 1 : 0,
       with_statistics: needStatistics ? 1 : 0,
@@ -3573,6 +3918,7 @@ const loadTableData = async () => {
         : await getMaterialLibraryMaterials({
           ...params,
           folder_id: selectedFolder.value,
+          ...(selectedFolderMeta?.library_type !== undefined ? { library_type: selectedFolderMeta.library_type } : {}),
           ...(selectedFolderMeta?.owner_id ? { owner_id: selectedFolderMeta.owner_id } : {}),
         });
 
@@ -3580,6 +3926,7 @@ const loadTableData = async () => {
     if (currentLoadSeq !== latestTableLoadSeq.value) return;
 
     tableData.value = result.data || [];
+    mergeMaterialPermissionMap(tableData.value);
     pagination.value.total = result.totalCount || 0;
   } catch (error) {
     if (currentLoadSeq !== latestTableLoadSeq.value) return;
@@ -3605,15 +3952,18 @@ const reloadTable = () => {
 const isCellEditableRecord = (record: any) => !!record && record.type !== 'folder';
 
 const cellEditPersonSourceList = computed(() =>
-  cellEditType.value === 'creatorId' ? (creators.value || []) : (designers.value || []),
+  cellEditType.value === 'creatorId' ? creatorUserOptions.value : designerUserOptions.value,
 );
 
-const cellEditPersonSelectedName = computed(() => {
-  if (!cellEditPersonSelectedId.value) return '';
-  const found = (cellEditPersonSourceList.value || []).find(
-    (item: any) => String(item?.id) === String(cellEditPersonSelectedId.value),
-  );
-  return found?.name || cellEditPersonSelectedId.value;
+const cellEditPersonSelectedNames = computed(() => {
+  return cellEditPersonSelectedIds.value
+    .map((id: string) => {
+      const found = (cellEditPersonSourceList.value || []).find(
+        (item: any) => String(item?.id) === String(id),
+      );
+      return found?.name || id;
+    })
+    .filter(Boolean);
 });
 
 const cellEditPersonTreeData = computed(() => {
@@ -3645,13 +3995,17 @@ const openCellEditor = (type: CellEditType, record: any) => {
       : String(record.productionCost);
   cellEditRemarkValue.value = String(record.remarks || '');
   cellEditPersonKeyword.value = '';
-  cellEditPersonSelectedId.value = '';
+  cellEditPersonSelectedIds.value = [];
   cellEditMetaTagOptionIds.value = [];
 
   if (type === 'designerId') {
-    cellEditPersonSelectedId.value = record.designerId ? String(record.designerId) : '';
+    cellEditPersonSelectedIds.value = Array.isArray(record.designerIds)
+      ? record.designerIds.map((id: any) => String(id))
+      : (record.designerId ? [String(record.designerId)] : []);
   } else if (type === 'creatorId') {
-    cellEditPersonSelectedId.value = record.creatorId ? String(record.creatorId) : '';
+    cellEditPersonSelectedIds.value = Array.isArray(record.creatorIds)
+      ? record.creatorIds.map((id: any) => String(id))
+      : (record.creatorId ? [String(record.creatorId)] : []);
   } else if (type === 'tags') {
     // 统一兼容：tag_ids / tagIds / tag_option_ids / tags(数字数组)
     cellEditMetaTagOptionIds.value = getRecordTagOptionIds(record);
@@ -3666,14 +4020,15 @@ const closeCellEditModal = () => {
   cellEditMaterialId.value = null;
 };
 
-const handleCellEditPersonSelect = (selectedKeys: any[]) => {
-  const selected = Array.isArray(selectedKeys) ? String(selectedKeys[0] || '') : '';
-  if (!selected || selected === 'person-root') return;
-  cellEditPersonSelectedId.value = selected;
+const handleCellEditPersonCheck = (checkedKeys: any) => {
+  const rawKeys = Array.isArray(checkedKeys) ? checkedKeys : (checkedKeys?.checked || []);
+  cellEditPersonSelectedIds.value = (rawKeys || [])
+    .map((key: any) => String(key))
+    .filter((key: string) => key !== '' && key !== 'person-root');
 };
 
 const clearCellEditPersonSelection = () => {
-  cellEditPersonSelectedId.value = '';
+  cellEditPersonSelectedIds.value = [];
 };
 
 const cellEditMetaTagOptionIds = ref<number[]>([]);
@@ -3702,9 +4057,15 @@ const handleCellEditConfirm = async () => {
       }
       await updateMaterialProductionCost(materialId, { production_cost: parsed });
     } else if (cellEditType.value === 'designerId') {
-      await updateMaterial(materialId, { designer_id: cellEditPersonSelectedId.value || null });
+      await updateMaterial(materialId, {
+        designer_ids: cellEditPersonSelectedIds.value,
+        designer_id: cellEditPersonSelectedIds.value[0] || null,
+      });
     } else if (cellEditType.value === 'creatorId') {
-      await updateMaterial(materialId, { creator_id: cellEditPersonSelectedId.value || null });
+      await updateMaterial(materialId, {
+        creator_ids: cellEditPersonSelectedIds.value,
+        creator_id: cellEditPersonSelectedIds.value[0] || null,
+      });
     } else if (cellEditType.value === 'remarks') {
       await updateMaterial(materialId, { remarks: cellEditRemarkValue.value.trim() || null });
     } else if (cellEditType.value === 'tags') {
@@ -3747,14 +4108,20 @@ const handleCellEditConfirm = async () => {
 };
 
 // 编辑素材
-const editMaterial = (record: any) => {
+const editMaterial = async (record: any) => {
+  await loadMaterialGroupOptionsOnly('');
   editingMaterialId.value = record.id;
   editFormData.value = {
     material_name: record.name ?? '',
     folder_id: record.folderId != null ? String(record.folderId) : null,
-    designer_id: record.designerId != null ? String(record.designerId) : null,
-    creator_id: record.creatorId != null ? String(record.creatorId) : null,
+    designer_ids: Array.isArray(record.designerIds)
+      ? record.designerIds.map((id: any) => String(id))
+      : (record.designerId != null ? [String(record.designerId)] : []),
+    creator_ids: Array.isArray(record.creatorIds)
+      ? record.creatorIds.map((id: any) => String(id))
+      : (record.creatorId != null ? [String(record.creatorId)] : []),
     material_group_id: record.materialGroupId != null ? String(record.materialGroupId) : null,
+    rating: Number(record.rating || 0),
     remarks: record.remarks ?? '',
     xmp_tag: record.xmpTag ?? null,
     mindworks_locked: !!record.mindworksLocked,
@@ -3781,15 +4148,19 @@ const handleEditMaterialSave = async () => {
     await updateMaterial(editingMaterialId.value, {
       material_name: editFormData.value.material_name,
       folder_id: editFormData.value.folder_id,
-      designer_id: editFormData.value.designer_id,
-      creator_id: editFormData.value.creator_id,
+      designer_ids: editFormData.value.designer_ids,
+      designer_id: editFormData.value.designer_ids[0] || null,
+      creator_ids: editFormData.value.creator_ids,
+      creator_id: editFormData.value.creator_ids[0] || null,
       material_group_id: editFormData.value.material_group_id,
+      rating: editFormData.value.rating || null,
       remarks: editFormData.value.remarks,
       xmp_tag: editFormData.value.xmp_tag,
       mindworks_locked: editFormData.value.mindworks_locked,
     });
     closeEditMaterialModal();
     await loadTableData();
+    message.success(t('保存成功'));
   } catch (e) {
     console.error('编辑素材失败:', e);
   } finally {
@@ -3828,6 +4199,16 @@ const closeAuditRejectModal = () => {
   auditRejectModalVisible.value = false;
   auditRejectSaving.value = false;
   auditRejectMaterialId.value = null;
+};
+
+const openAuditRejectReasonModal = (record: any) => {
+  auditRejectReasonText.value = String(record?.rejectReason || '').trim();
+  auditRejectReasonModalVisible.value = true;
+};
+
+const closeAuditRejectReasonModal = () => {
+  auditRejectReasonModalVisible.value = false;
+  auditRejectReasonText.value = '';
 };
 
 const handleAuditReject = async () => {
@@ -3970,7 +4351,7 @@ const handleStartMediaSync = async () => {
 
     const res = await syncMediaMaterials(payload);
     const syncId = res.data?.sync_id;
-    if (!syncId) throw new Error('sync_id missing');
+    if (!syncId) throw new Error('同步任务编号缺失');
 
     mediaSyncResult.value = { sync_id: syncId };
 
@@ -3999,7 +4380,8 @@ const handleStartMediaSync = async () => {
 };
 
 // 上传成功
-const handleUploadSuccess = () => {
+const handleUploadSuccess = async () => {
+  await loadMaterialGroupOptionsOnly('');
   loadFolders().then(() => {
     loadTableData();
   });
@@ -4025,7 +4407,11 @@ const loadFolders = async () => {
   try {
     const userInfo: any = userStore.info || {};
     const userId = userInfo?.id;
-    const enterpriseId = userInfo?.enterprise_id ?? userInfo?.enterpriseId;
+    const enterpriseId =
+      userInfo?.enterprise_id
+      ?? userInfo?.enterpriseId
+      ?? userInfo?.tenant_id
+      ?? userInfo?.tenantId;
 
     const normalizeRoots = (rows: any[]) => (rows || []).map((f: any) => normalizeFolderNode(f));
 
@@ -4062,7 +4448,7 @@ const loadFolders = async () => {
         needReloadMy = true;
       } catch (e: any) {
         if (!String(e?.response?.data?.message || '').includes('同级目录已存在同名文件夹')) {
-          console.warn('ensure my default library failed:', e);
+          console.warn('创建我的默认素材库失败:', e);
         }
       }
     }
@@ -4077,7 +4463,7 @@ const loadFolders = async () => {
         needReloadEnterprise = true;
       } catch (e: any) {
         if (!String(e?.response?.data?.message || '').includes('同级目录已存在同名文件夹')) {
-          console.warn('ensure enterprise default library failed:', e);
+          console.warn('创建企业默认素材库失败:', e);
         }
       }
     }
@@ -4086,10 +4472,16 @@ const loadFolders = async () => {
       ? await getMaterialLibraryFolders(enterpriseParams).then((r: any) => r?.data || [])
       : (enterpriseRes.data || []);
 
-    if ((enterpriseRowsBeforeSync || []).length && enterpriseParams.owner_id !== undefined) {
+    const enterpriseSyncOwnerId =
+      enterpriseParams.owner_id
+      ?? enterpriseRowsBeforeSync?.[0]?.owner_id
+      ?? enterpriseRowsBeforeSync?.[0]?.enterprise_id
+      ?? enterpriseRowsBeforeSync?.[0]?.tenant_id;
+
+    if ((enterpriseRowsBeforeSync || []).length) {
       needReloadEnterpriseAfterOrgSync = await ensureEnterpriseOrganizationFolders(
         enterpriseRowsBeforeSync,
-        enterpriseParams.owner_id,
+        enterpriseSyncOwnerId,
       );
     }
 
@@ -4122,37 +4514,167 @@ const loadFolders = async () => {
 };
 
 // 加载筛选选项
-const loadFilterOptions = async () => {
+const loadOrganizationTreeData = async () => {
   try {
-    const [dRes, tRes, cRes, gRes, rrRes] = await Promise.all([
+    const orgRes = await getOrganizationTree();
+    organizationTreeData.value = Array.isArray(orgRes?.data)
+      ? orgRes.data
+      : (Array.isArray(orgRes?.data?.data) ? orgRes.data.data : (Array.isArray(orgRes) ? orgRes : []));
+  } catch (error) {
+    console.error('加载组织架构失败:', error);
+    organizationTreeData.value = [];
+  }
+};
+
+const loadFilterOptions = async (groupKeyword = '') => {
+  try {
+    const [dRes, tRes, cRes, gRes] = await Promise.all([
       getMaterialLibraryDesigners(),
       getMaterialLibraryTags(),
       getMaterialLibraryCreators(),
-      getMaterialLibraryMaterialGroups(),
-      getMaterialLibraryRejectReasonOptions(),
+      getMaterialLibraryMaterialGroups(groupKeyword ? { search: groupKeyword } : undefined),
     ]);
     designers.value = dRes.data || [];
     tags.value = tRes.data || [];
     creators.value = cRes.data || [];
     materialGroups.value = gRes.data || [];
-    const rrRows = Array.isArray(rrRes?.data?.data) ? rrRes.data.data : (Array.isArray(rrRes?.data) ? rrRes.data : []);
-    rejectReasonOptionList.value = rrRows
-      .map((x: any) => ({ value: Number(x?.value), label: String(x?.label ?? '') }))
-      .filter((x: any) => Number.isFinite(x.value) && x.label);
   } catch (error) {
     console.error('加载筛选选项失败:', error);
   }
 };
 
+const loadMaterialGroupOptionsOnly = async (keyword = '') => {
+  filterMaterialGroupLoading.value = true;
+  try {
+    const res = await getMaterialLibraryMaterialGroups(keyword ? { search: keyword } : undefined);
+    materialGroups.value = res.data || [];
+  } catch (error) {
+    console.error('加载素材组失败:', error);
+  } finally {
+    filterMaterialGroupLoading.value = false;
+  }
+};
+
+const handleFilterMaterialGroupSearch = (value: string) => {
+  filterMaterialGroupKeyword.value = value;
+  filterMaterialGroupCreateName.value = value;
+  if (filterMaterialGroupSearchTimer) clearTimeout(filterMaterialGroupSearchTimer);
+  filterMaterialGroupSearchTimer = setTimeout(() => {
+    loadMaterialGroupOptionsOnly(value);
+  }, 300);
+};
+
+const handleFilterMaterialGroupClick = () => {
+  filterMaterialGroupOpen.value = true;
+  loadMaterialGroupOptionsOnly(filterMaterialGroupKeyword.value);
+};
+
+const handleFilterMaterialGroupDropdownVisibleChange = (open: boolean) => {
+  if (open) {
+    filterMaterialGroupOpen.value = true;
+    loadMaterialGroupOptionsOnly(filterMaterialGroupKeyword.value);
+    return;
+  }
+
+  if (filterMaterialGroupInteracting.value) {
+    filterMaterialGroupOpen.value = true;
+    setTimeout(() => {
+      filterMaterialGroupInteracting.value = false;
+    }, 0);
+    return;
+  }
+
+  filterMaterialGroupOpen.value = false;
+  filterMaterialGroupKeyword.value = '';
+  filterMaterialGroupCreateName.value = '';
+  loadMaterialGroupOptionsOnly('');
+};
+
+const handleFilterMaterialGroupClearSearch = () => {
+  filterMaterialGroupInteracting.value = true;
+  filterMaterialGroupKeyword.value = '';
+  filterMaterialGroupCreateName.value = '';
+  filterMaterialGroupOpen.value = true;
+  loadMaterialGroupOptionsOnly('');
+};
+
+const handleCreateFilterMaterialGroup = async () => {
+  const name = String(filterMaterialGroupCreateName.value || '').trim();
+  if (!name || !canCreateFilterMaterialGroup.value) return;
+
+  filterMaterialGroupInteracting.value = true;
+  filterMaterialGroupCreating.value = true;
+  try {
+    const res = await createMaterialLibraryMaterialGroup({ name });
+    const id = String(res?.data?.id ?? res?.data?.groupId ?? '');
+    if (!id) throw new Error('缺少素材组编号');
+
+    await loadMaterialGroupOptionsOnly('');
+    filters.value.materialGroupId = id;
+    filterMaterialGroupKeyword.value = '';
+    filterMaterialGroupCreateName.value = '';
+    filterMaterialGroupOpen.value = false;
+    handleFilterChange();
+    message.success('素材组创建成功');
+  } catch (error) {
+    console.error('创建素材组失败:', error);
+    message.error('素材组创建失败');
+  } finally {
+    filterMaterialGroupCreating.value = false;
+  }
+};
+
+const loadRejectReasonOptions = async () => {
+  try {
+    const folderMeta = currentSelectedFolderMeta.value;
+    const rrRes = await getMaterialLibraryRejectReasonOptions({
+      folder_id: selectedFolder.value ?? undefined,
+      owner_id: folderMeta?.owner_id ?? undefined,
+      library_type: folderMeta?.library_type ?? undefined,
+      include_subfolders: showSubfolders.value ? 1 : 0,
+    });
+    const rrRows = Array.isArray(rrRes?.data?.data) ? rrRes.data.data : (Array.isArray(rrRes?.data) ? rrRes.data : []);
+    rejectReasonOptionList.value = rrRows
+      .map((x: any) => ({ value: Number(x?.value), label: String(x?.label ?? '') }))
+      .filter((x: any) => Number.isFinite(x.value) && x.label);
+
+    const validIds = new Set(rejectReasonOptionList.value.map((item) => Number(item.value)));
+    const currentIds = Array.isArray(filters.value.rejectReason) ? filters.value.rejectReason.map((x: any) => Number(x)) : [];
+    const nextIds = currentIds.filter((id: number) => validIds.has(id));
+    if (nextIds.length !== currentIds.length) {
+      filters.value.rejectReason = nextIds.length ? nextIds : undefined;
+    }
+  } catch (error) {
+    console.error('加载拒审筛选项失败:', error);
+    rejectReasonOptionList.value = [];
+  }
+};
+
 onMounted(() => {
+  const route = useRoute();
+  const queryFolderId = route.query.folderId;
+  if (queryFolderId) {
+    selectedFolder.value = queryFolderId;
+  }
   void loadColumnTemplates();
   void loadSystemTags();
+  void loadOrganizationTreeData();
   loadFolders().then(() => {
+    // 如果有 query 传来的 folderId，文件夹树加载后重新设置
+    if (queryFolderId) {
+      selectedFolder.value = queryFolderId;
+      loadTableData();
+    }
     loadFilterTemplates();
     loadTableData();
     loadFilterOptions();
+    loadRejectReasonOptions();
     void loadMetaTagsTree();
   });
+});
+
+watch([selectedFolder, showSubfolders], () => {
+  void loadRejectReasonOptions();
 });
 
 // 监听全局搜索文本变化，触发搜索
@@ -4876,12 +5398,43 @@ watch(globalSearchText, (newVal, oldVal) => {
   margin-inline-end: 8px;
 }
 
+.edit-rating-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .page-section {
   border: 1px solid #e9e9e9;
   border-radius: 6px;
   padding: 12px 12px;
   margin-bottom: 10px;
   background: #fff;
+}
+
+.filter-group-create {
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filter-group-create-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: rgba(0, 0, 0, 0.65);
+  font-size: 12px;
+}
+
+.filter-group-create-clear {
+  padding: 0;
+  height: 20px;
+  line-height: 20px;
+}
+
+.filter-group-create-btn {
+  width: 100%;
 }
 
 .section-list :deep(.ant-table-content) {
@@ -5055,6 +5608,26 @@ watch(globalSearchText, (newVal, oldVal) => {
       gap: 4px;
     }
   }
+
+  .material-permission-summary {
+    margin-top: 4px;
+    font-size: 12px;
+    color: #1677ff;
+    line-height: 1.4;
+  }
+
+  .material-permission-summary--link {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .material-permission-summary--link:hover {
+    color: #4096ff;
+    text-decoration: underline;
+  }
 }
 
 .material-thumb-cell {
@@ -5198,6 +5771,23 @@ watch(globalSearchText, (newVal, oldVal) => {
   margin-top: 4px;
   font-size: 11px;
   color: #a0a0a0;
+}
+
+.grid-permission {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #1677ff;
+  line-height: 1.4;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.grid-permission:hover {
+  color: #4096ff;
+  text-decoration: underline;
 }
 
 .grid-card-footer {
@@ -5499,6 +6089,23 @@ watch(globalSearchText, (newVal, oldVal) => {
   text-align: right;
   color: #999;
   margin-top: 8px;
+}
+
+.audit-status-link {
+  color: #1677ff;
+  cursor: pointer;
+}
+
+.audit-status-link:hover {
+  color: #4096ff;
+}
+
+.audit-reject-reason-view {
+  min-height: 120px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.8;
+  color: #333;
 }
 
 @media (max-width: 1100px) {

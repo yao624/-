@@ -1,0 +1,181 @@
+<template>
+  <div class="material-list">
+    <div class="material-list-header">
+      <!-- <a-checkbox
+        :checked="isAllSelected"
+        :indeterminate="isIndeterminate"
+        @change="handleSelectAll"
+      >
+        全选
+      </a-checkbox> -->
+      <!-- <span class="material-count">({{ materials.length }})</span> -->
+    </div>
+    <div class="material-list-body">
+      <div
+        v-for="item in materials"
+        :key="item.id"
+        class="material-item"
+        :class="{ active: activeId === item.id }"
+        @click="handleSelect(item)"
+      >
+        <!-- <a-checkbox
+          :checked="checkedIds.includes(item.id)"
+          @click.stop
+          @change="(e: any) => handleCheck(item.id, e.target.checked)"
+        /> -->
+        <img
+          v-if="item.previewUrl"
+          :src="item.previewUrl"
+          class="material-thumb"
+          alt=""
+        />
+        <div v-else class="material-thumb material-thumb-empty">
+          {{ item.type === 'video' ? 'V' : 'I' }}
+        </div>
+        <div class="material-info">
+          <span class="material-name" :title="item.name">{{ item.name }}</span>
+          <span class="material-type">
+            <FileImageOutlined v-if="item.type === 'image'" />
+            <VideoCameraOutlined v-else />
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed } from 'vue';
+import { FileImageOutlined, VideoCameraOutlined } from '@ant-design/icons-vue';
+import type { MaterialItem } from '../../types';
+
+const props = defineProps<{
+  materials: MaterialItem[];
+  activeId: string | null;
+  checkedIds: string[];
+}>();
+
+const emit = defineEmits<{
+  'update:activeId': [id: string | null];
+  'update:checkedIds': [ids: string[]];
+}>();
+
+const isAllSelected = computed(() => {
+  return props.materials.length > 0 && props.checkedIds.length === props.materials.length;
+});
+
+const isIndeterminate = computed(() => {
+  return props.checkedIds.length > 0 && props.checkedIds.length < props.materials.length;
+});
+
+function handleSelect(item: MaterialItem) {
+  emit('update:activeId', item.id);
+}
+
+function handleSelectAll(e: any) {
+  if (e.target.checked) {
+    emit('update:checkedIds', props.materials.map((m) => m.id));
+  } else {
+    emit('update:checkedIds', []);
+  }
+}
+
+function handleCheck(id: string, checked: boolean) {
+  const ids = checked
+    ? [...props.checkedIds, id]
+    : props.checkedIds.filter((i) => i !== id);
+  emit('update:checkedIds', ids);
+}
+</script>
+
+<style scoped lang="less">
+.material-list {
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #f0f0f0;
+  background: #fafafa;
+  flex-shrink: 0;
+}
+
+.material-list-header {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fff;
+  font-size: 13px;
+
+  .material-count {
+    margin-left: 4px;
+    color: #999;
+    font-size: 12px;
+  }
+}
+
+.material-list-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.material-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+  gap: 8px;
+
+  &:hover {
+    background: #e6f7ff;
+  }
+
+  &.active {
+    background: #bae7ff;
+    border-right: 3px solid #1890ff;
+  }
+}
+
+.material-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  object-fit: cover;
+  border: 1px solid #e8e8e8;
+  flex-shrink: 0;
+}
+
+.material-thumb-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5f5f5;
+  color: #999;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.material-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.material-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: #333;
+}
+
+.material-type {
+  flex-shrink: 0;
+  color: #999;
+  font-size: 14px;
+}
+</style>
